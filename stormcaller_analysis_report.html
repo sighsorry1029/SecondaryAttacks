@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>StormcallerShocker 분석 보고서</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4efe6;
+      --paper: #fffdf8;
+      --ink: #1f1a17;
+      --muted: #6c5f57;
+      --accent: #9a3412;
+      --line: #e7d9ca;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background:
+        radial-gradient(circle at top left, #f8dcc0 0, transparent 28%),
+        linear-gradient(180deg, var(--bg) 0%, #efe7dc 100%);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 32px auto;
+      padding: 40px 48px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 50px rgba(31, 26, 23, 0.09);
+    }
+
+    h1, h2 {
+      margin: 0 0 12px;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 30px;
+      color: var(--accent);
+    }
+
+    h2 {
+      margin-top: 28px;
+      font-size: 19px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    ul {
+      margin: 10px 0 0 20px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+      background: #f3ede6;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 22px;
+    }
+
+    .callout {
+      margin-top: 18px;
+      padding: 14px 16px;
+      background: #fff4e8;
+      border-left: 4px solid var(--accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #fbf5ed;
+    }
+
+    @page {
+      size: A4;
+      margin: 16mm;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>StaffStormcallerShockerDO 분석 보고서</h1>
+    <div class="meta">생성일: 2026-03-16</div>
+
+    <h2>결론</h2>
+    <p><code>StaffStormcallerShockerDO</code>는 다른 종류의 projectile이라서 secondary attack이 실패하는 것으로 보이지 않는다. 현재 로그 기준으로는 secondary 커스텀 발사 경로에 정상 진입하고 있고, payload 구조도 <code>StaffDeathcallerPoisonDO</code>와 거의 같다.</p>
+
+    <h2>확인된 사실</h2>
+    <ul>
+      <li><code>StaffStormcallerShockerDO</code>도 <code>[RuntimeDump] ... launch ...</code> 로그가 찍혔다. 즉 커스텀 secondary 발사 경로에는 실제로 들어오고 있다.</li>
+      <li>두 무기 모두 <code>type=Projectile</code>, <code>payloadType=Projectile</code>이다.</li>
+      <li>두 payload의 루트 컴포넌트는 동일하다: <code>Transform, Projectile, ZNetView, ZSyncTransform</code>.</li>
+      <li>차이는 주로 수치와 시각 구성에 있다.</li>
+    </ul>
+
+    <h2>주요 차이</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>DeathcallerPoison</th>
+          <th>StormcallerShocker</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>accuracy</td>
+          <td>5</td>
+          <td>2</td>
+        </tr>
+        <tr>
+          <td>drag</td>
+          <td>0.3</td>
+          <td>0.25</td>
+        </tr>
+        <tr>
+          <td>ttl</td>
+          <td>4</td>
+          <td>2</td>
+        </tr>
+        <tr>
+          <td>rayRadius</td>
+          <td>0.1</td>
+          <td>0.5</td>
+        </tr>
+        <tr>
+          <td>stayTTL</td>
+          <td>2</td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td>payload hierarchy</td>
+          <td><code>flames_world</code> 파티클 자식 오브젝트 존재</td>
+          <td>루트 projectile만 존재</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>해석</h2>
+    <ul>
+      <li><code>StormcallerShocker</code>는 자식 파티클도 없고 <code>m_visual</code>도 없다. 따라서 실제로 발사되고 있어도 눈으로 거의 안 보일 수 있다.</li>
+      <li><code>ttl=2</code>는 짧지만, 메테오형 <code>aimed_aoe</code>처럼 상공 12m 정도에서 떨어뜨리는 경우에는 보통 치명적인 수준은 아니다.</li>
+      <li><code>accuracy</code> 차이는 현재 모드의 custom projectile preset에서는 영향이 크지 않다. 방향을 모드가 직접 계산해서 쏘기 때문이다.</li>
+      <li><code>rayRadius=0.5</code>, <code>aoe=4</code>를 보면 적중 판정 자체는 약한 편이 아니다.</li>
+    </ul>
+
+    <div class="callout">
+      현재 판단으로는 “StormcallerShocker가 projectile 타입이 달라서 호환되지 않는다”보다 “시각 효과가 거의 없고, 일부 preset에서 체공 시간이 짧아 체감이 약하다” 쪽이 더 유력하다.
+    </div>
+
+    <h2>관련 코드 변경</h2>
+    <ul>
+      <li><code>sun_sentinel</code>은 이제 적대적인 <code>MonsterAI</code>만 추적한다.</li>
+      <li><code>aimed_aoe</code>는 AOE 전용이 아니라 projectile 메테오형 preset으로 바뀌어 있다.</li>
+      <li>런타임 덤프는 무기 기본 공격 정보, projectile payload 정보, launch 정보, payload hierarchy까지 출력하도록 확장되어 있다.</li>
+    </ul>
+
+    <h2>다음 권장 작업</h2>
+    <ul>
+      <li><code>StormcallerShocker</code>용 secondary에서 spawned projectile에 임시 trail 또는 디버그 시각 효과를 붙여 실제 경로를 확인한다.</li>
+      <li><code>rain_volley</code>처럼 체공 시간이 필요한 preset을 쓸 경우, 필요하면 projectile TTL override를 추가한다.</li>
+    </ul>
+  </main>
+</body>
+</html>

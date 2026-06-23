@@ -1,0 +1,127 @@
+IL_0000: ldarg.0
+IL_0001: ldstr ""
+IL_0006: stfld System.String Attack::m_attackAnimation
+IL_000b: ldarg.0
+IL_000c: ldstr ""
+IL_0011: stfld System.String Attack::m_chargeAnimationBool
+IL_0016: ldarg.0
+IL_0017: ldc.i4.1
+IL_0018: stfld System.Boolean Attack::m_hitTerrain
+IL_001d: ldarg.0
+IL_001e: ldc.r4 20
+IL_0023: stfld System.Single Attack::m_attackStamina
+IL_0028: ldarg.0
+IL_0029: ldc.r4 1
+IL_002e: stfld System.Single Attack::m_attackAdrenaline
+IL_0033: ldarg.0
+IL_0034: ldc.i4.1
+IL_0035: stfld System.Boolean Attack::m_attackHealthLowBlockUse
+IL_003a: ldarg.0
+IL_003b: ldc.r4 0.2
+IL_0040: stfld System.Single Attack::m_speedFactor
+IL_0045: ldarg.0
+IL_0046: ldc.r4 0.2
+IL_004b: stfld System.Single Attack::m_speedFactorRotation
+IL_0050: ldarg.0
+IL_0051: ldc.r4 10
+IL_0056: stfld System.Single Attack::m_attackStartNoise
+IL_005b: ldarg.0
+IL_005c: ldc.r4 30
+IL_0061: stfld System.Single Attack::m_attackHitNoise
+IL_0066: ldarg.0
+IL_0067: ldc.r4 1
+IL_006c: stfld System.Single Attack::m_damageMultiplier
+IL_0071: ldarg.0
+IL_0072: ldc.r4 1
+IL_0077: stfld System.Single Attack::m_forceMultiplier
+IL_007c: ldarg.0
+IL_007d: ldc.r4 1
+IL_0082: stfld System.Single Attack::m_staggerMultiplier
+IL_0087: ldarg.0
+IL_0088: ldstr ""
+IL_008d: stfld System.String Attack::m_attackOriginJoint
+IL_0092: ldarg.0
+IL_0093: ldc.r4 1.5
+IL_0098: stfld System.Single Attack::m_attackRange
+IL_009d: ldarg.0
+IL_009e: ldc.r4 0.6
+IL_00a3: stfld System.Single Attack::m_attackHeight
+IL_00a8: ldarg.0
+IL_00a9: ldstr ""
+IL_00ae: stfld System.String Attack::m_reloadAnimation
+IL_00b3: ldarg.0
+IL_00b4: ldc.r4 2
+IL_00b9: stfld System.Single Attack::m_reloadTime
+IL_00be: ldarg.0
+IL_00bf: ldstr ""
+IL_00c4: stfld System.String Attack::m_drawAnimationState
+IL_00c9: ldarg.0
+IL_00ca: ldc.r4 0
+IL_00cf: ldc.r4 0
+IL_00d4: ldc.r4 1
+IL_00d9: ldc.r4 1
+IL_00de: call UnityEngine.AnimationCurve UnityEngine.AnimationCurve::Linear(System.Single,System.Single,System.Single,System.Single)
+IL_00e3: stfld UnityEngine.AnimationCurve Attack::m_drawVelocityCurve
+IL_00e8: ldarg.0
+IL_00e9: ldc.r4 90
+IL_00ee: stfld System.Single Attack::m_attackAngle
+IL_00f3: ldarg.0
+IL_00f4: ldc.i4.1
+IL_00f5: stfld System.Boolean Attack::m_lowerDamagePerHit
+IL_00fa: ldarg.0
+IL_00fb: ldc.i4.1
+IL_00fc: stfld System.Boolean Attack::m_multiHit
+IL_0101: ldarg.0
+IL_0102: ldc.r4 2
+IL_0107: stfld System.Single Attack::m_lastChainDamageMultiplier
+IL_010c: ldarg.0
+IL_010d: ldc.r4 1
+IL_0112: stfld System.Single Attack::m_raiseSkillAmount
+IL_0117: ldarg.0
+IL_0118: ldc.i4.4
+IL_0119: stfld DestructibleType Attack::m_skillHitType
+IL_011e: ldarg.0
+IL_011f: ldc.r4 10
+IL_0124: stfld System.Single Attack::m_projectileVel
+IL_0129: ldarg.0
+IL_012a: ldc.r4 2
+IL_012f: stfld System.Single Attack::m_projectileVelMin
+IL_0134: ldarg.0
+IL_0135: ldc.r4 10
+IL_013a: stfld System.Single Attack::m_projectileAccuracy
+IL_013f: ldarg.0
+IL_0140: ldc.r4 20
+IL_0145: stfld System.Single Attack::m_projectileAccuracyMin
+IL_014a: ldarg.0
+IL_014b: ldc.i4.1
+IL_014c: stfld System.Int32 Attack::m_projectiles
+IL_0151: ldarg.0
+IL_0152: ldc.i4.1
+IL_0153: stfld System.Int32 Attack::m_projectileBursts
+IL_0158: ldarg.0
+IL_0159: newobj System.Void EffectList::.ctor()
+IL_015e: stfld EffectList Attack::m_hitEffect
+IL_0163: ldarg.0
+IL_0164: newobj System.Void EffectList::.ctor()
+IL_0169: stfld EffectList Attack::m_hitTerrainEffect
+IL_016e: ldarg.0
+IL_016f: newobj System.Void EffectList::.ctor()
+IL_0174: stfld EffectList Attack::m_startEffect
+IL_0179: ldarg.0
+IL_017a: newobj System.Void EffectList::.ctor()
+IL_017f: stfld EffectList Attack::m_triggerEffect
+IL_0184: ldarg.0
+IL_0185: newobj System.Void EffectList::.ctor()
+IL_018a: stfld EffectList Attack::m_trailStartEffect
+IL_018f: ldarg.0
+IL_0190: newobj System.Void EffectList::.ctor()
+IL_0195: stfld EffectList Attack::m_burstEffect
+IL_019a: ldarg.0
+IL_019b: ldc.i4.1
+IL_019c: stfld System.Boolean Attack::m_attackTowardsCameraDir
+IL_01a1: ldarg.0
+IL_01a2: ldc.r4 -1
+IL_01a7: stfld System.Single Attack::m_projectileFireTimer
+IL_01ac: ldarg.0
+IL_01ad: call System.Void System.Object::.ctor()
+IL_01b2: ret

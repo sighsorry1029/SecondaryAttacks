@@ -1,0 +1,22 @@
+sa_status_secondary_cooldown: 보조 공격 재사용 대기
+sa_status_sneak_ambush_cooldown: 기습 재사용 대기
+sa_status_cleaving_thrust_cooldown: 가르기 찌르기 재사용 대기
+sa_status_impact_burst_cooldown: 충격 폭발 재사용 대기
+sa_status_boomerang_cooldown: 부메랑 재사용 대기
+sa_status_spinning_sweep_cooldown: 회전 휩쓸기 재사용 대기
+sa_status_launch_slam_cooldown: 도약 강타 재사용 대기
+sa_status_knockback_chain_cooldown: 밀쳐내기 연쇄 재사용 대기
+sa_status_aftershock_cooldown: 여진 재사용 대기
+sa_status_rift_trail_cooldown: 균열 궤적 재사용 대기
+sa_status_fracture_line_cooldown: 균열선 재사용 대기
+sa_status_harvest_sweep_cooldown: 수확 휩쓸기 재사용 대기
+sa_status_spear_rain_cooldown: 창비 재사용 대기
+sa_status_summon_empower_cooldown: 소환 강화 재사용 대기
+sa_status_shield_convert_cooldown: 보호막 전환 재사용 대기
+sa_status_sneak_ambush_charge: 기습 충전
+sa_tooltip_secondary_recharging: 보조 공격이 재사용 대기 중입니다.
+sa_tooltip_sneak_ambush_charge: 은신한 뒤 공격하면 기습을 충전합니다.
+sa_tooltip_sneak_ambush_charge_progress: "준비됨: {0} / {1}초\n은신 스킬이 높을수록 더 빠르게 충전됩니다."
+sa_hint_detonate: 폭파
+sa_hud_empower: 강화
+sa_summon_name_format: "{0} (소환)"

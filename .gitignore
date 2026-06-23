@@ -1,0 +1,13 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+.vs/
+ServerSyncModTemplate.sln.DotSettings.user
+.tmp_ilspy/
+Thunderstore/*_v*.zip
+Nexus/*_v*.zip
+Libs/Warfare.dll
+Libs/WarfareFireAndIce.dll

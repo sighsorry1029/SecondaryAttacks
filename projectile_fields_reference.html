@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Valheim Projectile 필드 레퍼런스</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3efe8;
+      --paper: #fffdf9;
+      --ink: #1d1a17;
+      --muted: #6b6258;
+      --accent: #14532d;
+      --line: #ddd3c5;
+      --soft: #f6f0e7;
+      --warn: #fff4dd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background:
+        radial-gradient(circle at top right, #dcefdc 0, transparent 30%),
+        linear-gradient(180deg, var(--bg) 0%, #ece4d8 100%);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 24px auto;
+      padding: 34px 40px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 44px rgba(29, 26, 23, 0.08);
+    }
+
+    h1, h2, h3 {
+      line-height: 1.2;
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      font-size: 30px;
+      color: var(--accent);
+    }
+
+    h2 {
+      margin-top: 26px;
+      font-size: 20px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+    }
+
+    h3 {
+      margin-top: 18px;
+      font-size: 16px;
+    }
+
+    p, li {
+      font-size: 14px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 18px;
+    }
+
+    .callout {
+      padding: 12px 14px;
+      background: var(--warn);
+      border-left: 4px solid #a16207;
+      margin: 14px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      padding: 12px 14px;
+    }
+
+    ul {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f8f3eb;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.94em;
+      background: #f1ece4;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    @page {
+      size: A4 landscape;
+      margin: 12mm;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Valheim Projectile 필드 레퍼런스</h1>
+    <div class="meta">기준: decompiled <code>Projectile</code> 클래스, 생성일 2026-03-16</div>
+
+    <p>이 문서는 <code>Projectile</code> prefab에서 바꿀 수 있는 주요 필드와, 실제 발사 시 <code>Setup(owner, velocity, hitNoise, hitData, item, ammo)</code>로 들어오는 런타임 입력값을 함께 정리한 것이다.</p>
+
+    <div class="callout">
+      중요한 점: <strong>속도는 보통 <code>Projectile</code>의 고정 필드가 아니라 <code>Setup()</code>에 전달되는 <code>velocity</code>로 결정된다.</strong> 따라서 “투사체 속도”를 바꾸려면 prefab의 <code>Projectile</code> 필드만이 아니라 공격 쪽 <code>Attack.m_projectileVel</code> 또는 발사 코드도 같이 봐야 한다.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>정적 prefab 필드</h3>
+        <ul>
+          <li>중력, 항력, TTL, 충돌 반경, bounce, hit effect, spawn-on-hit 등</li>
+          <li>prefab 자산에 저장되어 있고 기본값으로 시작한다</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>런타임 발사 입력</h3>
+        <ul>
+          <li><code>velocity</code>, <code>hitNoise</code>, <code>hitData</code>, <code>owner</code>, <code>item</code>, <code>ammo</code></li>
+          <li><code>Setup()</code>에서 일부 prefab 필드를 덮어쓴다</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>1. Setup에서 주로 덮어써지는 값</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>원래 위치</th>
+          <th>실제 적용 방식</th>
+          <th>메모</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>velocity</code></td>
+          <td><code>Setup()</code> 인자</td>
+          <td><code>m_vel = velocity</code></td>
+          <td>실질적인 투사체 속도/방향. prefab 필드가 아니라 발사 시 계산값이다.</td>
+        </tr>
+        <tr>
+          <td><code>m_damage</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_damage</code>로 덮어씀</td>
+          <td>무기/탄약/스킬/패치가 합쳐진 최종 데미지가 들어온다.</td>
+        </tr>
+        <tr>
+          <td><code>m_blockable</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_blockable</code>로 덮어씀</td>
+          <td>무기 쪽 blockable 설정을 따르는 경우가 많다.</td>
+        </tr>
+        <tr>
+          <td><code>m_dodgeable</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_dodgeable</code>로 덮어씀</td>
+          <td>무기/탄약 세팅 영향.</td>
+        </tr>
+        <tr>
+          <td><code>m_attackForce</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_pushForce</code>로 덮어씀</td>
+          <td>넉백/푸시력.</td>
+        </tr>
+        <tr>
+          <td><code>m_backstabBonus</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_backstabBonus</code>로 덮어씀</td>
+          <td>백스탭 배수.</td>
+        </tr>
+        <tr>
+          <td><code>m_healthReturn</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_healthReturn</code>로 덮어씀</td>
+          <td>흡혈/체력 회수 계열.</td>
+        </tr>
+        <tr>
+          <td><code>m_skill</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_skill</code>로 설정</td>
+          <td>적중 후 스킬 상승/판정용.</td>
+        </tr>
+        <tr>
+          <td><code>m_raiseSkillAmount</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitData.m_skillRaiseAmount</code>로 설정</td>
+          <td>스킬 경험치량.</td>
+        </tr>
+        <tr>
+          <td><code>m_hitNoise</code></td>
+          <td>Projectile 필드</td>
+          <td><code>hitNoise &gt;= 0</code>이면 입력값으로 덮어씀</td>
+          <td>AI 소리 감지 반경.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2. 충돌, 물리, 수명</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>실사용 포인트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_ttl</code></td><td>투사체 생존 시간</td><td>탄이 얼마나 오래 유지되는지. volley/meteor 체공 시간과 직접 충돌한다.</td></tr>
+        <tr><td><code>m_gravity</code></td><td>중력</td><td>포물선 정도 결정.</td></tr>
+        <tr><td><code>m_drag</code></td><td>항력</td><td>비행 중 감속 강도.</td></tr>
+        <tr><td><code>m_rayRadius</code></td><td>충돌 구체 반경</td><td>0이면 레이캐스트, 0보다 크면 sphere cast.</td></tr>
+        <tr><td><code>m_aoe</code></td><td>적중 시 범위 피해 반경</td><td>0보다 크면 impact 지점 주변에도 피해.</td></tr>
+        <tr><td><code>m_canHitWater</code></td><td>물 충돌 허용</td><td>수면 적중 효과와 연동.</td></tr>
+        <tr><td><code>m_doOwnerRaytest</code></td><td>owner 기준 ray test 시작점 사용</td><td>자기 자신/가까운 오브젝트 오적중 방지 쪽.</td></tr>
+        <tr><td><code>m_staticHitOnly</code></td><td>정적 대상만 적중</td><td>지형/고정물 전용 투사체류.</td></tr>
+        <tr><td><code>m_groundHitOnly</code></td><td>지면 전용 적중</td><td>메테오/지면 설치형에서 의미 있다.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. 피해 및 전투 속성</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>주의</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_damage</code></td><td>피해 타입 집합</td><td>대부분 <code>Setup(hitData)</code>에서 덮어써진다.</td></tr>
+        <tr><td><code>m_attackForce</code></td><td>넉백</td><td>대부분 런타임 값으로 덮어써진다.</td></tr>
+        <tr><td><code>m_dodgeable</code></td><td>회피 가능 여부</td><td>런타임 덮어쓰기 가능.</td></tr>
+        <tr><td><code>m_blockable</code></td><td>방패로 막기 가능 여부</td><td>런타임 덮어쓰기 가능.</td></tr>
+        <tr><td><code>m_backstabBonus</code></td><td>백스탭 배수</td><td>런타임 덮어쓰기 가능.</td></tr>
+        <tr><td><code>m_statusEffect</code></td><td>상태이상 이름/해시 연동</td><td><code>hitData</code>의 status effect와 연결된다.</td></tr>
+        <tr><td><code>m_healthReturn</code></td><td>피해 시 체력 회수</td><td>런타임 덮어쓰기 가능.</td></tr>
+        <tr><td><code>m_adrenaline</code></td><td>아드레날린 계열 값</td><td>특수 시스템 연동용.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. 적중 후 잔류/부착</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>실사용 포인트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_stayAfterHitStatic</code></td><td>정적 대상 적중 후 남기</td><td>벽/지면에 박힌 화살 느낌.</td></tr>
+        <tr><td><code>m_stayAfterHitDynamic</code></td><td>동적 대상 적중 후 남기</td><td>캐릭터/움직이는 물체에 박히는지.</td></tr>
+        <tr><td><code>m_stayTTL</code></td><td>적중 후 남아 있는 시간</td><td>박힌 뒤 사라질 때까지 시간.</td></tr>
+        <tr><td><code>m_attachToRigidBody</code></td><td>리지드바디에 붙이기</td><td>움직이는 대상에 따라붙는지.</td></tr>
+        <tr><td><code>m_attachToClosestBone</code></td><td>가까운 본에 부착</td><td>캐릭터 스켈레톤 기반 부착.</td></tr>
+        <tr><td><code>m_attachPenetration</code></td><td>박히는 깊이</td><td>시각적인 침투 정도.</td></tr>
+        <tr><td><code>m_attachBoneNearify</code></td><td>본 근접 보정</td><td>부착 위치 보정 계수.</td></tr>
+        <tr><td><code>m_hideOnHit</code></td><td>적중 시 숨길 오브젝트</td><td>시각 전환용.</td></tr>
+        <tr><td><code>m_stopEmittersOnHit</code></td><td>적중 시 emitter 정지</td><td>trail/particle 정지 여부.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>5. 효과 및 비주얼</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>실사용 포인트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_hitEffects</code></td><td>적중 이펙트</td><td>맞았을 때 생성되는 FX 리스트.</td></tr>
+        <tr><td><code>m_hitWaterEffects</code></td><td>물 적중 이펙트</td><td>수면 히트 전용.</td></tr>
+        <tr><td><code>m_spawnOnHitEffects</code></td><td>spawn-on-hit 시 이펙트</td><td>분열/추가 생성과 함께 재생.</td></tr>
+        <tr><td><code>m_visual</code></td><td>회전/교체 대상 visual 오브젝트</td><td>비주얼 루트가 따로 있을 때 사용.</td></tr>
+        <tr><td><code>m_canChangeVisuals</code></td><td>비주얼 변경 허용</td><td>특수 스킨/비주얼 스왑 계열.</td></tr>
+        <tr><td><code>m_rotateVisual</code></td><td>X축 회전 속도</td><td>프레임마다 visual 회전.</td></tr>
+        <tr><td><code>m_rotateVisualY</code></td><td>Y축 회전 속도</td><td>프레임마다 visual 회전.</td></tr>
+        <tr><td><code>m_rotateVisualZ</code></td><td>Z축 회전 속도</td><td>프레임마다 visual 회전.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>6. Bounce 관련</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>실사용 포인트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_bounce</code></td><td>튕김 허용</td><td>ricochet 계열.</td></tr>
+        <tr><td><code>m_bounceOnWater</code></td><td>물에서도 튕김</td><td>수면 반사 투사체.</td></tr>
+        <tr><td><code>m_bouncePower</code></td><td>튕긴 뒤 속도 보존율</td><td>0~1 범위.</td></tr>
+        <tr><td><code>m_bounceRoughness</code></td><td>튕김 난수성</td><td>리코셰 방향 난잡도.</td></tr>
+        <tr><td><code>m_maxBounces</code></td><td>최대 튕김 횟수</td><td>ricochet 지속성.</td></tr>
+        <tr><td><code>m_minBounceVel</code></td><td>최소 튕김 속도</td><td>이보다 느리면 더 안 튕김.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>7. 적중 시 추가 생성</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>실사용 포인트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_respawnItemOnHit</code></td><td>적중 시 아이템 재생성</td><td>화살 회수/드랍 계열.</td></tr>
+        <tr><td><code>m_spawnOnTtl</code></td><td>TTL 종료 시 spawn-on-hit 처리</td><td>시간 만료 폭발/분열형.</td></tr>
+        <tr><td><code>m_spawnOnHit</code></td><td>적중 시 생성할 prefab</td><td>분열탄/연쇄탄의 핵심.</td></tr>
+        <tr><td><code>m_spawnOnHitChance</code></td><td>적중 시 생성 확률</td><td>0~1.</td></tr>
+        <tr><td><code>m_spawnCount</code></td><td>생성 개수</td><td>분열 수량.</td></tr>
+        <tr><td><code>m_randomSpawnOnHit</code></td><td>랜덤 생성 후보 리스트</td><td>랜덤 분열/랜덤 효과.</td></tr>
+        <tr><td><code>m_randomSpawnOnHitCount</code></td><td>랜덤 생성 횟수</td><td>몇 번 뽑을지.</td></tr>
+        <tr><td><code>m_randomSpawnSkipLava</code></td><td>용암에서 랜덤 spawn 생략</td><td>환경 제한.</td></tr>
+        <tr><td><code>m_showBreakMessage</code></td><td>파괴 메시지 표시</td><td>소비형 탄 파손 알림.</td></tr>
+        <tr><td><code>m_spawnOffset</code></td><td>spawn 위치 오프셋</td><td>생성 위치 미세 조정.</td></tr>
+        <tr><td><code>m_copyProjectileRotation</code></td><td>원 투사체 회전 복사</td><td>분열탄 방향 정렬.</td></tr>
+        <tr><td><code>m_spawnRandomRotation</code></td><td>랜덤 회전으로 spawn</td><td>시각 랜덤성.</td></tr>
+        <tr><td><code>m_spawnFacingRotation</code></td><td>진행 방향 바라보게 spawn</td><td>전방 정렬.</td></tr>
+        <tr><td><code>m_onHit</code></td><td>적중 이벤트 훅</td><td>특수 코드 연동 포인트.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. Spawned projectile의 속도/데미지 계승</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>의미</th>
+          <th>실사용 포인트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>m_spawnProjectileNewVelocity</code></td><td>새 속도 사용</td><td>spawn된 투사체를 별도 속도로 발사.</td></tr>
+        <tr><td><code>m_spawnProjectileMinVel</code></td><td>최소 spawn 속도</td><td>새 속도 하한.</td></tr>
+        <tr><td><code>m_spawnProjectileMaxVel</code></td><td>최대 spawn 속도</td><td>새 속도 상한.</td></tr>
+        <tr><td><code>m_spawnProjectileRandomDir</code></td><td>방향 랜덤 보간 비율</td><td>원래 진행 방향과 랜덤 방향 사이 혼합.</td></tr>
+        <tr><td><code>m_spawnProjectileHemisphereDir</code></td><td>반구 제한</td><td>노멀 기준 같은 반구만 허용.</td></tr>
+        <tr><td><code>m_projectilesInheritHitData</code></td><td>원 hitData 계승</td><td>분열탄이 원본 데미지/효과를 이어받음.</td></tr>
+        <tr><td><code>m_onlySpawnedProjectilesDealDamage</code></td><td>spawn된 투사체만 피해</td><td>원본 탄 데미지 제거 후 분열탄만 유효.</td></tr>
+        <tr><td><code>m_divideDamageBetweenProjectiles</code></td><td>분열 수만큼 피해 분할</td><td>총합 데미지 유지용.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9. 실무적으로 자주 건드리는 값</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>목적</th>
+          <th>주로 건드리는 것</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>직사/낙차 조절</td><td><code>m_gravity</code>, <code>m_drag</code>, 발사 <code>velocity</code></td><td>속도는 보통 공격 쪽에서 결정.</td></tr>
+        <tr><td>체공 시간 조절</td><td><code>m_ttl</code></td><td>volley, meteor, sentinel에 중요.</td></tr>
+        <tr><td>맞추기 쉬움 조절</td><td><code>m_rayRadius</code>, <code>m_aoe</code></td><td>히트 판정 크기.</td></tr>
+        <tr><td>분열탄 구현</td><td><code>m_spawnOnHit</code>, <code>m_spawnCount</code>, <code>m_projectilesInheritHitData</code></td><td>split-shot 계열 핵심.</td></tr>
+        <tr><td>리코셰 구현</td><td><code>m_bounce</code>, <code>m_bouncePower</code>, <code>m_maxBounces</code></td><td>튕김형 투사체.</td></tr>
+        <tr><td>시각 개선</td><td><code>m_hitEffects</code>, <code>m_visual</code>, 자식 파티클</td><td>실제로는 hierarchy도 같이 봐야 한다.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>10. 현재 SecondaryAttacks 관점의 메모</h2>
+    <ul>
+      <li>현재 모드는 projectile preset에서 주로 발사 방향, 발사 시점, projectile 개수, 리소스 소모를 바꾼다.</li>
+      <li><code>damage</code>, <code>attackForce</code>, <code>blockable</code>, <code>dodgeable</code>는 대부분 <code>HitData</code> 경유로 들어가므로 단순 prefab 수정만으로는 의도대로 안 바뀔 수 있다.</li>
+      <li><code>speed</code>는 주로 <code>Attack.m_projectileVel</code> / <code>Attack.m_projectileVelMin</code> / <code>Setup(velocity)</code> 쪽이다.</li>
+      <li>눈에 안 보이는 탄 문제는 <code>m_visual</code>보다도 child 파티클/mesh hierarchy 유무가 더 중요할 수 있다.</li>
+    </ul>
+
+    <p class="small">요약: projectile에서 많이 만지는 값은 <code>m_ttl</code>, <code>m_gravity</code>, <code>m_drag</code>, <code>m_rayRadius</code>, <code>m_aoe</code>, <code>m_spawnOnHit</code>, <code>m_bounce</code> 계열이고, 데미지와 속도는 발사 시 입력값까지 같이 봐야 한다.</p>
+  </main>
+</body>
+</html>

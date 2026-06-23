@@ -1,0 +1,9 @@
+{
+  "name": "SecondaryAttacks",
+  "version_number": "1.0.0",
+  "website_url": "https://discord.gg/pdHgy6Bsng",
+  "description": "Adds server-synced YAML secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, with auto presets, per-prefab overrides, summon tools, cooldown HUD, localization, and WarfareTweaks compatibility for multiplayer balance.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2202"
+  ]
+}

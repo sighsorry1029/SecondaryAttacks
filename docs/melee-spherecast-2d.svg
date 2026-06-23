@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="#263238"/>
+    </marker>
+  </defs>
+  <rect width="920" height="560" fill="#f8fafc"/>
+  <text x="40" y="46" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#102027">Melee SphereCast 판정 탑뷰</text>
+  <text x="40" y="78" font-family="Arial, sans-serif" font-size="15" fill="#455a64">각도 안에 여러 방향 ray를 만들고, 각 ray마다 일정 두께의 구체를 앞으로 쓸어 보냅니다.</text>
+
+  <!-- arc sector -->
+  <path d="M460 470 L185 235 A360 360 0 0 1 735 235 Z" fill="#dbeafe" opacity="0.42"/>
+  <path d="M460 470 L185 235" stroke="#64748b" stroke-width="2" stroke-dasharray="8 8"/>
+  <path d="M460 470 L735 235" stroke="#64748b" stroke-width="2" stroke-dasharray="8 8"/>
+  <path d="M185 235 A360 360 0 0 1 735 235" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="710" y="224" font-family="Arial, sans-serif" font-size="15" fill="#334155">attackAngle</text>
+
+  <!-- spherecast thick rays -->
+  <g opacity="0.72">
+    <line x1="460" y1="470" x2="215" y2="280" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+    <line x1="460" y1="470" x2="290" y2="214" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+    <line x1="460" y1="470" x2="377" y2="151" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+    <line x1="460" y1="470" x2="460" y2="125" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+    <line x1="460" y1="470" x2="543" y2="151" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+    <line x1="460" y1="470" x2="630" y2="214" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+    <line x1="460" y1="470" x2="705" y2="280" stroke="#38bdf8" stroke-width="34" stroke-linecap="round"/>
+  </g>
+
+  <!-- center ray lines -->
+  <g>
+    <line x1="460" y1="470" x2="215" y2="280" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="460" y1="470" x2="290" y2="214" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="460" y1="470" x2="377" y2="151" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="460" y1="470" x2="460" y2="125" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="460" y1="470" x2="543" y2="151" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="460" y1="470" x2="630" y2="214" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <line x1="460" y1="470" x2="705" y2="280" stroke="#263238" stroke-width="2.5" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- origin -->
+  <circle cx="460" cy="470" r="18" fill="#111827"/>
+  <text x="485" y="476" font-family="Arial, sans-serif" font-size="16" fill="#111827">origin</text>
+
+  <!-- labels -->
+  <line x1="460" y1="470" x2="460" y2="125" stroke="#ef4444" stroke-width="3" stroke-dasharray="5 6"/>
+  <text x="477" y="300" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#b91c1c">attackRange</text>
+
+  <circle cx="600" cy="260" r="17" fill="none" stroke="#0369a1" stroke-width="4"/>
+  <line x1="600" y1="260" x2="617" y2="260" stroke="#0369a1" stroke-width="4"/>
+  <text x="626" y="265" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#0369a1">attackRayWidth</text>
+
+  <!-- character extra -->
+  <circle cx="704" cy="280" r="27" fill="none" stroke="#7c3aed" stroke-width="3" stroke-dasharray="6 5"/>
+  <circle cx="704" cy="280" r="9" fill="#7c3aed"/>
+  <text x="728" y="286" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#5b21b6">캐릭터 전용 추가 반경</text>
+
+  <!-- enemy dots -->
+  <circle cx="365" cy="225" r="11" fill="#dc2626"/>
+  <text x="382" y="230" font-family="Arial, sans-serif" font-size="14" fill="#7f1d1d">맞음</text>
+  <circle cx="520" cy="230" r="11" fill="#dc2626"/>
+  <text x="537" y="235" font-family="Arial, sans-serif" font-size="14" fill="#7f1d1d">맞음</text>
+  <circle cx="615" cy="145" r="11" fill="#94a3b8"/>
+  <text x="632" y="150" font-family="Arial, sans-serif" font-size="14" fill="#475569">빈틈이면 안 맞음</text>
+
+  <!-- note box -->
+  <rect x="40" y="408" width="310" height="104" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="60" y="438" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a">핵심</text>
+  <text x="60" y="464" font-family="Arial, sans-serif" font-size="14" fill="#334155">파란 두꺼운 선 = SphereCast 경로</text>
+  <text x="60" y="486" font-family="Arial, sans-serif" font-size="14" fill="#334155">검은 선 = 각 ray의 중심선</text>
+  <text x="60" y="508" font-family="Arial, sans-serif" font-size="14" fill="#334155">멀수록 ray 사이 빈 공간이 커집니다.</text>
+</svg>

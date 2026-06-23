@@ -1,0 +1,22 @@
+sa_status_secondary_cooldown: Secondary Cooldown
+sa_status_sneak_ambush_cooldown: Sneak Ambush Cooldown
+sa_status_cleaving_thrust_cooldown: Cleaving Thrust Cooldown
+sa_status_impact_burst_cooldown: Impact Burst Cooldown
+sa_status_boomerang_cooldown: Boomerang Cooldown
+sa_status_spinning_sweep_cooldown: Spinning Sweep Cooldown
+sa_status_launch_slam_cooldown: Launch Slam Cooldown
+sa_status_knockback_chain_cooldown: Knockback Chain Cooldown
+sa_status_aftershock_cooldown: Aftershock Cooldown
+sa_status_rift_trail_cooldown: Rift Trail Cooldown
+sa_status_fracture_line_cooldown: Fracture Line Cooldown
+sa_status_harvest_sweep_cooldown: Harvest Sweep Cooldown
+sa_status_spear_rain_cooldown: Spear Rain Cooldown
+sa_status_summon_empower_cooldown: Summon Empower Cooldown
+sa_status_shield_convert_cooldown: Shield Convert Cooldown
+sa_status_sneak_ambush_charge: Sneak Ambush Charge
+sa_tooltip_secondary_recharging: Secondary attack is recharging.
+sa_tooltip_sneak_ambush_charge: Sneak before striking to charge Sneak Ambush.
+sa_tooltip_sneak_ambush_charge_progress: "Prepared: {0} / {1}s\nHigher Sneak skill charges faster."
+sa_hint_detonate: Detonate
+sa_hud_empower: Empower
+sa_summon_name_format: "{0} (Summon)"
