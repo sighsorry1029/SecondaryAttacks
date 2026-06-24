@@ -306,6 +306,11 @@ internal static class SecondaryAttackWorldApplySystem
         }
 
         SecondaryAttacksPlugin.BombPresetSelection configuredPreset = SecondaryAttacksPlugin.BombPreset.Value;
+        if (configuredPreset == SecondaryAttacksPlugin.BombPresetSelection.Off)
+        {
+            return false;
+        }
+
         presetName = configuredPreset switch
         {
             SecondaryAttacksPlugin.BombPresetSelection.StickyDetonator => ProjectileRuntimeSystem.GetPresetName(SecondaryAttackPreset.StickyDetonator),
@@ -399,6 +404,11 @@ internal static class SecondaryAttackWorldApplySystem
     private static bool TryGetRangedPresetName(SecondaryAttacksPlugin.RangedPresetSelection selection, out string presetName)
     {
         presetName = "";
+        if (selection == SecondaryAttacksPlugin.RangedPresetSelection.Off)
+        {
+            return false;
+        }
+
         if (!Enum.TryParse(selection.ToString(), out SecondaryAttackPreset preset))
         {
             return false;

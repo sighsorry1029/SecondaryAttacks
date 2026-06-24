@@ -651,6 +651,7 @@
         <Error Text="icon.png not found in Thunderstore directory. Please note that Thunderstore requires this image to be 256x256 in dimension" Condition="!Exists('$(ProjectDir)\Thunderstore\icon.png')"/>
         <Error Text="CHANGELOG.md not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)\Thunderstore\CHANGELOG.md')"/>
         <Error Text="README.md not found in temporary Thunderstore package directory." Condition="!Exists('$(PackageDir)\README.md')"/>
+        <Error Text="English.yml not found in Resources\Translations directory." Condition="!Exists('$(ProjectDir)\Resources\Translations\English.yml')"/>
         <ItemGroup>
             <PackageFiles Include="$(TargetDir)$(AssemblyName).dll" Condition="Exists('$(TargetDir)$(AssemblyName).dll')"/>
             <PackageFiles Include="$(ProjectDir)\Thunderstore\CHANGELOG.md" Condition="Exists('$(ProjectDir)\Thunderstore\CHANGELOG.md')"/>
@@ -658,6 +659,7 @@
             <PackageFiles Include="$(ProjectDir)\Thunderstore\icon.png" Condition="Exists('$(ProjectDir)\Thunderstore\icon.png')"/>
         </ItemGroup>
         <Copy SourceFiles="@(PackageFiles)" DestinationFolder="$(PackageDir)"/>
+        <Copy SourceFiles="$(ProjectDir)\Resources\Translations\English.yml" DestinationFiles="$(PackageDir)\SecondaryAttacks.English.yml" OverwriteReadOnlyFiles="true"/>
         <ZipDirectory SourceDirectory="$(PackageDir)" DestinationFile="$(ProjectDir)Thunderstore\$(PackageName).zip" Overwrite="true"/>
         <RemoveDir Directories="$(PackageDir)"/>
     </Target>

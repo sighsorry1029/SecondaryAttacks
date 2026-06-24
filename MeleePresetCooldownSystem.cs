@@ -80,6 +80,7 @@ internal static class MeleePresetCooldownSystem
         state.ReadyAtByPreset[key] = now + finalCooldown;
         state.DurationByPreset[key] = finalCooldown;
         state.IconByPreset[key] = ResolveWeaponIcon(weapon) ?? ResolveRegisteredIcon(key);
+        state.HudClearedStatusByPreset.Remove(key);
         ApplyCooldownStatus(attacker, weapon, key, finalCooldown);
         return true;
     }
@@ -93,6 +94,12 @@ internal static class MeleePresetCooldownSystem
 
         double now = SecondaryAttackManager.GetNetworkTimeSeconds();
         ItemDrop.ItemData? weapon = ResolveCurrentWeapon(player);
+        bool suppressStatusEffects = SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(player);
+        if (!suppressStatusEffects)
+        {
+            state.HudClearedStatusByPreset.Clear();
+        }
+
         List<string> keys = state.UpdateKeys;
         keys.Clear();
         foreach (string key in state.ReadyAtByPreset.Keys)
@@ -104,12 +111,26 @@ internal static class MeleePresetCooldownSystem
         {
             if (!state.ReadyAtByPreset.TryGetValue(key, out double readyAt) || readyAt <= now)
             {
-                SyncCooldownStatusTtl(player, weapon, key, 0f);
+                if (!suppressStatusEffects)
+                {
+                    SyncCooldownStatusTtl(player, weapon, key, 0f);
+                }
+
                 ClearCooldownState(state, key);
                 continue;
             }
 
             float remaining = (float)Math.Max(0d, readyAt - now);
+            if (suppressStatusEffects)
+            {
+                if (state.HudClearedStatusByPreset.Add(key))
+                {
+                    ClearCooldownStatus(player, key);
+                }
+
+                continue;
+            }
+
             SyncCooldownStatusTtl(player, weapon, key, remaining);
             if (remaining <= 0f)
             {
@@ -182,6 +203,7 @@ internal static class MeleePresetCooldownSystem
 
         double now = SecondaryAttackManager.GetNetworkTimeSeconds();
         ItemDrop.ItemData? weapon = ResolveCurrentWeapon(player);
+        bool suppressStatusEffects = SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(player);
         List<string> keys = state.UpdateKeys;
         keys.Clear();
         foreach (string key in state.ReadyAtByPreset.Keys)
@@ -193,7 +215,11 @@ internal static class MeleePresetCooldownSystem
         {
             if (!state.ReadyAtByPreset.TryGetValue(key, out double readyAt) || readyAt <= now)
             {
-                SyncCooldownStatusTtl(player, weapon, key, 0f);
+                if (!suppressStatusEffects)
+                {
+                    SyncCooldownStatusTtl(player, weapon, key, 0f);
+                }
+
                 ClearCooldownState(state, key);
                 continue;
             }
@@ -205,7 +231,7 @@ internal static class MeleePresetCooldownSystem
             Sprite? icon = state.IconByPreset.TryGetValue(key, out Sprite? storedIcon)
                 ? storedIcon
                 : ResolveWeaponIcon(weapon) ?? ResolveRegisteredIcon(key);
-            entries.Add(new SecondaryCooldownHudSystem.Entry($"melee:{key}", key, icon, remaining, duration));
+            entries.Add(new SecondaryCooldownHudSystem.Entry(icon, remaining, duration));
         }
 
         keys.Clear();
@@ -344,6 +370,7 @@ internal static class MeleePresetCooldownSystem
         state.ReadyAtByPreset.Remove(presetName);
         state.DurationByPreset.Remove(presetName);
         state.IconByPreset.Remove(presetName);
+        state.HudClearedStatusByPreset.Remove(presetName);
     }
 
     private static void ClearCooldownStatus(Character attacker, string presetName)
@@ -487,6 +514,8 @@ internal static class MeleePresetCooldownSystem
         public Dictionary<string, Sprite?> IconByPreset { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public List<string> UpdateKeys { get; } = new();
+
+        public HashSet<string> HudClearedStatusByPreset { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private sealed class CooldownStatusRegistration

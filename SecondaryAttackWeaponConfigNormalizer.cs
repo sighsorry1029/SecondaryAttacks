@@ -166,6 +166,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         }
 
         rawConfig.Preset = presetName;
+        rawConfig.Enabled = null;
         globalRangedPresets[presetName] = FromRangedRaw(rawConfig);
     }
 

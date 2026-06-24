@@ -212,7 +212,7 @@ internal sealed class NormalizedProjectileSecondaryConfig
 
     public int MaxCharges { get; set; } = 6;
 
-    public string DetonateAnimation { get; set; } = "";
+    public string DetonateAnimation { get; set; } = "emote_blowkiss";
 
     public float AoeRadiusFactor { get; set; } = 1f;
 

@@ -85,7 +85,7 @@ internal static class SneakAmbushChargeSystem
 
         if (state.Display)
         {
-            ApplyStatus(player, weapon);
+            ApplyStatus(player, weapon, state);
         }
         else
         {
@@ -177,8 +177,6 @@ internal static class SneakAmbushChargeSystem
         TryResolveCurrentSneakAmbush(player, out ItemDrop.ItemData? weapon, out _);
         float chargeSeconds = Mathf.Clamp(state.ChargeSeconds, 0f, state.MaxSeconds);
         entries.Add(new SecondaryCooldownHudSystem.Entry(
-            "charge:sneakAmbush",
-            "sneakAmbushCharge",
             ResolveWeaponIcon(weapon) ?? ResolveFallbackIcon(),
             chargeSeconds,
             state.MaxSeconds,
@@ -213,14 +211,20 @@ internal static class SneakAmbushChargeSystem
         return player.InAttack() && humanoid.m_currentAttack != null && humanoid.m_currentAttackIsSecondary;
     }
 
-    private static void ApplyStatus(Player player, ItemDrop.ItemData? weapon)
+    private static void ApplyStatus(Player player, ItemDrop.ItemData? weapon, SneakAmbushChargeState state)
     {
         if (SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(player))
         {
-            RemoveStatus(player);
+            if (!state.HudClearedStatus)
+            {
+                RemoveStatus(player);
+                state.HudClearedStatus = true;
+            }
+
             return;
         }
 
+        state.HudClearedStatus = false;
         SEMan? seMan = player.GetSEMan();
         if (seMan == null)
         {
@@ -290,6 +294,8 @@ internal static class SneakAmbushChargeSystem
 
         public bool Display { get; set; }
 
+        public bool HudClearedStatus { get; set; }
+
         public void ClearDisplay()
         {
             MaxSeconds = 0f;
@@ -305,6 +311,7 @@ internal static class SneakAmbushChargeSystem
         public void Clear()
         {
             ChargeSeconds = 0f;
+            HudClearedStatus = false;
             ClearPendingAttack();
             ClearDisplay();
         }

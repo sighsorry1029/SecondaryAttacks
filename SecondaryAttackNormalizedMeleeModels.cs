@@ -47,13 +47,13 @@ internal sealed class NormalizedCleavingThrustConfig
 
     public float DurabilityFactor { get; set; } = 1f;
 
-    public float RangeFactor { get; set; } = 2.5f;
+    public float RangeFactor { get; set; } = 3f;
 
     public float Angle { get; set; } = 90f;
 
     public float DamageFactor { get; set; } = 1f;
 
-    public float PushFactor { get; set; } = 1f;
+    public float PushFactor { get; set; } = 6f;
 
     public static NormalizedCleavingThrustConfig CreateDefault()
     {

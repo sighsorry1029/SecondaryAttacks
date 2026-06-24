@@ -59,21 +59,23 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
     public enum RangedPresetSelection
     {
-        Barrage,
-        Volley,
-        Piercing,
-        Scatter,
-        Spiral,
-        Sentinel,
-        Meteor,
-        Burst
+        Off = -1,
+        Barrage = 0,
+        Volley = 1,
+        Piercing = 2,
+        Scatter = 3,
+        Spiral = 4,
+        Sentinel = 5,
+        Meteor = 6,
+        Burst = 7
     }
 
     public enum BombPresetSelection
     {
-        Auto,
-        StickyDetonator,
-        OverchargedBomb
+        Off = -1,
+        Auto = 0,
+        StickyDetonator = 1,
+        OverchargedBomb = 2
     }
 
     public enum MagicSummonQualityPresetSelection
@@ -276,13 +278,13 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
             const string group = "2 - Ranged";
-            const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Disable automatic assignment by setting the matching Global preset to enabled: false in SecondaryAttacks.Ranged.yml.";
+            const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic assignment for this group.";
             FireballStaffPreset = plugin.config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_fireball. {descriptionSuffix}", synchronizedSetting: true);
             RapidStaffPreset = plugin.config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_rapidfire. {descriptionSuffix}", synchronizedSetting: true);
             LightningStaffPreset = plugin.config(group, "Reload Staff Preset", RangedPresetSelection.Burst, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_lightningshot. {descriptionSuffix}", synchronizedSetting: true);
             BowPreset = plugin.config(group, "Bow Preset", RangedPresetSelection.Barrage, $"Default ranged preset for bow items. {descriptionSuffix}", synchronizedSetting: true);
             CrossbowPreset = plugin.config(group, "Crossbow Preset", RangedPresetSelection.Burst, $"Default ranged preset for reload-based crossbow-style projectile items. {descriptionSuffix}", synchronizedSetting: true);
-            BombPreset = plugin.config(group, "Bomb Preset", BombPresetSelection.Auto, "Default ranged preset for throw_bomb projectile items. Auto uses overchargedBomb when the primary projectile itself has AOE or spawns an Aoe prefab on hit, and stickyDetonator otherwise. Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Disable automatic assignment by setting the matching Global bomb preset to enabled: false in SecondaryAttacks.Ranged.yml.", synchronizedSetting: true);
+            BombPreset = plugin.config(group, "Bomb Preset", BombPresetSelection.Auto, "Default ranged preset for throw_bomb projectile items. Auto uses overchargedBomb when the primary projectile itself has AOE or spawns an Aoe prefab on hit, and stickyDetonator otherwise. Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic bomb assignment.", synchronizedSetting: true);
         }
     }
 
@@ -298,8 +300,8 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             const string group = "3 - UI";
             SecondaryCooldownHudEnabled = plugin.config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns are shown in a dedicated HUD block instead of status effect icons. While this HUD is on, secondary cooldown center messages are suppressed.", synchronizedSetting: false);
             SecondaryCooldownHudScale = plugin.config(group, "Secondary Cooldown HUD Scale", 2.0f, new ConfigDescription("Client-side scale for the secondary cooldown HUD block.", new AcceptableValueRange<float>(1.0f, 2.0f)), synchronizedSetting: false);
-            SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.6f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory and drag the block to change it.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
-            SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory and drag the block to change it.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
+            SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.6f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
+            SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
         }
     }
 

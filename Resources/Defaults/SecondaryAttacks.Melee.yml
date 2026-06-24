@@ -19,8 +19,11 @@
 # copyFrom only selects the source Attack shape, projectile, animation defaults, and effects; it does not use the source prefab's raw resource cost.
 # Ordinary copied secondaries use this YAML entry's root prefab primary attack cost * root resourceMultiplier.
 # Melee special presets use this YAML entry's root prefab primary attack cost * that preset block's resourceMultiplier.
-# damageFactor: copied/original damage multiplier.
-# pushFactor: copied/original push multiplier.
+# damageFactor: multiplier for the HitData produced by the active secondary attack, not the root primary cost.
+# If the weapon has a real secondary attack, damageFactor multiplies that secondary-derived damage.
+# If the weapon has no usable secondary, a preset may copy a valid primary attack into the secondary slot; then damageFactor multiplies that primary-derived generated secondary damage.
+# Projectile-based melee specials such as boomerang, impactBurst, and spearRain multiply the source projectile's original secondary HitData.
+# pushFactor: multiplier for the same active secondary/generated secondary HitData push force.
 
 Global:
   sneakAmbush: # knives
@@ -51,8 +54,8 @@ Global:
     durabilityFactor: 2
     resourceMultiplier: 2
     damageFactor: 1.0
-    pushFactor: 4.0
-    rangeFactor: 2.5 # Multiplies the copied thrust attack range and trail length.
+    pushFactor: 6.0
+    rangeFactor: 3.0 # Multiplies the copied thrust attack range and trail length.
   launchSlam: # 1H clubs
     enabled: true
     cooldown: 10.0

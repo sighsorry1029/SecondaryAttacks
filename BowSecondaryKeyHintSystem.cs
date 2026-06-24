@@ -6,6 +6,7 @@ namespace SecondaryAttacks;
 
 internal static class BowSecondaryKeyHintSystem
 {
+    private const int MissingBlockHintRefreshFrames = 30;
     private static readonly string[] BowSecondaryHintKeys = new string[1];
     private static readonly string[] DetonateBlockHintKeys = new string[1];
     private static KeyHints? _activeKeyHints;
@@ -14,13 +15,18 @@ internal static class BowSecondaryKeyHintSystem
     private static GameObject? _bowSecondaryHintTemplate;
     private static KeyHints? _cachedTemplateHints;
     private static GameObject? _cachedCombatHintTemplate;
+    private static KeyHints? _cachedBlockHintHints;
+    private static GameObject? _cachedBlockHint;
     private static bool _showingBowSecondaryHint;
     private static bool _showingDetonateBlockHint;
     private static bool _cachedTemplateGamepadActive;
+    private static bool _cachedBlockHintGamepadActive;
+    private static bool _cachedBlockHintResolved;
     private static bool _lastGamepadActive;
     private static bool _lastDetonateBlockGamepadActive;
     private static bool _keyHintApplied;
     private static bool _detonateBlockHintApplied;
+    private static int _cachedBlockHintFrame;
     private static string _lastButtonLabel = string.Empty;
     private static string _lastDetonateBlockButtonLabel = string.Empty;
 
@@ -30,6 +36,7 @@ internal static class BowSecondaryKeyHintSystem
         DestroyBowSecondaryHint();
         RestoreDetonateBlockHint();
         _detonateBlockHint = null;
+        ClearBlockHintCache();
         _showingBowSecondaryHint = false;
         UpdateKeyHint(hints);
     }
@@ -121,8 +128,8 @@ internal static class BowSecondaryKeyHintSystem
         }
 
         bool gamepadActive = ZInput.IsGamepadActive();
-        GameObject? targetHint = ResolveBlockHint(hints, gamepadActive);
-        if (!KeyHintCell.IsUsableTemplate(targetHint))
+        GameObject? targetHint = ResolveCachedBlockHint(hints, gamepadActive);
+        if (targetHint == null)
         {
             RestoreDetonateBlockHint();
             return;
@@ -340,7 +347,33 @@ internal static class BowSecondaryKeyHintSystem
         hint.SetText($"{detonateLabel} <mspace=0.6em>{buttonLabel}</mspace>");
     }
 
-    private static GameObject? ResolveBlockHint(KeyHints hints, bool gamepadActive)
+    private static GameObject? ResolveCachedBlockHint(KeyHints hints, bool gamepadActive)
+    {
+        if (_cachedBlockHintResolved &&
+            _cachedBlockHintHints == hints &&
+            _cachedBlockHintGamepadActive == gamepadActive)
+        {
+            if (_cachedBlockHint != null && _cachedBlockHint.transform.parent != null)
+            {
+                return _cachedBlockHint;
+            }
+
+            if (_cachedBlockHint == null &&
+                Time.frameCount - _cachedBlockHintFrame < MissingBlockHintRefreshFrames)
+            {
+                return null;
+            }
+        }
+
+        _cachedBlockHintHints = hints;
+        _cachedBlockHintGamepadActive = gamepadActive;
+        _cachedBlockHint = ResolveBlockHintUncached(hints, gamepadActive);
+        _cachedBlockHintResolved = true;
+        _cachedBlockHintFrame = Time.frameCount;
+        return _cachedBlockHint;
+    }
+
+    private static GameObject? ResolveBlockHintUncached(KeyHints hints, bool gamepadActive)
     {
         Transform? preferredGroup = ResolveCombatInputGroup(hints, gamepadActive);
         GameObject? blockHint = FindBlockHint(preferredGroup);
@@ -351,6 +384,14 @@ internal static class BowSecondaryKeyHintSystem
 
         Transform? alternateGroup = ResolveCombatInputGroup(hints, !gamepadActive);
         return FindBlockHint(alternateGroup);
+    }
+
+    private static void ClearBlockHintCache()
+    {
+        _cachedBlockHintHints = null;
+        _cachedBlockHint = null;
+        _cachedBlockHintResolved = false;
+        _cachedBlockHintFrame = 0;
     }
 
     private static Transform? ResolveCombatInputGroup(KeyHints hints, bool gamepadActive)

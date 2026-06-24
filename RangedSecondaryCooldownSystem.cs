@@ -72,11 +72,16 @@ internal static class RangedSecondaryCooldownSystem
 
         if (!Cooldowns.TryGetValue(player, out CharacterCooldownState state))
         {
-            ClearCooldownStatus(player);
+            if (!SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(player))
+            {
+                ClearCooldownStatus(player);
+            }
+
             return;
         }
 
         double now = SecondaryAttackManager.GetNetworkTimeSeconds();
+        bool suppressStatusEffects = SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(player);
         List<string> expiredKeys = state.UpdateKeys;
         expiredKeys.Clear();
         foreach ((string key, double readyAt) in state.ReadyAtByWeaponKey)
@@ -95,6 +100,22 @@ internal static class RangedSecondaryCooldownSystem
         }
 
         expiredKeys.Clear();
+        if (suppressStatusEffects)
+        {
+            if (state.ReadyAtByWeaponKey.Count > 0 && !state.HudClearedStatus)
+            {
+                ClearCooldownStatus(player);
+                state.HudClearedStatus = true;
+            }
+            else if (state.ReadyAtByWeaponKey.Count == 0)
+            {
+                state.HudClearedStatus = false;
+            }
+
+            return;
+        }
+
+        state.HudClearedStatus = false;
         ItemDrop.ItemData? weapon = player.GetCurrentWeapon();
         string currentKey = ResolveWeaponKey(weapon);
         if (!string.IsNullOrWhiteSpace(currentKey) &&
@@ -167,7 +188,17 @@ internal static class RangedSecondaryCooldownSystem
         state.ReadyAtByWeaponKey[key] = SecondaryAttackManager.GetNetworkTimeSeconds() + finalCooldown;
         state.DurationByWeaponKey[key] = finalCooldown;
         state.IconByWeaponKey[key] = ResolveWeaponIcon(weapon) ?? ResolveRegisteredIcon();
-        SyncCooldownStatusTtl(attacker, weapon, finalCooldown);
+        state.HudClearedStatus = false;
+        if (SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(attacker))
+        {
+            ClearCooldownStatus(attacker);
+            state.HudClearedStatus = true;
+        }
+        else
+        {
+            SyncCooldownStatusTtl(attacker, weapon, finalCooldown);
+        }
+
         return true;
     }
 
@@ -203,7 +234,7 @@ internal static class RangedSecondaryCooldownSystem
             Sprite? icon = state.IconByWeaponKey.TryGetValue(key, out Sprite? storedIcon)
                 ? storedIcon
                 : ResolveRegisteredIcon();
-            entries.Add(new SecondaryCooldownHudSystem.Entry($"ranged:{key}", "rangedSecondary", icon, remaining, duration));
+            entries.Add(new SecondaryCooldownHudSystem.Entry(icon, remaining, duration));
         }
 
         keys.Clear();
@@ -310,5 +341,7 @@ internal static class RangedSecondaryCooldownSystem
         public Dictionary<string, Sprite?> IconByWeaponKey { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public List<string> UpdateKeys { get; } = new();
+
+        public bool HudClearedStatus { get; set; }
     }
 }
