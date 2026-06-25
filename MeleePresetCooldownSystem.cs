@@ -45,7 +45,18 @@ internal static class MeleePresetCooldownSystem
         out float finalCooldown)
     {
         finalCooldown = 0f;
-        if (attacker == null || cooldown == null)
+        if (attacker == null)
+        {
+            return true;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
+        {
+            ClearCooldown(attacker, presetName);
+            return true;
+        }
+
+        if (cooldown == null)
         {
             return true;
         }
@@ -87,7 +98,18 @@ internal static class MeleePresetCooldownSystem
 
     internal static void UpdateActiveCooldowns(Player player)
     {
-        if (player == null || !Cooldowns.TryGetValue(player, out CharacterCooldownState state))
+        if (player == null)
+        {
+            return;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(player))
+        {
+            ClearAllCooldowns(player);
+            return;
+        }
+
+        if (!Cooldowns.TryGetValue(player, out CharacterCooldownState state))
         {
             return;
         }
@@ -147,7 +169,18 @@ internal static class MeleePresetCooldownSystem
         string presetName,
         MeleePresetCooldownDefinition cooldown)
     {
-        if (attacker == null || cooldown == null || Mathf.Max(0f, cooldown.Cooldown) <= 0f)
+        if (attacker == null)
+        {
+            return true;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
+        {
+            ClearCooldown(attacker, presetName);
+            return true;
+        }
+
+        if (cooldown == null || Mathf.Max(0f, cooldown.Cooldown) <= 0f)
         {
             return true;
         }
@@ -169,7 +202,18 @@ internal static class MeleePresetCooldownSystem
     internal static bool IsCooldownActive(Character attacker, ItemDrop.ItemData? weapon, string presetName, out float remaining)
     {
         remaining = 0f;
-        if (attacker == null || !Cooldowns.TryGetValue(attacker, out CharacterCooldownState state))
+        if (attacker == null)
+        {
+            return false;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
+        {
+            ClearCooldown(attacker, presetName);
+            return false;
+        }
+
+        if (!Cooldowns.TryGetValue(attacker, out CharacterCooldownState state))
         {
             return false;
         }
@@ -196,7 +240,18 @@ internal static class MeleePresetCooldownSystem
 
     internal static void CollectHudEntries(Player player, List<SecondaryCooldownHudSystem.Entry> entries)
     {
-        if (player == null || entries == null || !Cooldowns.TryGetValue(player, out CharacterCooldownState state))
+        if (player == null || entries == null)
+        {
+            return;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(player))
+        {
+            ClearAllCooldowns(player);
+            return;
+        }
+
+        if (!Cooldowns.TryGetValue(player, out CharacterCooldownState state))
         {
             return;
         }
@@ -255,6 +310,11 @@ internal static class MeleePresetCooldownSystem
 
         float baseCooldown = Mathf.Max(0f, cooldown.Cooldown);
         string key = string.IsNullOrWhiteSpace(presetName) ? "unknown" : presetName.Trim();
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
+        {
+            return $"key={key} baseCooldown={baseCooldown:0.###} ready=true reason=admin-bypass";
+        }
+
         if (baseCooldown <= 0f)
         {
             return $"key={key} baseCooldown={baseCooldown:0.###} ready=true reason=no-cooldown";
@@ -371,6 +431,33 @@ internal static class MeleePresetCooldownSystem
         state.DurationByPreset.Remove(presetName);
         state.IconByPreset.Remove(presetName);
         state.HudClearedStatusByPreset.Remove(presetName);
+    }
+
+    private static void ClearCooldown(Character attacker, string presetName)
+    {
+        string key = string.IsNullOrWhiteSpace(presetName) ? "unknown" : presetName.Trim();
+        if (Cooldowns.TryGetValue(attacker, out CharacterCooldownState state))
+        {
+            ClearCooldownState(state, key);
+        }
+
+        ClearCooldownStatus(attacker, key);
+    }
+
+    private static void ClearAllCooldowns(Character attacker)
+    {
+        if (Cooldowns.TryGetValue(attacker, out CharacterCooldownState state))
+        {
+            state.ReadyAtByPreset.Clear();
+            state.DurationByPreset.Clear();
+            state.IconByPreset.Clear();
+            state.HudClearedStatusByPreset.Clear();
+        }
+
+        foreach (string presetName in StatusesByPreset.Keys)
+        {
+            ClearCooldownStatus(attacker, presetName);
+        }
     }
 
     private static void ClearCooldownStatus(Character attacker, string presetName)

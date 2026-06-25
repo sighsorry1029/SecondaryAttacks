@@ -212,3 +212,5 @@ Melee and Blood Magic presets use `Global` blocks for shared defaults and prefab
 - Adds General config tweaks for Sneak scaling, including sneak movement speed, visibility reduction, and backstab skill gain tuning.
 - Adds General config tweaks for Blood Magic health-cost behavior, including max-health based costs and Blood Magic skill gain from health-cost abilities.
 
+## Github
+https://github.com/sighsorry1029?tab=repositories

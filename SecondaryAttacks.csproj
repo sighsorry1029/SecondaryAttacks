@@ -501,6 +501,7 @@
         <Compile Include="SecondaryAttackConfigLoader.cs" />
         <Compile Include="SecondaryAttackLocalization.cs" />
         <Compile Include="SecondaryAttackAdrenalineSystem.cs" />
+        <Compile Include="SecondaryAttackAdminAccessSystem.cs" />
         <Compile Include="SecondaryAttackNamedEffectSystem.cs" />
         <Compile Include="SecondaryAttackMagicSummonNormalizer.cs" />
         <Compile Include="SecondaryAttackWeaponConfigNormalizer.cs" />

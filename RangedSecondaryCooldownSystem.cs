@@ -70,6 +70,12 @@ internal static class RangedSecondaryCooldownSystem
             return;
         }
 
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(player))
+        {
+            ClearAllCooldowns(player);
+            return;
+        }
+
         if (!Cooldowns.TryGetValue(player, out CharacterCooldownState state))
         {
             if (!SecondaryCooldownHudSystem.ShouldSuppressCooldownStatusEffects(player))
@@ -131,7 +137,18 @@ internal static class RangedSecondaryCooldownSystem
 
     private static bool CanUse(Character attacker, ItemDrop.ItemData? weapon, ProjectileSecondaryBehavior behavior)
     {
-        if (attacker == null || behavior == null || Mathf.Max(0f, behavior.Cooldown) <= 0f)
+        if (attacker == null)
+        {
+            return true;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
+        {
+            ClearAllCooldowns(attacker);
+            return true;
+        }
+
+        if (behavior == null || Mathf.Max(0f, behavior.Cooldown) <= 0f)
         {
             return true;
         }
@@ -159,7 +176,18 @@ internal static class RangedSecondaryCooldownSystem
 
     private static bool StartCooldown(Character attacker, ItemDrop.ItemData? weapon, ProjectileSecondaryBehavior behavior)
     {
-        if (attacker == null || behavior == null)
+        if (attacker == null)
+        {
+            return true;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
+        {
+            ClearAllCooldowns(attacker);
+            return true;
+        }
+
+        if (behavior == null)
         {
             return true;
         }
@@ -204,7 +232,18 @@ internal static class RangedSecondaryCooldownSystem
 
     internal static void CollectHudEntries(Player player, List<SecondaryCooldownHudSystem.Entry> entries)
     {
-        if (player == null || entries == null || !Cooldowns.TryGetValue(player, out CharacterCooldownState state))
+        if (player == null || entries == null)
+        {
+            return;
+        }
+
+        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(player))
+        {
+            ClearAllCooldowns(player);
+            return;
+        }
+
+        if (!Cooldowns.TryGetValue(player, out CharacterCooldownState state))
         {
             return;
         }
@@ -297,6 +336,19 @@ internal static class RangedSecondaryCooldownSystem
         {
             statusEffect.m_ttl = statusEffect.m_time;
         }
+    }
+
+    private static void ClearAllCooldowns(Character attacker)
+    {
+        if (Cooldowns.TryGetValue(attacker, out CharacterCooldownState state))
+        {
+            state.ReadyAtByWeaponKey.Clear();
+            state.DurationByWeaponKey.Clear();
+            state.IconByWeaponKey.Clear();
+            state.HudClearedStatus = false;
+        }
+
+        ClearCooldownStatus(attacker);
     }
 
     private static string ResolveWeaponKey(ItemDrop.ItemData? weapon)

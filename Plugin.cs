@@ -18,7 +18,7 @@ namespace SecondaryAttacks;
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.0.0";
+    internal const string ModVersion = "1.0.1";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -44,6 +44,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> SecondaryCooldownHudScale => Settings.Ui.SecondaryCooldownHudScale;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionX => Settings.Ui.SecondaryCooldownHudPositionX;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
+    internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.Admin.AdminNoPresetCooldowns;
     private FileSystemWatcher? _watcher;
     private readonly object _reloadLock = new();
     private DateTime _lastConfigReloadTime;
@@ -235,11 +236,14 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
         internal UiSettings Ui { get; } = new();
 
+        internal AdminSettings Admin { get; } = new();
+
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
             General.Bind(plugin);
             Ranged.Bind(plugin);
             Ui.Bind(plugin);
+            Admin.Bind(plugin);
         }
     }
 
@@ -302,6 +306,22 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             SecondaryCooldownHudScale = plugin.config(group, "Secondary Cooldown HUD Scale", 2.0f, new ConfigDescription("Client-side scale for the secondary cooldown HUD block.", new AcceptableValueRange<float>(1.0f, 2.0f)), synchronizedSetting: false);
             SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.6f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
             SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
+        }
+    }
+
+    internal sealed class AdminSettings
+    {
+        internal ConfigEntry<Toggle> AdminNoPresetCooldowns = null!;
+
+        internal void Bind(SecondaryAttacksPlugin plugin)
+        {
+            const string group = "4 - Admin";
+            AdminNoPresetCooldowns = plugin.config(
+                group,
+                "Admin No Preset Cooldowns",
+                Toggle.Off,
+                "Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.",
+                synchronizedSetting: false);
         }
     }
 
