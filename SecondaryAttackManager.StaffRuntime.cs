@@ -121,7 +121,7 @@ internal static class StaffRuntimeSystem
 
         float moveSpeedFactor = Mathf.Max(0.05f, behavior.MoveSpeedFactor);
         float attackSpeedFactor = Mathf.Max(0.05f, behavior.AttackSpeedFactor);
-        float expiry = SecondaryAttackManager.GetNetworkTimeSeconds() + Mathf.Max(0.1f, behavior.Duration);
+        float expiry = (float)SecondaryAttackManager.GetNetworkTimeSeconds() + Mathf.Max(0.1f, behavior.Duration);
         Vector3 origin = player.GetCenterPoint();
         int affectedTargets = 0;
 
@@ -331,7 +331,7 @@ internal static class StaffRuntimeSystem
             return;
         }
 
-        float now = SecondaryAttackManager.GetNetworkTimeSeconds();
+        float now = (float)SecondaryAttackManager.GetNetworkTimeSeconds();
         if (SecondaryAttackManager.TryGetShieldRemaining(character, preferredStatusEffectHash: 0, out _, out float remaining, out float remainingTime))
         {
             zdo!.Set(SecondaryAttackManager.ShieldRemainingDisplayZdoKeyForStaffRuntime, Mathf.Max(0f, remaining));
@@ -355,7 +355,7 @@ internal static class StaffRuntimeSystem
             return false;
         }
 
-        float now = SecondaryAttackManager.GetNetworkTimeSeconds();
+        float now = (float)SecondaryAttackManager.GetNetworkTimeSeconds();
         float expiry = zdo!.GetFloat(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, 0f);
         if (expiry <= now)
         {
@@ -379,7 +379,7 @@ internal static class StaffRuntimeSystem
             return SecondaryAttackManager.TryGetShieldRemaining(character, preferredStatusEffectHash: 0, out _, out remaining, out _);
         }
 
-        float now = SecondaryAttackManager.GetNetworkTimeSeconds();
+        float now = (float)SecondaryAttackManager.GetNetworkTimeSeconds();
         float expiry = zdo!.GetFloat(SecondaryAttackManager.ShieldDisplayExpiryZdoKeyForStaffRuntime, 0f);
         if (expiry <= now)
         {

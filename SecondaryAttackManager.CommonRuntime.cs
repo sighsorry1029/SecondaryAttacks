@@ -187,9 +187,9 @@ internal static partial class SecondaryAttackManager
         return nview != null && nview.IsValid() && zdo != null;
     }
 
-    internal static float GetNetworkTimeSeconds()
+    internal static double GetNetworkTimeSeconds()
     {
-        return ZNet.instance != null ? (float)ZNet.instance.GetTimeSeconds() : Time.time;
+        return ZNet.instance != null ? ZNet.instance.GetTimeSeconds() : Time.timeAsDouble;
     }
 
     internal static bool TryGetShieldRemaining(
