@@ -1089,6 +1089,8 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                 CooldownReductionFactor = raw.CooldownReductionFactor ?? baseConfig.CooldownReductionFactor,
                 ResourceMultiplier = raw.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
                 DurabilityFactor = raw.DurabilityFactor ?? baseConfig.DurabilityFactor,
+                DamageFactor = raw.DamageFactor ?? baseConfig.DamageFactor,
+                PushFactor = raw.PushFactor ?? baseConfig.PushFactor,
                 LoopStart = raw.LoopStart ?? baseConfig.LoopStart,
                 LoopEnd = raw.LoopEnd ?? baseConfig.LoopEnd,
                 AnimationSpeed = raw.AnimationSpeed ?? baseConfig.AnimationSpeed,

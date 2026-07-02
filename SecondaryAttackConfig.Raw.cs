@@ -264,6 +264,10 @@ internal sealed class SpinningSweepConfig
 
     public float? DurabilityFactor { get; set; }
 
+    public float? DamageFactor { get; set; }
+
+    public float? PushFactor { get; set; }
+
     public float? LoopStart { get; set; }
 
     public float? LoopEnd { get; set; }

@@ -125,6 +125,8 @@ Global:
     cooldownReductionFactor: 0.5
     durabilityFactor: 1.5
     resourceMultiplier: 1.5
+    damageFactor: 0.75 # Damage multiplier applied to each loop attack.
+    pushFactor: 0.5 # Push/knockback multiplier applied to each loop attack.
     skillRaiseFactor: 0.25 # Skill gain multiplier per loop hit.
     animation: atgeir_secondary # Looping spin animation trigger.
     loopStart: 0.4 # Normalized animation time rewound to after each loop.
@@ -235,6 +237,7 @@ AtgeirIron:
   enabled: false
   preset: spinningSweep
   spinningSweep:
+    damageFactor: 0.85
     moveSpeedFactor: 0.85
 
 AtgeirBlackmetal:
@@ -242,6 +245,7 @@ AtgeirBlackmetal:
   preset: spinningSweep
   spinningSweep:
     animationSpeed: 1.1
+    pushFactor: 0.65
 
 # launchSlam
 MaceIron:

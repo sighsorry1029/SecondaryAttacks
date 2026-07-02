@@ -123,6 +123,8 @@ internal sealed class SpinningSweepController : MonoBehaviour
     private float _nextRepeatTime;
     private float _originalAnimatorSpeed = 1f;
     private float _originalRaiseSkillAmount;
+    private float _originalDamageMultiplier = 1f;
+    private float _originalForceMultiplier = 1f;
     private int _loopStateHash;
     private int _lastLoopFrame = -1;
     private int _startedFrame;
@@ -133,10 +135,12 @@ internal sealed class SpinningSweepController : MonoBehaviour
     private bool _lastPrimaryHold;
     private bool _hasOriginalAnimatorSpeed;
     private bool _hasOriginalRaiseSkillAmount;
+    private bool _hasOriginalAttackMultipliers;
     private bool _speedApplied;
     private bool _initialLoopStartApplied;
     private bool _loopRearmed = true;
     private Attack? _skillRaiseAttack;
+    private Attack? _multiplierAttack;
 
     internal bool IsActive => _spinningSweep != null && !_stopRequested;
 
@@ -192,6 +196,7 @@ internal sealed class SpinningSweepController : MonoBehaviour
         }
 
         ApplyMovementFactors(attack, spinningSweep);
+        ApplyAttackMultipliers(attack, spinningSweep);
         ApplySkillRaiseFactor(attack, spinningSweep);
         ApplyAnimationSpeed(spinningSweep);
         _nextRepeatTime = Time.time + SpinningSweepSystem.GetRepeatDelay();
@@ -636,6 +641,34 @@ internal sealed class SpinningSweepController : MonoBehaviour
         attack.m_speedFactorRotation = SpinningSweepSystem.GetRotationSpeedFactor();
     }
 
+    private void ApplyAttackMultipliers(Attack attack, SpinningSweepDefinition spinningSweep)
+    {
+        if (!ReferenceEquals(_multiplierAttack, attack))
+        {
+            RestoreAttackMultipliers();
+            _multiplierAttack = attack;
+            _originalDamageMultiplier = attack.m_damageMultiplier;
+            _originalForceMultiplier = attack.m_forceMultiplier;
+            _hasOriginalAttackMultipliers = true;
+        }
+
+        attack.m_damageMultiplier = _originalDamageMultiplier * Mathf.Max(0f, spinningSweep.DamageFactor);
+        attack.m_forceMultiplier = _originalForceMultiplier * Mathf.Max(0f, spinningSweep.PushFactor);
+    }
+
+    private void RestoreAttackMultipliers()
+    {
+        if (!_hasOriginalAttackMultipliers || _multiplierAttack == null)
+        {
+            return;
+        }
+
+        _multiplierAttack.m_damageMultiplier = _originalDamageMultiplier;
+        _multiplierAttack.m_forceMultiplier = _originalForceMultiplier;
+        _multiplierAttack = null;
+        _hasOriginalAttackMultipliers = false;
+    }
+
     private void ApplySkillRaiseFactor(Attack attack, SpinningSweepDefinition spinningSweep)
     {
         if (!ReferenceEquals(_skillRaiseAttack, attack))
@@ -669,6 +702,7 @@ internal sealed class SpinningSweepController : MonoBehaviour
         }
 
         SweepTrailResetSystem.ClearWeaponTrails(_currentAttack);
+        RestoreAttackMultipliers();
         RestoreSkillRaiseFactor();
         RestoreAnimationSpeed();
     }

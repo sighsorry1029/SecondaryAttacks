@@ -325,6 +325,8 @@ internal static partial class SecondaryAttackManager
                 spinningSweep.Cooldown,
                 spinningSweep.CooldownReductionFactor),
             DurabilityFactor = Mathf.Max(0f, spinningSweep.DurabilityFactor),
+            DamageFactor = Mathf.Max(0f, spinningSweep.DamageFactor),
+            PushFactor = Mathf.Max(0f, spinningSweep.PushFactor),
             LoopStart = loopStart,
             LoopEnd = loopEnd,
             AnimationSpeed = Mathf.Clamp(spinningSweep.AnimationSpeed, 0.1f, 5f),

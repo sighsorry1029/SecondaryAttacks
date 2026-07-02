@@ -249,6 +249,10 @@ internal sealed class NormalizedSpinningSweepConfig
 
     public float DurabilityFactor { get; set; } = 1f;
 
+    public float DamageFactor { get; set; } = 0.75f;
+
+    public float PushFactor { get; set; } = 0.5f;
+
     public float LoopStart { get; set; } = 0.4f;
 
     public float LoopEnd { get; set; } = 0.6f;
