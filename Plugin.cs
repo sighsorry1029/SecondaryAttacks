@@ -18,7 +18,7 @@ namespace SecondaryAttacks;
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.0.2";
+    internal const string ModVersion = "1.0.3";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -266,7 +266,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             BackstabSneakSkillRaiseAmount = plugin.config(group, "Backstab Sneak Skill Raise Amount", 1.0f, new ConfigDescription("Sneak skill raise amount awarded whenever any attack successfully triggers backstab damage. 0 disables this reward.", new AcceptableValueRange<float>(0f, 10f), new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
             MagicSummonQualityPreset = plugin.config(group, "Magic Summon Quality Preset", MagicSummonQualityPresetSelection.LevelByQuality, new ConfigDescription("Global quality preset for BloodMagic summon items whose primary or secondary projectile resolves to a SpawnAbility. Explicit summon blocks in SecondaryAttacks.BloodMagic.yml override this. Off disables automatic quality scaling; CountByQuality makes item quality raise active summon count; LevelByQuality makes item quality raise summoned creature level.", null, new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
             BloodMagicHealthCostUsesMaxHealth = plugin.config(group, "Blood Magic Health Cost Uses Max Health", Toggle.On, new ConfigDescription("If on, Blood Magic attack health percentage costs are calculated from max health at cast time instead of current health. Flat health cost and Blood Magic skill cost reduction are unchanged.", null, new ConfigurationManagerAttributes { Order = 650 }), synchronizedSetting: true);
-            BloodMagicHealthCostSkillRaiseFactor = plugin.config(group, "Blood Magic Health Cost Skill Raise Factor", 0.01f, new ConfigDescription("Blood Magic skill raise amount per actual consumed health. 0 disables this custom health-cost skill gain and keeps the vanilla Blood Magic skill gain behavior. Example: consuming 160 health and 0.01 factor awards 1.6 raise amount.", new AcceptableValueRange<float>(0f, 0.1f), new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
+            BloodMagicHealthCostSkillRaiseFactor = plugin.config(group, "Blood Magic Health Cost Skill Raise Factor", 0.01f, new ConfigDescription("Additional Blood Magic skill raise amount per actual consumed health. Vanilla Blood Magic skill gain always remains active. 0 disables only this custom health-cost skill gain. Example: consuming 160 health and 0.01 factor awards 1.6 extra raise amount.", new AcceptableValueRange<float>(0f, 0.1f), new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
         }
     }
 

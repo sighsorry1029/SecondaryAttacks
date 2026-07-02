@@ -41,6 +41,7 @@ internal static class SpinningSweepSystem
             }
 
             controller.AttachAttack(attack, spinningSweep);
+            SweepObserverVisualSystem.SendRefresh(humanoid, false, attack.m_attackAnimation, spinningSweep.LoopStart, spinningSweep.LoopEnd, spinningSweep.AnimationSpeed);
             return true;
         }
 
@@ -60,6 +61,7 @@ internal static class SpinningSweepSystem
         }
 
         controller.Begin(attack, definition, spinningSweep);
+        SweepObserverVisualSystem.SendStart(humanoid, false, attack.m_attackAnimation, spinningSweep.LoopStart, spinningSweep.LoopEnd, spinningSweep.AnimationSpeed);
         if (debugLogging)
         {
             LogDebug($"begin weapon={DescribeWeapon(attack.m_weapon)} animation={attack.m_attackAnimation} loop={spinningSweep.LoopStart:0.###}-{spinningSweep.LoopEnd:0.###} speed={spinningSweep.AnimationSpeed:0.###} move={spinningSweep.MoveSpeedFactor:0.###}.");
@@ -481,6 +483,10 @@ internal sealed class SpinningSweepController : MonoBehaviour
 
         SweepTrailResetSystem.ClearWeaponTrails(_currentAttack);
         _animator.Play(stateHash, 0, _spinningSweep.LoopStart);
+        if (_humanoid != null && SecondaryAttackManager.HasCharacterAuthority(_humanoid))
+        {
+            SweepObserverVisualSystem.SendRefresh(_humanoid, false, _currentAttack?.m_attackAnimation ?? string.Empty, _spinningSweep.LoopStart, _spinningSweep.LoopEnd, _spinningSweep.AnimationSpeed);
+        }
     }
 
     private static AnimatorStateInfo GetAttackAnimatorState(Animator animator)
@@ -657,6 +663,11 @@ internal sealed class SpinningSweepController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_humanoid != null && SecondaryAttackManager.HasCharacterAuthority(_humanoid))
+        {
+            SweepObserverVisualSystem.SendStop(_humanoid);
+        }
+
         SweepTrailResetSystem.ClearWeaponTrails(_currentAttack);
         RestoreSkillRaiseFactor();
         RestoreAnimationSpeed();

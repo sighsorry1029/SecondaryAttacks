@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
@@ -7,6 +8,7 @@ namespace SecondaryAttacks;
 
 internal static class RiftTrailSystem
 {
+    internal const string ObserverFallbackVisualRpcName = "SecondaryAttacks_RiftTrailVisual";
     private const bool HitThroughWalls = false;
     private const int MaxTrailSamples = 64;
     private const float MinTrailSampleDistance = 0.025f;
@@ -78,6 +80,48 @@ internal static class RiftTrailSystem
         }
 
         controller.Activate();
+        SendObserverFallbackVisual(attack, definition.RiftTrail!);
+    }
+
+    internal static void HandleObserverFallbackVisualRpc(Character character, ZNetView? nview, Vector3 origin, Vector3 forward, string payload)
+    {
+        if (character == null || nview == null || !nview.IsValid() || nview.IsOwner())
+        {
+            return;
+        }
+
+        if (!TryParseObserverFallbackVisualPayload(payload, out RiftTrailObserverVisualData data))
+        {
+            return;
+        }
+
+        RiftTrailObserverFallbackController controller =
+            character.GetComponent<RiftTrailObserverFallbackController>() ??
+            character.gameObject.AddComponent<RiftTrailObserverFallbackController>();
+        controller.Initialize(origin, forward, data);
+    }
+
+    private static void SendObserverFallbackVisual(Attack attack, RiftTrailDefinition riftTrail)
+    {
+        if (attack?.m_character == null ||
+            riftTrail.VisualScaleFactor <= 0f ||
+            !SecondaryAttackManager.TryGetCharacterZdo(attack.m_character, out ZNetView? nview, out _) ||
+            ZRoutedRpc.instance == null)
+        {
+            return;
+        }
+
+        ResolveAttackShape(attack, out Vector3 origin, out Vector3 forward, out float range, out float angle, out float width);
+        string payload = CreateObserverFallbackVisualPayload(
+            range,
+            angle,
+            width,
+            riftTrail.Duration,
+            riftTrail.VisualScaleFactor,
+            riftTrail.VisualForwardOffset,
+            riftTrail.VisualAlphaFactor,
+            riftTrail.VisualTint);
+        nview!.InvokeRPC(ZNetView.Everybody, ObserverFallbackVisualRpcName, origin, forward, payload);
     }
 
     private static void UnregisterController(Attack? attack, RiftTrailController controller)
@@ -378,10 +422,90 @@ internal static class RiftTrailSystem
         return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
     }
 
+    private static void ResolveAttackShape(
+        Attack attack,
+        out Vector3 origin,
+        out Vector3 forward,
+        out float range,
+        out float angle,
+        out float width)
+    {
+        Transform attackerTransform = attack.m_character.transform;
+        Vector3 projectedForward = Vector3.ProjectOnPlane(attackerTransform.forward, Vector3.up);
+        forward = projectedForward.sqrMagnitude > 0.001f ? projectedForward.normalized : attackerTransform.forward;
+        origin = attackerTransform.position +
+                 Vector3.up * Mathf.Max(0f, attack.m_attackHeight) +
+                 attackerTransform.right * attack.m_attackOffset;
+        range = Mathf.Max(0.1f, attack.m_attackRange);
+        angle = Mathf.Clamp(attack.m_attackAngle, 1f, 360f);
+        width = Mathf.Max(0.01f, attack.m_attackRayWidth + Mathf.Max(0f, attack.m_attackRayWidthCharExtra));
+    }
+
+    private static string CreateObserverFallbackVisualPayload(
+        float range,
+        float angle,
+        float width,
+        float duration,
+        float visualScaleFactor,
+        float visualForwardOffset,
+        float visualAlphaFactor,
+        string visualTint)
+    {
+        CultureInfo culture = CultureInfo.InvariantCulture;
+        return string.Join(
+            "|",
+            Mathf.Max(0.1f, range).ToString("R", culture),
+            Mathf.Clamp(angle, 1f, 360f).ToString("R", culture),
+            Mathf.Max(0.01f, width).ToString("R", culture),
+            Mathf.Max(0.05f, duration).ToString("R", culture),
+            Mathf.Max(0.01f, visualScaleFactor).ToString("R", culture),
+            visualForwardOffset.ToString("R", culture),
+            Mathf.Max(0f, visualAlphaFactor).ToString("R", culture),
+            (visualTint ?? "#ffffff").Replace("|", string.Empty));
+    }
+
+    private static bool TryParseObserverFallbackVisualPayload(string payload, out RiftTrailObserverVisualData data)
+    {
+        data = default;
+        string[] parts = payload.Split('|');
+        if (parts.Length < 7)
+        {
+            return false;
+        }
+
+        CultureInfo culture = CultureInfo.InvariantCulture;
+        if (!float.TryParse(parts[0], NumberStyles.Float, culture, out float range) ||
+            !float.TryParse(parts[1], NumberStyles.Float, culture, out float angle) ||
+            !float.TryParse(parts[2], NumberStyles.Float, culture, out float width) ||
+            !float.TryParse(parts[3], NumberStyles.Float, culture, out float duration) ||
+            !float.TryParse(parts[4], NumberStyles.Float, culture, out float visualScaleFactor) ||
+            !float.TryParse(parts[5], NumberStyles.Float, culture, out float visualForwardOffset) ||
+            !float.TryParse(parts[6], NumberStyles.Float, culture, out float visualAlphaFactor))
+        {
+            return false;
+        }
+
+        data = new RiftTrailObserverVisualData(
+            Mathf.Max(0.1f, range),
+            Mathf.Clamp(angle, 1f, 360f),
+            Mathf.Max(0.01f, width),
+            Mathf.Max(0.05f, duration),
+            Mathf.Max(0.01f, visualScaleFactor),
+            visualForwardOffset,
+            Mathf.Max(0f, visualAlphaFactor),
+            parts.Length >= 8 ? parts[7] : "#ffffff");
+        return true;
+    }
+
     private static Color ResolveVisualTint(RiftTrailDefinition riftTrail)
     {
-        if (!string.IsNullOrWhiteSpace(riftTrail.VisualTint) &&
-            ColorUtility.TryParseHtmlString(riftTrail.VisualTint.Trim(), out Color tint))
+        return ResolveVisualTint(riftTrail.VisualTint);
+    }
+
+    private static Color ResolveVisualTint(string visualTint)
+    {
+        if (!string.IsNullOrWhiteSpace(visualTint) &&
+            ColorUtility.TryParseHtmlString(visualTint.Trim(), out Color tint))
         {
             return tint;
         }
@@ -396,6 +520,260 @@ internal static class RiftTrailSystem
         color.b *= tint.b;
         color.a *= tint.a * alphaFactor;
         return color;
+    }
+
+    private readonly struct RiftTrailObserverVisualData
+    {
+        public RiftTrailObserverVisualData(
+            float range,
+            float angle,
+            float width,
+            float duration,
+            float visualScaleFactor,
+            float visualForwardOffset,
+            float visualAlphaFactor,
+            string visualTint)
+        {
+            Range = range;
+            Angle = angle;
+            Width = width;
+            Duration = duration;
+            VisualScaleFactor = visualScaleFactor;
+            VisualForwardOffset = visualForwardOffset;
+            VisualAlphaFactor = visualAlphaFactor;
+            VisualTint = visualTint;
+        }
+
+        public float Range { get; }
+
+        public float Angle { get; }
+
+        public float Width { get; }
+
+        public float Duration { get; }
+
+        public float VisualScaleFactor { get; }
+
+        public float VisualForwardOffset { get; }
+
+        public float VisualAlphaFactor { get; }
+
+        public string VisualTint { get; }
+    }
+
+    private sealed class RiftTrailObserverFallbackController : MonoBehaviour
+    {
+        private readonly List<ObserverRibbonVisual> _visualRibbons = new();
+        private GameObject? _visualObject;
+        private float _endTime;
+        private float _visualEndTime;
+
+        internal void Initialize(Vector3 origin, Vector3 forward, RiftTrailObserverVisualData data)
+        {
+            DestroyVisuals();
+            if (forward.sqrMagnitude <= 0.001f || data.VisualScaleFactor <= 0f)
+            {
+                Destroy(this);
+                return;
+            }
+
+            Material? baseMaterial = GetRiftMaterial();
+            if (baseMaterial == null)
+            {
+                Destroy(this);
+                return;
+            }
+
+            forward = Vector3.ProjectOnPlane(forward, Vector3.up);
+            if (forward.sqrMagnitude <= 0.001f)
+            {
+                forward = transform.forward;
+            }
+
+            forward.Normalize();
+            _visualObject = new GameObject("SecondaryAttacks_RiftTrailObserverFallback");
+            CreateFallbackRibbonVisual(baseMaterial, origin, forward, data);
+            if (_visualRibbons.Count == 0)
+            {
+                DestroyVisuals();
+                Destroy(this);
+                return;
+            }
+
+            _endTime = Time.time + data.Duration;
+            _visualEndTime = _endTime + VisualFadeSeconds;
+            UpdateVisualFade();
+            enabled = true;
+        }
+
+        private void CreateFallbackRibbonVisual(Material baseMaterial, Vector3 origin, Vector3 forward, RiftTrailObserverVisualData data)
+        {
+            if (_visualObject == null)
+            {
+                return;
+            }
+
+            int sampleCount = Mathf.Clamp(Mathf.CeilToInt(data.Angle / 8f) + 2, 4, 24);
+            float halfAngle = data.Angle * 0.5f;
+            Vector3 visualOffset = forward * data.VisualForwardOffset;
+            float outerRadius = Mathf.Max(0.4f, data.Range);
+            float bandWidth = Mathf.Clamp(Mathf.Max(0.25f, data.Width * 1.25f) * data.VisualScaleFactor, 0.2f, outerRadius * 0.75f);
+            float innerRadius = Mathf.Max(0.1f, outerRadius - bandWidth);
+            Color visualTint = ResolveVisualTint(data.VisualTint);
+            Color baseColor = ApplyVisualTint(new Color(0.9f, 0.95f, 1f, 0.65f), visualTint, data.VisualAlphaFactor);
+
+            GameObject ribbonObject = new("RiftTrailObserverFallbackRibbon");
+            ribbonObject.transform.SetParent(_visualObject.transform, worldPositionStays: false);
+            MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
+            Material material = new(baseMaterial);
+            if (material.HasProperty("_Cull"))
+            {
+                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.color = baseColor;
+            }
+
+            meshRenderer.material = material;
+
+            Vector3[] vertices = new Vector3[sampleCount * 2];
+            Vector2[] uvs = new Vector2[sampleCount * 2];
+            Color[] colors = new Color[sampleCount * 2];
+            int[] triangles = new int[(sampleCount - 1) * 6];
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float t = sampleCount <= 1 ? 0f : i / (float)(sampleCount - 1);
+                float angle = Mathf.Lerp(-halfAngle, halfAngle, t);
+                Vector3 direction = (Quaternion.AngleAxis(angle, Vector3.up) * forward).normalized;
+                vertices[i * 2] = origin + visualOffset + direction * innerRadius;
+                vertices[i * 2 + 1] = origin + visualOffset + direction * outerRadius;
+                Color color = baseColor;
+                color.a *= Mathf.Lerp(0.35f, 1f, Mathf.Sin(t * Mathf.PI));
+                colors[i * 2] = color;
+                colors[i * 2 + 1] = color;
+                uvs[i * 2] = new Vector2(t, 0f);
+                uvs[i * 2 + 1] = new Vector2(t, 1f);
+            }
+
+            int triangleIndex = 0;
+            for (int i = 1; i < sampleCount; i++)
+            {
+                triangles[triangleIndex++] = i * 2 - 2;
+                triangles[triangleIndex++] = i * 2 - 1;
+                triangles[triangleIndex++] = i * 2;
+                triangles[triangleIndex++] = i * 2 + 1;
+                triangles[triangleIndex++] = i * 2;
+                triangles[triangleIndex++] = i * 2 - 1;
+            }
+
+            Mesh mesh = new()
+            {
+                vertices = vertices,
+                uv = uvs,
+                colors = colors,
+                triangles = triangles
+            };
+            mesh.RecalculateBounds();
+            meshFilter.sharedMesh = mesh;
+            _visualRibbons.Add(new ObserverRibbonVisual(mesh, material, colors, baseColor));
+        }
+
+        private void Update()
+        {
+            UpdateVisualFade();
+            if (Time.time >= _visualEndTime)
+            {
+                Destroy(this);
+            }
+        }
+
+        private void UpdateVisualFade()
+        {
+            if (_visualRibbons.Count == 0)
+            {
+                return;
+            }
+
+            float alpha = Time.time <= _endTime
+                ? 1f
+                : Mathf.Clamp01((_visualEndTime - Time.time) / VisualFadeSeconds);
+            foreach (ObserverRibbonVisual ribbon in _visualRibbons)
+            {
+                if (ribbon.Mesh == null || ribbon.Material == null)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < ribbon.WorkingColors.Length; i++)
+                {
+                    Color color = ribbon.BaseColors[i];
+                    color.a *= alpha;
+                    ribbon.WorkingColors[i] = color;
+                }
+
+                ribbon.Mesh.colors = ribbon.WorkingColors;
+                if (ribbon.Material.HasProperty("_Color"))
+                {
+                    Color materialColor = ribbon.BaseMaterialColor;
+                    materialColor.a *= alpha;
+                    ribbon.Material.color = materialColor;
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            DestroyVisuals();
+        }
+
+        private void DestroyVisuals()
+        {
+            if (_visualObject != null)
+            {
+                Destroy(_visualObject);
+                _visualObject = null;
+            }
+
+            foreach (ObserverRibbonVisual ribbon in _visualRibbons)
+            {
+                if (ribbon.Material != null)
+                {
+                    Destroy(ribbon.Material);
+                }
+
+                if (ribbon.Mesh != null)
+                {
+                    Destroy(ribbon.Mesh);
+                }
+            }
+
+            _visualRibbons.Clear();
+        }
+
+        private sealed class ObserverRibbonVisual
+        {
+            public ObserverRibbonVisual(Mesh mesh, Material material, Color[] baseColors, Color baseMaterialColor)
+            {
+                Mesh = mesh;
+                Material = material;
+                BaseColors = baseColors;
+                WorkingColors = new Color[baseColors.Length];
+                BaseMaterialColor = baseMaterialColor;
+            }
+
+            public Mesh Mesh { get; }
+
+            public Material Material { get; }
+
+            public Color[] BaseColors { get; }
+
+            public Color[] WorkingColors { get; }
+
+            public Color BaseMaterialColor { get; }
+        }
     }
 
     private readonly struct RiftTrailHitTarget

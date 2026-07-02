@@ -41,6 +41,20 @@ internal static class SweepTrailResetSystem
         }
     }
 
+    internal static void ClearWeaponTrails(Character? character)
+    {
+        GameObject? rightItemInstance = GetRightItemInstance(character);
+        if (rightItemInstance == null)
+        {
+            return;
+        }
+
+        foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+        {
+            ClearTrail(trail);
+        }
+    }
+
     private static void ClearTrail(MeleeWeaponTrail trail)
     {
         if (trail == null)
@@ -97,6 +111,12 @@ internal static class SweepTrailResetSystem
         }
 
         visEquipment = attack.m_character.GetComponent<VisEquipment>();
+        return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
+    }
+
+    private static GameObject? GetRightItemInstance(Character? character)
+    {
+        VisEquipment? visEquipment = character != null ? character.GetComponent<VisEquipment>() : null;
         return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
     }
 }

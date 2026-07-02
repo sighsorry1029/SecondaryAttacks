@@ -10,6 +10,7 @@ namespace SecondaryAttacks;
 internal static class SneakAmbushSystem
 {
     internal const string RpcName = "SecondaryAttacks_SpawnSneakAmbushVfx";
+    internal const string OwnerSmokeRpcName = "SecondaryAttacks_ApplySneakAmbushSmoke";
     private const string SmokeBombExplosionPrefabName = "smokebomb_explosion";
     private const string SmokeBombVfxChildName = "smoke particles";
     private const float DestroyDelay = 10f;
@@ -72,6 +73,44 @@ internal static class SneakAmbushSystem
         }
 
         SpawnVisual(position, Quaternion.Euler(0f, yaw, 0f));
+    }
+
+    internal static void ApplyOwnerSmokeFromRpc(
+        Character monster,
+        ZNetView? monsterView,
+        ZDOID hiddenPlayerId,
+        float range,
+        float senseBlockDuration,
+        float backstabResetSeconds)
+    {
+        if (monster == null ||
+            monsterView == null ||
+            !monsterView.IsValid() ||
+            !monsterView.IsOwner() ||
+            hiddenPlayerId.IsNone() ||
+            monster.IsDead() ||
+            monster.IsTamed() ||
+            monster.GetBaseAI() is not MonsterAI monsterAI)
+        {
+            return;
+        }
+
+        Player? hiddenPlayer = ResolvePlayer(hiddenPlayerId);
+        if (hiddenPlayer == null ||
+            hiddenPlayer.IsDead() ||
+            !IsValidSneakAmbushTarget(hiddenPlayer, monster))
+        {
+            return;
+        }
+
+        float allowedRange = Mathf.Max(0f, range) + 1f;
+        if (allowedRange > 0f &&
+            (monster.transform.position - hiddenPlayer.transform.position).sqrMagnitude > allowedRange * allowedRange)
+        {
+            return;
+        }
+
+        ApplyOwnedSmokeEffect(hiddenPlayer, monster, monsterAI, senseBlockDuration, backstabResetSeconds);
     }
 
     private static bool IsValidSneakAmbushTarget(Player player, Character target)
@@ -144,13 +183,12 @@ internal static class SneakAmbushSystem
 
     private static void ApplySmokeEffect(Player player, float range, float senseBlockDuration, float backstabResetSeconds)
     {
-        bool applySenseBlock = senseBlockDuration > 0f;
-        if (applySenseBlock)
+        ZDOID hiddenPlayerId = player.GetZDOID();
+        if (hiddenPlayerId.IsNone())
         {
-            EnsureUpdater();
+            return;
         }
 
-        float until = Time.time + senseBlockDuration;
         Vector3 playerPosition = player.transform.position;
         float rangeSqr = Mathf.Max(0f, range);
         rangeSqr *= rangeSqr;
@@ -161,21 +199,45 @@ internal static class SneakAmbushSystem
                 continue;
             }
 
-            ClearMonsterAwareness(character, monsterAI!, backstabResetSeconds);
-            if (!applySenseBlock)
+            if (!SecondaryAttackManager.TryGetCharacterZdo(character, out ZNetView? nview, out _))
             {
                 continue;
             }
 
-            if (SenseBlocks.TryGetValue(character, out SmokeSenseBlockState? previousBlock))
+            if (nview!.IsOwner())
             {
-                previousBlock.HiddenPlayer = player;
-                previousBlock.Until = Mathf.Max(previousBlock.Until, until);
+                ApplyOwnedSmokeEffect(player, character, monsterAI!, senseBlockDuration, backstabResetSeconds);
             }
             else
             {
-                SenseBlocks[character] = new SmokeSenseBlockState(player, until);
+                nview.InvokeRPC(OwnerSmokeRpcName, hiddenPlayerId, range, senseBlockDuration, backstabResetSeconds);
             }
+        }
+    }
+
+    private static void ApplyOwnedSmokeEffect(
+        Player player,
+        Character monster,
+        MonsterAI monsterAI,
+        float senseBlockDuration,
+        float backstabResetSeconds)
+    {
+        ClearMonsterAwareness(monster, monsterAI, backstabResetSeconds);
+        if (senseBlockDuration <= 0f)
+        {
+            return;
+        }
+
+        EnsureUpdater();
+        float until = Time.time + senseBlockDuration;
+        if (SenseBlocks.TryGetValue(monster, out SmokeSenseBlockState? previousBlock))
+        {
+            previousBlock.HiddenPlayer = player;
+            previousBlock.Until = Mathf.Max(previousBlock.Until, until);
+        }
+        else
+        {
+            SenseBlocks[monster] = new SmokeSenseBlockState(player, until);
         }
     }
 
@@ -218,10 +280,35 @@ internal static class SneakAmbushSystem
         return monsterAI != null;
     }
 
+    private static Player? ResolvePlayer(ZDOID playerId)
+    {
+        if (playerId.IsNone())
+        {
+            return null;
+        }
+
+        GameObject? playerObject = ZNetScene.instance != null ? ZNetScene.instance.FindInstance(playerId) : null;
+        if (playerObject != null && playerObject.TryGetComponent(out Player player))
+        {
+            return player;
+        }
+
+        foreach (Character character in Character.GetAllCharacters())
+        {
+            if (character is Player candidate && candidate.GetZDOID().Equals(playerId))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private static void ClearMonsterAwareness(Character character, MonsterAI monsterAI, float backstabResetSeconds)
     {
         monsterAI.SetTarget(null);
-        monsterAI.m_alerted = false;
+        monsterAI.SetTargetInfo(ZDOID.None);
+        monsterAI.SetAlerted(false);
         monsterAI.m_targetCreature = null;
         monsterAI.m_targetStatic = null;
         monsterAI.m_lastKnownTargetPos = character.transform.position;
@@ -238,7 +325,8 @@ internal static class SneakAmbushSystem
             zdo.Set("target", ZDOID.None);
             if (nview.IsOwner())
             {
-                zdo.Set("alerted", false);
+                monsterAI.SetTargetInfo(ZDOID.None);
+                monsterAI.SetAlerted(false);
             }
         }
 

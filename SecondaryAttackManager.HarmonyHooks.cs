@@ -23,6 +23,9 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         _nview.Register<float, int>("SecondaryAttacks_ConvertShieldToHeal", RPC_ConvertShieldToHeal);
         _nview.Register<float>(BackstabSkillGainSystem.GrantSneakSkillRpcName, RPC_GrantBackstabSneakSkill);
         _nview.Register<Vector3, float>(SneakAmbushSystem.RpcName, RPC_SpawnSneakAmbushVfx);
+        _nview.Register<ZDOID, float, float, float>(SneakAmbushSystem.OwnerSmokeRpcName, RPC_ApplySneakAmbushSmoke);
+        _nview.Register<int, string>(SweepObserverVisualSystem.RpcName, RPC_SweepVisual);
+        _nview.Register<Vector3, Vector3, string>(RiftTrailSystem.ObserverFallbackVisualRpcName, RPC_RiftTrailVisual);
         _nview.Register(StaffRuntimeSystem.StaffTargetEffectRpcName, RPC_SpawnStaffTargetEffect);
     }
 
@@ -59,6 +62,21 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
     private void RPC_SpawnSneakAmbushVfx(long sender, Vector3 position, float yaw)
     {
         SneakAmbushSystem.SpawnFromRpc(_character, position, yaw);
+    }
+
+    private void RPC_ApplySneakAmbushSmoke(long sender, ZDOID hiddenPlayerId, float range, float senseBlockDuration, float backstabResetSeconds)
+    {
+        SneakAmbushSystem.ApplyOwnerSmokeFromRpc(_character, _nview, hiddenPlayerId, range, senseBlockDuration, backstabResetSeconds);
+    }
+
+    private void RPC_SweepVisual(long sender, int action, string payload)
+    {
+        SweepObserverVisualSystem.HandleRpc(_character, _nview, action, payload);
+    }
+
+    private void RPC_RiftTrailVisual(long sender, Vector3 origin, Vector3 forward, string payload)
+    {
+        RiftTrailSystem.HandleObserverFallbackVisualRpc(_character, _nview, origin, forward, payload);
     }
 
     private void RPC_SpawnStaffTargetEffect(long sender)
@@ -446,11 +464,6 @@ internal static class SkillsRaiseSkillBloodMagicPatch
 {
     private static bool Prefix(Skills.SkillType skillType, ref float factor)
     {
-        if (BloodMagicSkillGainSystem.ShouldBlockBloodMagicRaise(skillType))
-        {
-            return false;
-        }
-
         HarvestSweepSystem.ApplySkillRaiseFactor(skillType, ref factor);
         return true;
     }

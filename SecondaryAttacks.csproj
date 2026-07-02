@@ -484,6 +484,7 @@
         <Compile Include="SneakAmbushChargeSystem.cs" />
         <Compile Include="SneakAmbushSystem.cs" />
         <Compile Include="SpinningSweepSystem.cs" />
+        <Compile Include="SweepObserverVisualSystem.cs" />
         <Compile Include="SweepTrailResetSystem.cs" />
         <Compile Include="SummonQualityHudSystem.cs" />
         <Compile Include="SweepHitStopSystem.cs" />

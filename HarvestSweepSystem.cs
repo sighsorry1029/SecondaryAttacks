@@ -46,6 +46,7 @@ internal static class HarvestSweepSystem
             }
 
             controller.AttachAttack(attack, harvestSweep);
+            SweepObserverVisualSystem.SendRefresh(humanoid, true, attack.m_attackAnimation, harvestSweep.LoopStart, harvestSweep.LoopEnd, harvestSweep.AnimationSpeed);
             return true;
         }
 
@@ -65,6 +66,7 @@ internal static class HarvestSweepSystem
         }
 
         controller.Begin(attack, definition, harvestSweep);
+        SweepObserverVisualSystem.SendStart(humanoid, true, attack.m_attackAnimation, harvestSweep.LoopStart, harvestSweep.LoopEnd, harvestSweep.AnimationSpeed);
         if (debugLogging)
         {
             LogDebug($"begin weapon={SpinningSweepSystem.DescribeWeapon(attack.m_weapon)} animation={attack.m_attackAnimation} loop={harvestSweep.LoopStart:0.###}-{harvestSweep.LoopEnd:0.###} speed={harvestSweep.AnimationSpeed:0.###} move={harvestSweep.MoveSpeedFactor:0.###}.");
@@ -521,6 +523,10 @@ internal sealed class HarvestSweepController : MonoBehaviour
         {
             SweepTrailResetSystem.ClearWeaponTrails(_currentAttack);
             _animator.Play(stateHash, 0, _harvestSweep.LoopStart);
+            if (_humanoid != null && SecondaryAttackManager.HasCharacterAuthority(_humanoid))
+            {
+                SweepObserverVisualSystem.SendRefresh(_humanoid, true, _currentAttack?.m_attackAnimation ?? string.Empty, _harvestSweep.LoopStart, _harvestSweep.LoopEnd, _harvestSweep.AnimationSpeed);
+            }
         }
     }
 
@@ -855,6 +861,11 @@ internal sealed class HarvestSweepController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_humanoid != null && SecondaryAttackManager.HasCharacterAuthority(_humanoid))
+        {
+            SweepObserverVisualSystem.SendStop(_humanoid);
+        }
+
         SweepTrailResetSystem.ClearWeaponTrails(_currentAttack);
         RestoreAnimationSpeed();
     }

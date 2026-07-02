@@ -4,8 +4,6 @@ namespace SecondaryAttacks;
 
 internal static class BloodMagicSkillGainSystem
 {
-    private static bool _allowConfiguredBloodMagicRaise;
-
     private static float GetHealthCostSkillRaiseFactor()
     {
         return Mathf.Max(0f, SecondaryAttacksPlugin.BloodMagicHealthCostSkillRaiseFactor?.Value ?? 0f);
@@ -44,13 +42,6 @@ internal static class BloodMagicSkillGainSystem
         healthCost = baseCost - baseCost * 0.33f * skillFactor;
     }
 
-    internal static bool ShouldBlockBloodMagicRaise(Skills.SkillType skillType)
-    {
-        return skillType == Skills.SkillType.BloodMagic &&
-               IsHealthCostSkillGainEnabled() &&
-               !_allowConfiguredBloodMagicRaise;
-    }
-
     internal static void TryGrantForHealthUse(Character character, float previousHealth)
     {
         if (!IsHealthCostSkillGainEnabled() || character is not Player player || character is not Humanoid humanoid)
@@ -77,14 +68,6 @@ internal static class BloodMagicSkillGainSystem
             return;
         }
 
-        _allowConfiguredBloodMagicRaise = true;
-        try
-        {
-            player.RaiseSkill(Skills.SkillType.BloodMagic, raiseAmount);
-        }
-        finally
-        {
-            _allowConfiguredBloodMagicRaise = false;
-        }
+        player.RaiseSkill(Skills.SkillType.BloodMagic, raiseAmount);
     }
 }
