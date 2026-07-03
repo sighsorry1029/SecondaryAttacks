@@ -13,9 +13,12 @@ internal static class RiftTrailSystem
     private const int MaxTrailSamples = 64;
     private const float MinTrailSampleDistance = 0.025f;
     private const int MaxTrailSubdivisions = 8;
+    private const int MaxObserverTrailSamples = 32;
     private const float PostTriggerVisualCaptureSeconds = 0.18f;
     private const float VisualFadeSeconds = 1f;
     private const float FanStepDegrees = 4f;
+    private const string ObserverSamplePayloadType = "S";
+    private const string ObserverFallbackPayloadType = "F";
     private static readonly FieldInfo AttackVisEquipmentField = AccessTools.Field(typeof(Attack), "m_visEquipment")!;
     private static readonly FieldInfo VisRightItemInstanceField = AccessTools.Field(typeof(VisEquipment), "m_rightItemInstance")!;
     private static readonly FieldInfo TrailBaseField = AccessTools.Field(typeof(MeleeWeaponTrail), "_base")!;
@@ -80,13 +83,21 @@ internal static class RiftTrailSystem
         }
 
         controller.Activate();
-        SendObserverFallbackVisual(attack, definition.RiftTrail!);
     }
 
     internal static void HandleObserverFallbackVisualRpc(Character character, ZNetView? nview, Vector3 origin, Vector3 forward, string payload)
     {
         if (character == null || nview == null || !nview.IsValid() || nview.IsOwner())
         {
+            return;
+        }
+
+        if (TryParseObserverSampleVisualPayload(payload, out RiftTrailObserverSampleVisualData sampleData))
+        {
+            RiftTrailObserverFallbackController sampleController =
+                character.GetComponent<RiftTrailObserverFallbackController>() ??
+                character.gameObject.AddComponent<RiftTrailObserverFallbackController>();
+            sampleController.InitializeSampled(character, sampleData);
             return;
         }
 
@@ -121,7 +132,21 @@ internal static class RiftTrailSystem
             riftTrail.VisualForwardOffset,
             riftTrail.VisualAlphaFactor,
             riftTrail.VisualTint);
+        SendObserverVisualPayload(attack, origin, forward, payload);
+    }
+
+    private static bool SendObserverVisualPayload(Attack attack, Vector3 origin, Vector3 forward, string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload) ||
+            attack?.m_character == null ||
+            !SecondaryAttackManager.TryGetCharacterZdo(attack.m_character, out ZNetView? nview, out _) ||
+            ZRoutedRpc.instance == null)
+        {
+            return false;
+        }
+
         nview!.InvokeRPC(ZNetView.Everybody, ObserverFallbackVisualRpcName, origin, forward, payload);
+        return true;
     }
 
     private static void UnregisterController(Attack? attack, RiftTrailController controller)
@@ -418,8 +443,33 @@ internal static class RiftTrailSystem
             return rightItemInstance;
         }
 
-        visEquipment = attack.m_character != null ? attack.m_character.GetComponent<VisEquipment>() : null;
+        return GetRightItemInstance(attack.m_character);
+    }
+
+    private static GameObject? GetRightItemInstance(Character? character)
+    {
+        VisEquipment? visEquipment = character != null ? character.GetComponent<VisEquipment>() : null;
         return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
+    }
+
+    private static List<ObserverTrailMetadata> ResolveObserverTrailMetadata(Character character)
+    {
+        List<ObserverTrailMetadata> metadata = new();
+        GameObject? rightItemInstance = GetRightItemInstance(character);
+        if (rightItemInstance == null)
+        {
+            return metadata;
+        }
+
+        foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+        {
+            metadata.Add(new ObserverTrailMetadata(
+                TrailMaterialField.GetValue(trail) as Material,
+                TrailColorsField.GetValue(trail) as Color[],
+                TrailSizesField.GetValue(trail) as float[]));
+        }
+
+        return metadata;
     }
 
     private static void ResolveAttackShape(
@@ -454,6 +504,7 @@ internal static class RiftTrailSystem
         CultureInfo culture = CultureInfo.InvariantCulture;
         return string.Join(
             "|",
+            ObserverFallbackPayloadType,
             Mathf.Max(0.1f, range).ToString("R", culture),
             Mathf.Clamp(angle, 1f, 360f).ToString("R", culture),
             Mathf.Max(0.01f, width).ToString("R", culture),
@@ -468,19 +519,20 @@ internal static class RiftTrailSystem
     {
         data = default;
         string[] parts = payload.Split('|');
-        if (parts.Length < 7)
+        int offset = parts.Length > 0 && string.Equals(parts[0], ObserverFallbackPayloadType, System.StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        if (parts.Length < offset + 7)
         {
             return false;
         }
 
         CultureInfo culture = CultureInfo.InvariantCulture;
-        if (!float.TryParse(parts[0], NumberStyles.Float, culture, out float range) ||
-            !float.TryParse(parts[1], NumberStyles.Float, culture, out float angle) ||
-            !float.TryParse(parts[2], NumberStyles.Float, culture, out float width) ||
-            !float.TryParse(parts[3], NumberStyles.Float, culture, out float duration) ||
-            !float.TryParse(parts[4], NumberStyles.Float, culture, out float visualScaleFactor) ||
-            !float.TryParse(parts[5], NumberStyles.Float, culture, out float visualForwardOffset) ||
-            !float.TryParse(parts[6], NumberStyles.Float, culture, out float visualAlphaFactor))
+        if (!float.TryParse(parts[offset], NumberStyles.Float, culture, out float range) ||
+            !float.TryParse(parts[offset + 1], NumberStyles.Float, culture, out float angle) ||
+            !float.TryParse(parts[offset + 2], NumberStyles.Float, culture, out float width) ||
+            !float.TryParse(parts[offset + 3], NumberStyles.Float, culture, out float duration) ||
+            !float.TryParse(parts[offset + 4], NumberStyles.Float, culture, out float visualScaleFactor) ||
+            !float.TryParse(parts[offset + 5], NumberStyles.Float, culture, out float visualForwardOffset) ||
+            !float.TryParse(parts[offset + 6], NumberStyles.Float, culture, out float visualAlphaFactor))
         {
             return false;
         }
@@ -493,7 +545,114 @@ internal static class RiftTrailSystem
             Mathf.Max(0.01f, visualScaleFactor),
             visualForwardOffset,
             Mathf.Max(0f, visualAlphaFactor),
-            parts.Length >= 8 ? parts[7] : "#ffffff");
+            parts.Length >= offset + 8 ? parts[offset + 7] : "#ffffff");
+        return true;
+    }
+
+    private static string CreateObserverSampleVisualPayload(
+        RiftTrailDefinition riftTrail,
+        IReadOnlyList<RiftTrailObserverSampleRibbonData> ribbons)
+    {
+        if (ribbons.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        CultureInfo culture = CultureInfo.InvariantCulture;
+        List<string> parts = new(8 + ribbons.Count * MaxObserverTrailSamples * 7)
+        {
+            ObserverSamplePayloadType,
+            Mathf.Max(0.05f, riftTrail.Duration).ToString("R", culture),
+            Mathf.Max(0.01f, riftTrail.VisualScaleFactor).ToString("R", culture),
+            riftTrail.VisualForwardOffset.ToString("R", culture),
+            Mathf.Max(0f, riftTrail.VisualAlphaFactor).ToString("R", culture),
+            (riftTrail.VisualTint ?? "#ffffff").Replace("|", string.Empty),
+            ribbons.Count.ToString(culture)
+        };
+
+        foreach (RiftTrailObserverSampleRibbonData ribbon in ribbons)
+        {
+            parts.Add(ribbon.Samples.Count.ToString(culture));
+            foreach (RiftTrailObserverSample sample in ribbon.Samples)
+            {
+                parts.Add(sample.Base.x.ToString("R", culture));
+                parts.Add(sample.Base.y.ToString("R", culture));
+                parts.Add(sample.Base.z.ToString("R", culture));
+                parts.Add(sample.Tip.x.ToString("R", culture));
+                parts.Add(sample.Tip.y.ToString("R", culture));
+                parts.Add(sample.Tip.z.ToString("R", culture));
+                parts.Add(Mathf.Clamp01(sample.NormalizedAge).ToString("R", culture));
+            }
+        }
+
+        return string.Join("|", parts);
+    }
+
+    private static bool TryParseObserverSampleVisualPayload(string payload, out RiftTrailObserverSampleVisualData data)
+    {
+        data = default;
+        string[] parts = payload.Split('|');
+        if (parts.Length < 7 ||
+            !string.Equals(parts[0], ObserverSamplePayloadType, System.StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        CultureInfo culture = CultureInfo.InvariantCulture;
+        if (!float.TryParse(parts[1], NumberStyles.Float, culture, out float duration) ||
+            !float.TryParse(parts[2], NumberStyles.Float, culture, out float visualScaleFactor) ||
+            !float.TryParse(parts[3], NumberStyles.Float, culture, out float visualForwardOffset) ||
+            !float.TryParse(parts[4], NumberStyles.Float, culture, out float visualAlphaFactor) ||
+            !int.TryParse(parts[6], NumberStyles.Integer, culture, out int ribbonCount) ||
+            ribbonCount <= 0 ||
+            ribbonCount > 8)
+        {
+            return false;
+        }
+
+        List<RiftTrailObserverSampleRibbonData> ribbons = new(ribbonCount);
+        int index = 7;
+        for (int ribbonIndex = 0; ribbonIndex < ribbonCount; ribbonIndex++)
+        {
+            if (index >= parts.Length ||
+                !int.TryParse(parts[index++], NumberStyles.Integer, culture, out int sampleCount) ||
+                sampleCount < 2 ||
+                sampleCount > MaxObserverTrailSamples)
+            {
+                return false;
+            }
+
+            List<RiftTrailObserverSample> samples = new(sampleCount);
+            for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+            {
+                if (index + 6 >= parts.Length ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float baseX) ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float baseY) ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float baseZ) ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float tipX) ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float tipY) ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float tipZ) ||
+                    !float.TryParse(parts[index++], NumberStyles.Float, culture, out float normalizedAge))
+                {
+                    return false;
+                }
+
+                samples.Add(new RiftTrailObserverSample(
+                    new Vector3(baseX, baseY, baseZ),
+                    new Vector3(tipX, tipY, tipZ),
+                    Mathf.Clamp01(normalizedAge)));
+            }
+
+            ribbons.Add(new RiftTrailObserverSampleRibbonData(samples));
+        }
+
+        data = new RiftTrailObserverSampleVisualData(
+            Mathf.Max(0.05f, duration),
+            Mathf.Max(0.01f, visualScaleFactor),
+            visualForwardOffset,
+            Mathf.Max(0f, visualAlphaFactor),
+            parts[5],
+            ribbons);
         return true;
     }
 
@@ -520,6 +679,44 @@ internal static class RiftTrailSystem
         color.b *= tint.b;
         color.a *= tint.a * alphaFactor;
         return color;
+    }
+
+    private static Color EvaluateTrailColor(Color[]? colors, float normalizedAge)
+    {
+        if (colors == null || colors.Length == 0)
+        {
+            return Color.Lerp(Color.white, Color.clear, normalizedAge);
+        }
+
+        if (colors.Length == 1)
+        {
+            return colors[0];
+        }
+
+        float scaledIndex = Mathf.Clamp01(normalizedAge) * (colors.Length - 1);
+        int left = Mathf.Clamp(Mathf.FloorToInt(scaledIndex), 0, colors.Length - 1);
+        int right = Mathf.Clamp(Mathf.CeilToInt(scaledIndex), 0, colors.Length - 1);
+        float t = Mathf.InverseLerp(left, right, scaledIndex);
+        return Color.Lerp(colors[left], colors[right], t);
+    }
+
+    private static float EvaluateTrailSize(float[]? sizes, float normalizedAge)
+    {
+        if (sizes == null || sizes.Length == 0)
+        {
+            return 1f;
+        }
+
+        if (sizes.Length == 1)
+        {
+            return sizes[0];
+        }
+
+        float scaledIndex = Mathf.Clamp01(normalizedAge) * (sizes.Length - 1);
+        int left = Mathf.Clamp(Mathf.FloorToInt(scaledIndex), 0, sizes.Length - 1);
+        int right = Mathf.Clamp(Mathf.CeilToInt(scaledIndex), 0, sizes.Length - 1);
+        float t = Mathf.InverseLerp(left, right, scaledIndex);
+        return Mathf.Lerp(sizes[left], sizes[right], t);
     }
 
     private readonly struct RiftTrailObserverVisualData
@@ -561,12 +758,117 @@ internal static class RiftTrailSystem
         public string VisualTint { get; }
     }
 
+    private readonly struct RiftTrailObserverSampleVisualData
+    {
+        public RiftTrailObserverSampleVisualData(
+            float duration,
+            float visualScaleFactor,
+            float visualForwardOffset,
+            float visualAlphaFactor,
+            string visualTint,
+            IReadOnlyList<RiftTrailObserverSampleRibbonData> ribbons)
+        {
+            Duration = duration;
+            VisualScaleFactor = visualScaleFactor;
+            VisualForwardOffset = visualForwardOffset;
+            VisualAlphaFactor = visualAlphaFactor;
+            VisualTint = visualTint;
+            Ribbons = ribbons;
+        }
+
+        public float Duration { get; }
+
+        public float VisualScaleFactor { get; }
+
+        public float VisualForwardOffset { get; }
+
+        public float VisualAlphaFactor { get; }
+
+        public string VisualTint { get; }
+
+        public IReadOnlyList<RiftTrailObserverSampleRibbonData> Ribbons { get; }
+    }
+
+    private readonly struct RiftTrailObserverSampleRibbonData
+    {
+        public RiftTrailObserverSampleRibbonData(IReadOnlyList<RiftTrailObserverSample> samples)
+        {
+            Samples = samples;
+        }
+
+        public IReadOnlyList<RiftTrailObserverSample> Samples { get; }
+    }
+
+    private readonly struct RiftTrailObserverSample
+    {
+        public RiftTrailObserverSample(Vector3 basePosition, Vector3 tipPosition, float normalizedAge)
+        {
+            Base = basePosition;
+            Tip = tipPosition;
+            NormalizedAge = normalizedAge;
+        }
+
+        public Vector3 Base { get; }
+
+        public Vector3 Tip { get; }
+
+        public float NormalizedAge { get; }
+    }
+
+    private readonly struct ObserverTrailMetadata
+    {
+        public ObserverTrailMetadata(Material? material, Color[]? colors, float[]? sizes)
+        {
+            Material = material;
+            Colors = colors;
+            Sizes = sizes;
+        }
+
+        public Material? Material { get; }
+
+        public Color[]? Colors { get; }
+
+        public float[]? Sizes { get; }
+    }
+
     private sealed class RiftTrailObserverFallbackController : MonoBehaviour
     {
         private readonly List<ObserverRibbonVisual> _visualRibbons = new();
         private GameObject? _visualObject;
         private float _endTime;
         private float _visualEndTime;
+
+        internal void InitializeSampled(Character character, RiftTrailObserverSampleVisualData data)
+        {
+            DestroyVisuals();
+            if (data.VisualScaleFactor <= 0f || data.Ribbons.Count == 0)
+            {
+                Destroy(this);
+                return;
+            }
+
+            _visualObject = new GameObject("SecondaryAttacks_RiftTrailObserverSampled");
+            List<ObserverTrailMetadata> metadata = ResolveObserverTrailMetadata(character);
+            for (int i = 0; i < data.Ribbons.Count; i++)
+            {
+                ObserverTrailMetadata trailMetadata = i < metadata.Count
+                    ? metadata[i]
+                    : default;
+                CreateSampledRibbonVisual(data, data.Ribbons[i], trailMetadata);
+            }
+
+            if (_visualRibbons.Count == 0)
+            {
+                DestroyVisuals();
+                Destroy(this);
+                return;
+            }
+
+            _endTime = Time.time + data.Duration;
+            _visualEndTime = _endTime + VisualFadeSeconds;
+            UpdateVisualFade();
+            enabled = true;
+        }
 
         internal void Initialize(Vector3 origin, Vector3 forward, RiftTrailObserverVisualData data)
         {
@@ -604,6 +906,87 @@ internal static class RiftTrailSystem
             _visualEndTime = _endTime + VisualFadeSeconds;
             UpdateVisualFade();
             enabled = true;
+        }
+
+        private void CreateSampledRibbonVisual(
+            RiftTrailObserverSampleVisualData data,
+            RiftTrailObserverSampleRibbonData ribbon,
+            ObserverTrailMetadata trailMetadata)
+        {
+            if (_visualObject == null || ribbon.Samples.Count < 2)
+            {
+                return;
+            }
+
+            Material? baseMaterial = trailMetadata.Material != null ? trailMetadata.Material : GetRiftMaterial();
+            if (baseMaterial == null)
+            {
+                return;
+            }
+
+            GameObject ribbonObject = new("RiftTrailObserverSampledRibbon");
+            ribbonObject.transform.SetParent(_visualObject.transform, worldPositionStays: false);
+            MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
+            Material material = new(baseMaterial);
+            if (material.HasProperty("_Cull"))
+            {
+                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            }
+
+            meshRenderer.material = material;
+
+            int sampleCount = ribbon.Samples.Count;
+            Vector3[] vertices = new Vector3[sampleCount * 2];
+            Vector2[] uvs = new Vector2[sampleCount * 2];
+            Color[] colors = new Color[sampleCount * 2];
+            int[] triangles = new int[(sampleCount - 1) * 6];
+            float visualScale = Mathf.Max(0.01f, data.VisualScaleFactor);
+            Color visualTint = ResolveVisualTint(data.VisualTint);
+            float visualAlphaFactor = Mathf.Max(0f, data.VisualAlphaFactor);
+            for (int i = 0; i < sampleCount; i++)
+            {
+                RiftTrailObserverSample sample = ribbon.Samples[i];
+                Color color = ApplyVisualTint(EvaluateTrailColor(trailMetadata.Colors, sample.NormalizedAge), visualTint, visualAlphaFactor);
+                float size = Mathf.Max(0.01f, EvaluateTrailSize(trailMetadata.Sizes, sample.NormalizedAge)) * visualScale;
+                Vector3 width = sample.Tip - sample.Base;
+                vertices[i * 2] = sample.Base - width * (size * 0.5f);
+                vertices[i * 2 + 1] = sample.Tip + width * (size * 0.5f);
+                colors[i * 2] = color;
+                colors[i * 2 + 1] = color;
+                float u = i / (float)sampleCount;
+                uvs[i * 2] = new Vector2(u, 0f);
+                uvs[i * 2 + 1] = new Vector2(u, 1f);
+            }
+
+            int triangleIndex = 0;
+            for (int i = 1; i < sampleCount; i++)
+            {
+                triangles[triangleIndex++] = i * 2 - 2;
+                triangles[triangleIndex++] = i * 2 - 1;
+                triangles[triangleIndex++] = i * 2;
+                triangles[triangleIndex++] = i * 2 + 1;
+                triangles[triangleIndex++] = i * 2;
+                triangles[triangleIndex++] = i * 2 - 1;
+            }
+
+            Mesh mesh = new()
+            {
+                vertices = vertices,
+                uv = uvs,
+                colors = colors,
+                triangles = triangles
+            };
+            mesh.RecalculateBounds();
+            meshFilter.sharedMesh = mesh;
+            Color materialColor = material.HasProperty("_Color") ? material.color : Color.white;
+            materialColor = ApplyVisualTint(materialColor, visualTint, visualAlphaFactor);
+            if (material.HasProperty("_Color"))
+            {
+                material.color = materialColor;
+            }
+
+            _visualRibbons.Add(new ObserverRibbonVisual(mesh, material, colors, materialColor));
         }
 
         private void CreateFallbackRibbonVisual(Material baseMaterial, Vector3 origin, Vector3 forward, RiftTrailObserverVisualData data)
@@ -818,6 +1201,7 @@ internal static class RiftTrailSystem
         private bool _finished;
         private bool _visualCreated;
         private bool _visualCreationFinalized;
+        private bool _observerVisualSent;
         private float _visualCaptureUntil;
         private GameObject? _visualObject;
         private readonly List<TrailSampler> _trailSamplers = new();
@@ -1006,6 +1390,7 @@ internal static class RiftTrailSystem
 
             _visualCreated = true;
             UpdateVisualFade();
+            SendObserverSampleVisual();
             return true;
         }
 
@@ -1037,7 +1422,85 @@ internal static class RiftTrailSystem
 
             _visualCreated = true;
             UpdateVisualFade();
+            SendObserverFallbackVisualOnce();
             return true;
+        }
+
+        private void SendObserverSampleVisual()
+        {
+            if (_observerVisualSent)
+            {
+                return;
+            }
+
+            List<RiftTrailObserverSampleRibbonData> ribbons = BuildObserverSampleRibbons();
+            if (ribbons.Count == 0)
+            {
+                return;
+            }
+
+            string payload = CreateObserverSampleVisualPayload(RiftTrail, ribbons);
+            if (!SendObserverVisualPayload(Attack, Origin, Forward, payload))
+            {
+                return;
+            }
+
+            _observerVisualSent = true;
+        }
+
+        private void SendObserverFallbackVisualOnce()
+        {
+            if (_observerVisualSent)
+            {
+                return;
+            }
+
+            SendObserverFallbackVisual(Attack, RiftTrail);
+            _observerVisualSent = true;
+        }
+
+        private List<RiftTrailObserverSampleRibbonData> BuildObserverSampleRibbons()
+        {
+            List<RiftTrailObserverSampleRibbonData> ribbons = new();
+            Vector3 visualOffset = VisualOffset;
+            foreach (TrailSampler trailSampler in _trailSamplers)
+            {
+                if (trailSampler.Samples.Count < 2)
+                {
+                    continue;
+                }
+
+                List<TrailSample> samples = BuildSmoothSamples(trailSampler.Samples, trailSampler.Subdivisions);
+                if (samples.Count < 2)
+                {
+                    continue;
+                }
+
+                List<RiftTrailObserverSample> observerSamples = new(Mathf.Min(samples.Count, MaxObserverTrailSamples));
+                int outputCount = Mathf.Min(samples.Count, MaxObserverTrailSamples);
+                for (int i = 0; i < outputCount; i++)
+                {
+                    int sampleIndex = outputCount == samples.Count
+                        ? i
+                        : Mathf.Clamp(Mathf.RoundToInt(i * (samples.Count - 1) / (float)(outputCount - 1)), 0, samples.Count - 1);
+                    TrailSample sample = samples[sampleIndex];
+                    float age = Mathf.Max(0f, Time.time - sample.Time);
+                    float normalizedAge = trailSampler.LifeTime > 0.001f
+                        ? Mathf.Clamp01(age / trailSampler.LifeTime)
+                        : outputCount <= 1 ? 1f : 1f - i / (float)(outputCount - 1);
+                    observerSamples.Add(new RiftTrailObserverSample(
+                        sample.Base + visualOffset,
+                        sample.Tip + visualOffset,
+                        normalizedAge));
+                }
+
+                if (observerSamples.Count >= 2)
+                {
+                    ribbons.Add(new RiftTrailObserverSampleRibbonData(observerSamples));
+                }
+            }
+
+            return ribbons;
         }
 
         private void CreateFallbackRibbonVisual(Material baseMaterial)

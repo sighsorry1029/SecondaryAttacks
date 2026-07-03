@@ -7,6 +7,8 @@ namespace SecondaryAttacks;
 
 internal static class GreatSwordSkillScalingSystem
 {
+    internal const string CleavingThrustTrailScaleRpcName = "SecondaryAttacks_CleavingThrustTrailScale";
+    private const float CleavingThrustObserverTrailScaleDuration = 1.25f;
     private static readonly FieldInfo AttackVisEquipmentField = AccessTools.Field(typeof(Attack), "m_visEquipment")!;
     private static readonly FieldInfo VisRightItemInstanceField = AccessTools.Field(typeof(VisEquipment), "m_rightItemInstance")!;
     private static readonly FieldInfo TrailBaseField = AccessTools.Field(typeof(MeleeWeaponTrail), "_base")!;
@@ -39,6 +41,24 @@ internal static class GreatSwordSkillScalingSystem
         }
 
         ApplyTrailScale(attack, rangeScale);
+        SendCleavingThrustTrailScale(attack, rangeScale);
+    }
+
+    internal static void HandleCleavingThrustTrailScaleRpc(Character character, ZNetView? nview, float rangeScale, float duration)
+    {
+        if (character == null ||
+            nview == null ||
+            !nview.IsValid() ||
+            nview.IsOwner() ||
+            rangeScale <= 1.0001f)
+        {
+            return;
+        }
+
+        CleavingThrustObserverTrailScaleController controller =
+            character.GetComponent<CleavingThrustObserverTrailScaleController>() ??
+            character.gameObject.AddComponent<CleavingThrustObserverTrailScaleController>();
+        controller.Begin(character, rangeScale, Mathf.Clamp(duration, 0.1f, 3f));
     }
 
     internal static void ApplyTrailScaleForActiveDefinition(Attack attack, SecondaryAttackDefinition definition)
@@ -107,13 +127,7 @@ internal static class GreatSwordSkillScalingSystem
         }
 
         ScaledTrailTipsByAttack.Remove(attack);
-        foreach (Transform tipTransform in scaledTips)
-        {
-            if (tipTransform != null && OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out Vector3 originalTipLocalPosition))
-            {
-                tipTransform.localPosition = originalTipLocalPosition;
-            }
-        }
+        RestoreTrailTips(scaledTips);
     }
 
     private static bool TryGetConfiguredTrailScale(Attack attack, out float rangeScale)
@@ -200,8 +214,137 @@ internal static class GreatSwordSkillScalingSystem
             return rightItemInstance;
         }
 
-        visEquipment = attack.m_character != null ? attack.m_character.GetComponent<VisEquipment>() : null;
+        return GetRightItemInstance(attack.m_character);
+    }
+
+    private static GameObject? GetRightItemInstance(Character? character)
+    {
+        VisEquipment? visEquipment = character != null ? character.GetComponent<VisEquipment>() : null;
         return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
+    }
+
+    private static void SendCleavingThrustTrailScale(Attack attack, float rangeScale)
+    {
+        if (rangeScale <= 1.0001f ||
+            attack?.m_character == null ||
+            !SecondaryAttackManager.TryGetCharacterZdo(attack.m_character, out ZNetView? nview, out _) ||
+            ZRoutedRpc.instance == null)
+        {
+            return;
+        }
+
+        nview!.InvokeRPC(
+            ZNetView.Everybody,
+            CleavingThrustTrailScaleRpcName,
+            rangeScale,
+            CleavingThrustObserverTrailScaleDuration);
+    }
+
+    private static List<Transform> ApplyTrailScale(Character character, float rangeScale)
+    {
+        List<Transform> scaledTips = new();
+        GameObject? rightItemInstance = GetRightItemInstance(character);
+        if (rightItemInstance == null)
+        {
+            return scaledTips;
+        }
+
+        foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+        {
+            Transform? baseTransform = TrailBaseField.GetValue(trail) as Transform;
+            Transform? tipTransform = TrailTipField.GetValue(trail) as Transform;
+            if (baseTransform == null || tipTransform == null)
+            {
+                continue;
+            }
+
+            if (!OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out Vector3 originalTipLocalPosition))
+            {
+                originalTipLocalPosition = tipTransform.localPosition;
+                OriginalTrailTipLocalPositions[tipTransform] = originalTipLocalPosition;
+            }
+
+            Vector3 baseLocalPosition = tipTransform.parent != null
+                ? tipTransform.parent.InverseTransformPoint(baseTransform.position)
+                : baseTransform.position;
+            Vector3 originalDelta = originalTipLocalPosition - baseLocalPosition;
+            tipTransform.localPosition = baseLocalPosition + originalDelta * rangeScale;
+            scaledTips.Add(tipTransform);
+        }
+
+        return scaledTips;
+    }
+
+    private static void RestoreTrailTips(List<Transform> scaledTips)
+    {
+        foreach (Transform tipTransform in scaledTips)
+        {
+            if (tipTransform != null && OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out Vector3 originalTipLocalPosition))
+            {
+                tipTransform.localPosition = originalTipLocalPosition;
+            }
+        }
+    }
+
+    private sealed class CleavingThrustObserverTrailScaleController : MonoBehaviour
+    {
+        private readonly List<Transform> _scaledTips = new();
+        private Character? _character;
+        private float _rangeScale;
+        private float _expiresAt;
+
+        internal void Begin(Character character, float rangeScale, float duration)
+        {
+            Restore();
+            _character = character;
+            _rangeScale = Mathf.Max(1f, rangeScale);
+            _expiresAt = Time.time + Mathf.Max(0.1f, duration);
+            TryApply();
+            enabled = true;
+        }
+
+        private void Update()
+        {
+            if (_character == null ||
+                _character.IsDead() ||
+                SecondaryAttackManager.HasCharacterAuthority(_character) ||
+                Time.time >= _expiresAt)
+            {
+                Destroy(this);
+                return;
+            }
+
+            if (_scaledTips.Count == 0)
+            {
+                TryApply();
+            }
+        }
+
+        private void TryApply()
+        {
+            if (_character == null || _scaledTips.Count > 0)
+            {
+                return;
+            }
+
+            _scaledTips.AddRange(ApplyTrailScale(_character, _rangeScale));
+        }
+
+        private void Restore()
+        {
+            if (_scaledTips.Count == 0)
+            {
+                return;
+            }
+
+            RestoreTrailTips(_scaledTips);
+            _scaledTips.Clear();
+        }
+
+        private void OnDestroy()
+        {
+            Restore();
+        }
     }
 
     internal readonly struct AttackRangeScope

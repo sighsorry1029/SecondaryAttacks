@@ -26,6 +26,7 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         _nview.Register<ZDOID, float, float, float>(SneakAmbushSystem.OwnerSmokeRpcName, RPC_ApplySneakAmbushSmoke);
         _nview.Register<int, string>(SweepObserverVisualSystem.RpcName, RPC_SweepVisual);
         _nview.Register<Vector3, Vector3, string>(RiftTrailSystem.ObserverFallbackVisualRpcName, RPC_RiftTrailVisual);
+        _nview.Register<float, float>(GreatSwordSkillScalingSystem.CleavingThrustTrailScaleRpcName, RPC_CleavingThrustTrailScale);
         _nview.Register(StaffRuntimeSystem.StaffTargetEffectRpcName, RPC_SpawnStaffTargetEffect);
     }
 
@@ -77,6 +78,11 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
     private void RPC_RiftTrailVisual(long sender, Vector3 origin, Vector3 forward, string payload)
     {
         RiftTrailSystem.HandleObserverFallbackVisualRpc(_character, _nview, origin, forward, payload);
+    }
+
+    private void RPC_CleavingThrustTrailScale(long sender, float rangeScale, float duration)
+    {
+        GreatSwordSkillScalingSystem.HandleCleavingThrustTrailScaleRpc(_character, _nview, rangeScale, duration);
     }
 
     private void RPC_SpawnStaffTargetEffect(long sender)
