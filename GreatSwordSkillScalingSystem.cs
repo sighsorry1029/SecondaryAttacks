@@ -79,6 +79,7 @@ internal static class GreatSwordSkillScalingSystem
         }
 
         ApplyTrailScale(attack, rangeScale);
+        SendCleavingThrustTrailScale(attack, rangeScale);
     }
 
     private static void ApplyTrailScale(Attack attack, float rangeScale)
@@ -290,6 +291,7 @@ internal static class GreatSwordSkillScalingSystem
     {
         private readonly List<Transform> _scaledTips = new();
         private Character? _character;
+        private GameObject? _rightItemInstance;
         private float _rangeScale;
         private float _expiresAt;
 
@@ -314,20 +316,52 @@ internal static class GreatSwordSkillScalingSystem
                 return;
             }
 
-            if (_scaledTips.Count == 0)
+            GameObject? currentRightItemInstance = GetRightItemInstance(_character);
+            if (_scaledTips.Count == 0 ||
+                _rightItemInstance != currentRightItemInstance ||
+                HasDestroyedScaledTip())
             {
-                TryApply();
+                TryApply(currentRightItemInstance);
             }
         }
 
-        private void TryApply()
+        private void TryApply(GameObject? rightItemInstance = null)
         {
-            if (_character == null || _scaledTips.Count > 0)
+            if (_character == null)
+            {
+                return;
+            }
+
+            rightItemInstance ??= GetRightItemInstance(_character);
+            if (_rightItemInstance != rightItemInstance)
+            {
+                Restore();
+                _rightItemInstance = rightItemInstance;
+            }
+
+            if (_scaledTips.Count > 0)
             {
                 return;
             }
 
             _scaledTips.AddRange(ApplyTrailScale(_character, _rangeScale));
+            if (_scaledTips.Count > 0)
+            {
+                SweepTrailResetSystem.ClearWeaponTrails(_character);
+            }
+        }
+
+        private bool HasDestroyedScaledTip()
+        {
+            for (int index = 0; index < _scaledTips.Count; index++)
+            {
+                if (_scaledTips[index] == null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void Restore()
@@ -339,6 +373,7 @@ internal static class GreatSwordSkillScalingSystem
 
             RestoreTrailTips(_scaledTips);
             _scaledTips.Clear();
+            _rightItemInstance = null;
         }
 
         private void OnDestroy()

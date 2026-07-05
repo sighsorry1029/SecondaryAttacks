@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
@@ -35,8 +36,14 @@ internal static class MagicPluginCompat
     private const string PlayerPatchTypeName = "MagicPlugin.Patches.PlayerPatch";
     private static bool _projectilePatchInstalled;
     private static bool _teleportPatchInstalled;
+    private static bool _summonCleanupPatchInstalled;
     private static bool _reportedRuntimeError;
     private static bool _reportedTeleportRuntimeError;
+    private static bool _reportedSummonCleanupRuntimeError;
+    private static object? _magicPluginInstance;
+    private static Type? _magicPluginType;
+    private static bool _magicSummonReferenceFieldsInitialized;
+    private static readonly List<FieldInfo> MagicSummonReferenceFields = new();
 
     internal static void TryInstall(Harmony harmony)
     {
@@ -47,6 +54,7 @@ internal static class MagicPluginCompat
 
         TryInstallProjectilePatch(harmony, pluginInfo);
         TryInstallTeleportPatch(harmony, pluginInfo);
+        TryInstallSummonCleanupPatch(harmony, pluginInfo);
     }
 
     private static void TryInstallProjectilePatch(Harmony harmony, PluginInfo pluginInfo)
@@ -142,6 +150,43 @@ internal static class MagicPluginCompat
         _teleportPatchInstalled = true;
 
         SecondaryAttacksPlugin.ModLogger.LogInfo($"Installed MagicPlugin safe teleport compatibility patch for MagicPlugin {pluginInfo.Metadata.Version}; removed {magicPostfixes.Count} unsafe TeleportTo postfix(es).");
+    }
+
+    private static void TryInstallSummonCleanupPatch(Harmony harmony, PluginInfo pluginInfo)
+    {
+        if (_summonCleanupPatchInstalled)
+        {
+            return;
+        }
+
+        Assembly? magicAssembly = pluginInfo.Instance?.GetType().Assembly ?? FindAssemblyWithType(MagicPluginTypeName);
+        Type? pluginType = magicAssembly?.GetType(MagicPluginTypeName, throwOnError: false);
+        MethodInfo? update = pluginType != null ? AccessTools.DeclaredMethod(pluginType, "Update") : null;
+        MethodInfo? characterOnDestroy = AccessTools.DeclaredMethod(typeof(Character), "OnDestroy");
+        if (pluginType == null || update == null || characterOnDestroy == null)
+        {
+            SecondaryAttacksPlugin.ModLogger.LogWarning("MagicPlugin summon cleanup compatibility skipped: required runtime methods were not found.");
+            return;
+        }
+
+        _magicPluginInstance = pluginInfo.Instance;
+        _magicPluginType = pluginType;
+        RebuildMagicSummonReferenceFields(pluginType);
+
+        HarmonyMethod updatePrefix = new(typeof(MagicPluginCompat), nameof(MagicPluginUpdatePrefix))
+        {
+            priority = Priority.First
+        };
+        HarmonyMethod destroyPrefix = new(typeof(MagicPluginCompat), nameof(CharacterOnDestroyPrefix))
+        {
+            priority = Priority.First
+        };
+
+        harmony.Patch(update, prefix: updatePrefix);
+        harmony.Patch(characterOnDestroy, prefix: destroyPrefix);
+        _summonCleanupPatchInstalled = true;
+
+        SecondaryAttacksPlugin.ModLogger.LogInfo($"Installed MagicPlugin summon cleanup compatibility patch for MagicPlugin {pluginInfo.Metadata.Version}; tracking {MagicSummonReferenceFields.Count} possible summon reference field(s).");
     }
 
     private static bool FireProjectileBurstPrefix(Attack __instance)
@@ -369,6 +414,268 @@ internal static class MagicPluginCompat
         MonsterAI? monsterAi = tameable != null ? tameable.m_monsterAI : null;
         GameObject? followTarget = monsterAi != null ? monsterAi.GetFollowTarget() : null;
         return followTarget == owner;
+    }
+
+    private static void MagicPluginUpdatePrefix(object __instance)
+    {
+        if (__instance != null)
+        {
+            _magicPluginInstance = __instance;
+        }
+
+        TryPruneMagicPluginSummonReferences(null);
+    }
+
+    private static void CharacterOnDestroyPrefix(Character __instance)
+    {
+        TryPruneMagicPluginSummonReferences(__instance);
+    }
+
+    private static void TryPruneMagicPluginSummonReferences(Character? target)
+    {
+        try
+        {
+            PruneMagicPluginSummonReferences(target);
+        }
+        catch (Exception ex)
+        {
+            if (!_reportedSummonCleanupRuntimeError)
+            {
+                _reportedSummonCleanupRuntimeError = true;
+                SecondaryAttacksPlugin.ModLogger.LogWarning($"MagicPlugin summon cleanup compatibility failed while pruning stale summon references: {ex.Message}");
+            }
+        }
+    }
+
+    private static int PruneMagicPluginSummonReferences(Character? target)
+    {
+        object? pluginInstance = _magicPluginInstance;
+        Type? pluginType = pluginInstance?.GetType() ?? _magicPluginType;
+        if (pluginType == null)
+        {
+            return 0;
+        }
+
+        if (!_magicSummonReferenceFieldsInitialized || _magicPluginType != pluginType)
+        {
+            _magicPluginType = pluginType;
+            RebuildMagicSummonReferenceFields(pluginType);
+        }
+
+        int removed = 0;
+        foreach (FieldInfo field in MagicSummonReferenceFields)
+        {
+            object? owner = field.IsStatic ? null : pluginInstance;
+            if (!field.IsStatic && owner == null)
+            {
+                continue;
+            }
+
+            object? value = field.GetValue(owner);
+            removed += PruneMagicSummonReferenceValue(field, owner, value, target);
+        }
+
+        return removed;
+    }
+
+    private static void RebuildMagicSummonReferenceFields(Type pluginType)
+    {
+        MagicSummonReferenceFields.Clear();
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+        foreach (FieldInfo field in pluginType.GetFields(flags))
+        {
+            if (CanContainCharacterReference(field.FieldType))
+            {
+                MagicSummonReferenceFields.Add(field);
+            }
+        }
+
+        _magicSummonReferenceFieldsInitialized = true;
+    }
+
+    private static bool CanContainCharacterReference(Type type)
+    {
+        if (typeof(Character).IsAssignableFrom(type))
+        {
+            return true;
+        }
+
+        Type? elementType = type.IsArray ? type.GetElementType() : null;
+        if (elementType != null && typeof(Character).IsAssignableFrom(elementType))
+        {
+            return true;
+        }
+
+        if (HasCharacterGenericArgument(type))
+        {
+            return true;
+        }
+
+        foreach (Type interfaceType in type.GetInterfaces())
+        {
+            if (HasCharacterGenericArgument(interfaceType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasCharacterGenericArgument(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        foreach (Type argument in type.GetGenericArguments())
+        {
+            if (typeof(Character).IsAssignableFrom(argument))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int PruneMagicSummonReferenceValue(FieldInfo field, object? owner, object? value, Character? target)
+    {
+        if (value == null)
+        {
+            return 0;
+        }
+
+        if (value is Character character)
+        {
+            if (ShouldPruneCharacterReference(character, target) && !field.IsInitOnly)
+            {
+                field.SetValue(owner, null);
+                return 1;
+            }
+
+            return 0;
+        }
+
+        if (value is Array array)
+        {
+            return PruneArray(array, target);
+        }
+
+        if (value is IList list)
+        {
+            return PruneList(list, target);
+        }
+
+        if (value is IDictionary dictionary)
+        {
+            return PruneDictionary(dictionary, target);
+        }
+
+        if (value is IEnumerable enumerable)
+        {
+            return PruneEnumerableWithRemove(value, enumerable, target);
+        }
+
+        return 0;
+    }
+
+    private static int PruneArray(Array array, Character? target)
+    {
+        int removed = 0;
+        for (int index = 0; index < array.Length; index++)
+        {
+            object? item = array.GetValue(index);
+            if (item is Character character && ShouldPruneCharacterReference(character, target))
+            {
+                array.SetValue(null, index);
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
+    private static int PruneList(IList list, Character? target)
+    {
+        int removed = 0;
+        for (int index = list.Count - 1; index >= 0; index--)
+        {
+            object? item = list[index];
+            if (item == null || item is Character character && ShouldPruneCharacterReference(character, target))
+            {
+                list.RemoveAt(index);
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
+    private static int PruneDictionary(IDictionary dictionary, Character? target)
+    {
+        List<object> keysToRemove = new();
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            if (entry.Key is Character keyCharacter && ShouldPruneCharacterReference(keyCharacter, target) ||
+                entry.Value is Character valueCharacter && ShouldPruneCharacterReference(valueCharacter, target))
+            {
+                keysToRemove.Add(entry.Key);
+            }
+        }
+
+        foreach (object key in keysToRemove)
+        {
+            dictionary.Remove(key);
+        }
+
+        return keysToRemove.Count;
+    }
+
+    private static int PruneEnumerableWithRemove(object collection, IEnumerable enumerable, Character? target)
+    {
+        MethodInfo? removeMethod = collection.GetType().GetMethod(
+            "Remove",
+            BindingFlags.Instance | BindingFlags.Public,
+            null,
+            new[] { typeof(Character) },
+            null);
+        if (removeMethod == null)
+        {
+            return 0;
+        }
+
+        List<Character> charactersToRemove = new();
+        foreach (object? item in enumerable)
+        {
+            if (item is Character character && ShouldPruneCharacterReference(character, target))
+            {
+                charactersToRemove.Add(character);
+            }
+        }
+
+        int removed = 0;
+        foreach (Character character in charactersToRemove)
+        {
+            object? result = removeMethod.Invoke(collection, new object[] { character });
+            if (result is not bool removedItem || removedItem)
+            {
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
+    private static bool ShouldPruneCharacterReference(Character character, Character? target)
+    {
+        if (!ReferenceEquals(target, null) && ReferenceEquals(character, target))
+        {
+            return true;
+        }
+
+        return character == null;
     }
 
     private static int CountMagicPluginPrefixes(MethodBase original)
