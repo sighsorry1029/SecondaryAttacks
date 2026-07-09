@@ -15,6 +15,7 @@ internal static class GreatSwordSkillScalingSystem
     private static readonly FieldInfo TrailTipField = AccessTools.Field(typeof(MeleeWeaponTrail), "_tip")!;
     private static readonly Dictionary<Transform, Vector3> OriginalTrailTipLocalPositions = new();
     private static readonly Dictionary<Attack, List<Transform>> ScaledTrailTipsByAttack = new();
+    private static readonly Dictionary<MeleeWeaponTrail, CleavingThrustObserverTrailScaleController> ObserverTrailScaleControllers = new();
 
     internal static AttackRangeScope BeginAttackRangeScope(Attack attack)
     {
@@ -241,39 +242,20 @@ internal static class GreatSwordSkillScalingSystem
             CleavingThrustObserverTrailScaleDuration);
     }
 
-    private static List<Transform> ApplyTrailScale(Character character, float rangeScale)
+    internal static ObserverTrailSampleScope BeginObserverTrailSample(MeleeWeaponTrail trail)
     {
-        List<Transform> scaledTips = new();
-        GameObject? rightItemInstance = GetRightItemInstance(character);
-        if (rightItemInstance == null)
+        if (trail == null ||
+            !ObserverTrailScaleControllers.TryGetValue(trail, out CleavingThrustObserverTrailScaleController? controller))
         {
-            return scaledTips;
+            return default;
         }
 
-        foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
-        {
-            Transform? baseTransform = TrailBaseField.GetValue(trail) as Transform;
-            Transform? tipTransform = TrailTipField.GetValue(trail) as Transform;
-            if (baseTransform == null || tipTransform == null)
-            {
-                continue;
-            }
+        return controller.BeginTrailSample(trail);
+    }
 
-            if (!OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out Vector3 originalTipLocalPosition))
-            {
-                originalTipLocalPosition = tipTransform.localPosition;
-                OriginalTrailTipLocalPositions[tipTransform] = originalTipLocalPosition;
-            }
-
-            Vector3 baseLocalPosition = tipTransform.parent != null
-                ? tipTransform.parent.InverseTransformPoint(baseTransform.position)
-                : baseTransform.position;
-            Vector3 originalDelta = originalTipLocalPosition - baseLocalPosition;
-            tipTransform.localPosition = baseLocalPosition + originalDelta * rangeScale;
-            scaledTips.Add(tipTransform);
-        }
-
-        return scaledTips;
+    internal static void EndObserverTrailSample(ObserverTrailSampleScope scope)
+    {
+        scope.Restore();
     }
 
     private static void RestoreTrailTips(List<Transform> scaledTips)
@@ -289,7 +271,7 @@ internal static class GreatSwordSkillScalingSystem
 
     private sealed class CleavingThrustObserverTrailScaleController : MonoBehaviour
     {
-        private readonly List<Transform> _scaledTips = new();
+        private readonly List<MeleeWeaponTrail> _registeredTrails = new();
         private Character? _character;
         private GameObject? _rightItemInstance;
         private float _rangeScale;
@@ -297,11 +279,12 @@ internal static class GreatSwordSkillScalingSystem
 
         internal void Begin(Character character, float rangeScale, float duration)
         {
-            Restore();
+            UnregisterTrails();
             _character = character;
             _rangeScale = Mathf.Max(1f, rangeScale);
             _expiresAt = Time.time + Mathf.Max(0.1f, duration);
-            TryApply();
+            _rightItemInstance = null;
+            RefreshRegistrations();
             enabled = true;
         }
 
@@ -317,15 +300,43 @@ internal static class GreatSwordSkillScalingSystem
             }
 
             GameObject? currentRightItemInstance = GetRightItemInstance(_character);
-            if (_scaledTips.Count == 0 ||
-                _rightItemInstance != currentRightItemInstance ||
-                HasDestroyedScaledTip())
+            if (_rightItemInstance != currentRightItemInstance ||
+                _registeredTrails.Count == 0 ||
+                HasDestroyedRegisteredTrail())
             {
-                TryApply(currentRightItemInstance);
+                RefreshRegistrations(currentRightItemInstance);
             }
         }
 
-        private void TryApply(GameObject? rightItemInstance = null)
+        internal ObserverTrailSampleScope BeginTrailSample(MeleeWeaponTrail trail)
+        {
+            if (_character == null ||
+                Time.time >= _expiresAt ||
+                SecondaryAttackManager.HasCharacterAuthority(_character))
+            {
+                return default;
+            }
+
+            Transform? baseTransform = TrailBaseField.GetValue(trail) as Transform;
+            Transform? tipTransform = TrailTipField.GetValue(trail) as Transform;
+            if (baseTransform == null || tipTransform == null)
+            {
+                return default;
+            }
+
+            Vector3 basePosition = baseTransform.position;
+            Vector3 tipDelta = tipTransform.position - basePosition;
+            if (tipDelta.sqrMagnitude <= 0.000001f)
+            {
+                return default;
+            }
+
+            Vector3 originalLocalPosition = tipTransform.localPosition;
+            tipTransform.position = basePosition + tipDelta * _rangeScale;
+            return new ObserverTrailSampleScope(tipTransform, originalLocalPosition);
+        }
+
+        private void RefreshRegistrations(GameObject? rightItemInstance = null)
         {
             if (_character == null)
             {
@@ -333,29 +344,35 @@ internal static class GreatSwordSkillScalingSystem
             }
 
             rightItemInstance ??= GetRightItemInstance(_character);
-            if (_rightItemInstance != rightItemInstance)
-            {
-                Restore();
-                _rightItemInstance = rightItemInstance;
-            }
-
-            if (_scaledTips.Count > 0)
+            UnregisterTrails();
+            _rightItemInstance = rightItemInstance;
+            if (rightItemInstance == null)
             {
                 return;
             }
 
-            _scaledTips.AddRange(ApplyTrailScale(_character, _rangeScale));
-            if (_scaledTips.Count > 0)
+            foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+            {
+                if (trail == null)
+                {
+                    continue;
+                }
+
+                ObserverTrailScaleControllers[trail] = this;
+                _registeredTrails.Add(trail);
+            }
+
+            if (_registeredTrails.Count > 0)
             {
                 SweepTrailResetSystem.ClearWeaponTrails(_character);
             }
         }
 
-        private bool HasDestroyedScaledTip()
+        private bool HasDestroyedRegisteredTrail()
         {
-            for (int index = 0; index < _scaledTips.Count; index++)
+            for (int index = 0; index < _registeredTrails.Count; index++)
             {
-                if (_scaledTips[index] == null)
+                if (_registeredTrails[index] == null)
                 {
                     return true;
                 }
@@ -364,21 +381,46 @@ internal static class GreatSwordSkillScalingSystem
             return false;
         }
 
-        private void Restore()
+        private void UnregisterTrails()
         {
-            if (_scaledTips.Count == 0)
+            for (int index = 0; index < _registeredTrails.Count; index++)
             {
-                return;
+                MeleeWeaponTrail trail = _registeredTrails[index];
+                if (trail != null &&
+                    ObserverTrailScaleControllers.TryGetValue(trail, out CleavingThrustObserverTrailScaleController? controller) &&
+                    ReferenceEquals(controller, this))
+                {
+                    ObserverTrailScaleControllers.Remove(trail);
+                }
             }
 
-            RestoreTrailTips(_scaledTips);
-            _scaledTips.Clear();
+            _registeredTrails.Clear();
             _rightItemInstance = null;
         }
 
         private void OnDestroy()
         {
-            Restore();
+            UnregisterTrails();
+        }
+    }
+
+    internal readonly struct ObserverTrailSampleScope
+    {
+        private readonly Transform? _tipTransform;
+        private readonly Vector3 _originalLocalPosition;
+
+        internal ObserverTrailSampleScope(Transform tipTransform, Vector3 originalLocalPosition)
+        {
+            _tipTransform = tipTransform;
+            _originalLocalPosition = originalLocalPosition;
+        }
+
+        internal void Restore()
+        {
+            if (_tipTransform != null)
+            {
+                _tipTransform.localPosition = _originalLocalPosition;
+            }
         }
     }
 
@@ -422,6 +464,22 @@ internal static class AttackStopGreatSwordSkillScalingPatch
     private static void Postfix(Attack __instance)
     {
         GreatSwordSkillScalingSystem.RestoreTrailScaleForAttack(__instance);
+    }
+}
+
+[HarmonyPatch(typeof(MeleeWeaponTrail), nameof(MeleeWeaponTrail.CustomFixedUpdate))]
+internal static class MeleeWeaponTrailCleavingThrustObserverScalePatch
+{
+    private static void Prefix(
+        MeleeWeaponTrail __instance,
+        out GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
+    {
+        __state = GreatSwordSkillScalingSystem.BeginObserverTrailSample(__instance);
+    }
+
+    private static void Postfix(GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
+    {
+        GreatSwordSkillScalingSystem.EndObserverTrailSample(__state);
     }
 }
 
