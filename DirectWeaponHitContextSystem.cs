@@ -60,6 +60,12 @@ internal static class DirectWeaponHitContextSystem
         }
     }
 
+    internal static void End(ref Scope scope)
+    {
+        End(scope);
+        scope = default;
+    }
+
     private static bool IsSecondaryAttackProjectile(Projectile projectile)
     {
         return SecondaryAttackRuntimeContext.TryGetProjectileAttackAttribution(
@@ -96,9 +102,14 @@ internal static class AttackDoMeleeAttackDirectWeaponHitPatch
     }
 
     [HarmonyPriority(Priority.First)]
-    private static void Postfix(DirectWeaponHitContextSystem.Scope __state)
+    private static void Postfix(ref DirectWeaponHitContextSystem.Scope __state)
     {
-        DirectWeaponHitContextSystem.End(__state);
+        DirectWeaponHitContextSystem.End(ref __state);
+    }
+
+    private static void Finalizer(ref DirectWeaponHitContextSystem.Scope __state)
+    {
+        DirectWeaponHitContextSystem.End(ref __state);
     }
 }
 
@@ -112,9 +123,14 @@ internal static class AttackDoAreaAttackDirectWeaponHitPatch
     }
 
     [HarmonyPriority(Priority.First)]
-    private static void Postfix(DirectWeaponHitContextSystem.Scope __state)
+    private static void Postfix(ref DirectWeaponHitContextSystem.Scope __state)
     {
-        DirectWeaponHitContextSystem.End(__state);
+        DirectWeaponHitContextSystem.End(ref __state);
+    }
+
+    private static void Finalizer(ref DirectWeaponHitContextSystem.Scope __state)
+    {
+        DirectWeaponHitContextSystem.End(ref __state);
     }
 }
 
@@ -128,8 +144,13 @@ internal static class CharacterDamageDirectWeaponHitDepthPatch
     }
 
     [HarmonyPriority(Priority.Last)]
-    private static void Postfix(DirectWeaponHitContextSystem.Scope __state)
+    private static void Postfix(ref DirectWeaponHitContextSystem.Scope __state)
     {
-        DirectWeaponHitContextSystem.End(__state);
+        DirectWeaponHitContextSystem.End(ref __state);
+    }
+
+    private static void Finalizer(ref DirectWeaponHitContextSystem.Scope __state)
+    {
+        DirectWeaponHitContextSystem.End(ref __state);
     }
 }

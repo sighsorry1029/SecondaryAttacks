@@ -7,7 +7,6 @@ namespace SecondaryAttacks;
 
 internal static class SecondaryAttackWorldApplySystem
 {
-    private const string FixedThrowCarrierPrefab = "SpearFlint";
     private static int _nextApplyRevision = 1;
 
     public static SecondaryAttackAppliedWorldSnapshot Apply(
@@ -20,8 +19,9 @@ internal static class SecondaryAttackWorldApplySystem
             return SecondaryAttackAppliedWorldSnapshot.Empty;
         }
 
-        SecondaryAttackWorldApplyContributors.BeforeDefinitions(objectDb, compiledSnapshot, emitMissingWarnings);
-        SecondaryAttackManager.ResetWorldApplyTransientState();
+        SecondaryAttackObjectDbStateStore.Capture(objectDb);
+        SecondaryAttackObjectDbStateStore.Restore(objectDb);
+        MagicSummonQualityPresetSystem.RestoreObjectDb(objectDb);
         SecondaryAttackDefinitionBuildContext buildContext = new(objectDb, compiledSnapshot.Effects, emitMissingWarnings);
 
         Dictionary<string, SecondaryAttackDefinition> appliedDefinitions = new(StringComparer.OrdinalIgnoreCase);
@@ -45,8 +45,6 @@ internal static class SecondaryAttackWorldApplySystem
                 continue;
             }
 
-            SecondaryAttackManager.DumpRuntimeWeaponProfile(itemPrefab.name, itemDrop.m_itemData.m_shared);
-
             bool usesGlobalMeleeFallback = false;
             bool usesGlobalRangedFallback = false;
             bool usesGlobalBloodMagicFallback = false;
@@ -57,7 +55,7 @@ internal static class SecondaryAttackWorldApplySystem
                 seenConfiguredPrefabs.Add(itemPrefab.name);
                 if (weaponConfig.Enabled && !weaponConfig.UseAutomaticFallback)
                 {
-                    ApplyDefaultMeleeFallbacksIfNeeded(itemDrop, weaponConfig, compiledSnapshot.GlobalMeleeFallback);
+                    weaponConfig = ResolveDefaultMeleeFallbacks(itemDrop, weaponConfig, compiledSnapshot.GlobalMeleeFallback);
                 }
                 else
                 {
@@ -151,9 +149,28 @@ internal static class SecondaryAttackWorldApplySystem
             }
         }
 
-        SecondaryAttackWorldApplyContributors.AfterDefinitions(objectDb, appliedWorldSnapshot, emitMissingWarnings);
+        WeaponEffectManager.ApplyToObjectDb(
+            objectDb,
+            appliedWorldSnapshot.DefinitionsByPrefabName);
+        MagicSummonQualityPresetSystem.ApplyToObjectDb(
+            objectDb,
+            appliedWorldSnapshot.CompiledSnapshot.MagicSummons);
         SecondaryAttacksPlugin.ModLogger.LogInfo($"Applied {appliedCount} secondary attack definition(s), including {appliedGlobalRangedFallbackCount} global ranged fallback definition(s), {appliedGlobalBloodMagicFallbackCount} global blood magic fallback definition(s), {appliedGlobalMeleeFallbackCount} global melee fallback definition(s), and {appliedEffectOnlyCount} effect-only definition(s).");
         return appliedWorldSnapshot;
+    }
+
+    internal static void ApplyToZNetScene(
+        ZNetScene scene,
+        SecondaryAttackCompiledSnapshot compiledSnapshot,
+        bool emitMissingWarnings)
+    {
+        SummonPrefabOverrideSystem.RestoreScene(scene);
+        SummonPrefabOverrideSystem.Apply(
+            scene,
+            compiledSnapshot.MagicSummons,
+            compiledSnapshot.SnapshotId,
+            emitMissingWarnings);
+        MagicSummonQualityPresetSystem.ApplyToZNetScene(scene, compiledSnapshot.MagicSummons);
     }
 
     private static bool TryCreateDefaultBloodMagicFallback(
@@ -418,11 +435,6 @@ internal static class SecondaryAttackWorldApplySystem
         return true;
     }
 
-    private static bool ShouldApplyGlobalMeleeFallback(ItemDrop itemDrop, NormalizedWeaponConfig? globalMeleeFallback)
-    {
-        return TryCreateDefaultMeleeFallback(itemDrop, globalMeleeFallback, out _);
-    }
-
     private static bool IsDefaultSneakAmbushWeapon(ItemDrop.ItemData.SharedData? sharedData)
     {
         return sharedData?.m_skillType == Skills.SkillType.Knives;
@@ -650,17 +662,17 @@ internal static class SecondaryAttackWorldApplySystem
 
         if (impactBurst != null)
         {
-            return CreateImpactBurstSecondary(impactBurst);
+            return SecondaryAttackWeaponConfigNormalizer.CreateImpactBurstSecondary(impactBurst);
         }
 
         if (boomerang != null)
         {
-            return CreateBoomerangSecondary(boomerang);
+            return SecondaryAttackWeaponConfigNormalizer.CreateBoomerangSecondary(boomerang);
         }
 
         if (spinningSweep != null)
         {
-            return CreateSpinningSweepSecondary(spinningSweep);
+            return SecondaryAttackWeaponConfigNormalizer.CreateSpinningSweepSecondary(spinningSweep);
         }
 
         return harvestSweep != null ? CreateHarvestSweepSecondary(harvestSweep) : null;
@@ -734,75 +746,6 @@ internal static class SecondaryAttackWorldApplySystem
             ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
         };
     }
-
-    private static NormalizedSecondaryModeConfig CreateImpactBurstSecondary(NormalizedImpactBurstConfig impactBurst)
-    {
-        return new NormalizedSecondaryModeConfig
-        {
-            Type = "copy",
-            Animation = impactBurst.Animation,
-            ResourceMultiplier = impactBurst.ResourceMultiplier,
-            OutputMultiplier = 1f,
-            DurabilityFactor = impactBurst.DurabilityFactor,
-            CopyFrom = FixedThrowCarrierPrefab,
-            OnProjectileHit = new NormalizedMeleeOnProjectileHitConfig
-            {
-                Preset = "impactBurst",
-                Cooldown = impactBurst.Cooldown,
-                CooldownReductionFactor = impactBurst.CooldownReductionFactor,
-                CooldownFallback = ProjectilePresetCooldownFallback.OriginalSecondary,
-                ResourceMultiplier = impactBurst.ResourceMultiplier,
-                DurabilityFactor = impactBurst.DurabilityFactor,
-                ProjectileSpinAxis = impactBurst.ProjectileSpinAxis,
-                ProjectileVisualRotationOffset = impactBurst.ProjectileVisualRotationOffset,
-                Vfx = impactBurst.Vfx,
-                DamageFactor = impactBurst.DamageFactor,
-                PushFactor = impactBurst.PushFactor,
-                Radius = impactBurst.Radius,
-                IncludeDirectTarget = false,
-                IncludeDestructibles = true,
-                TriggerOnCharactersOnly = false
-            },
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
-        };
-    }
-
-    private static NormalizedSecondaryModeConfig CreateBoomerangSecondary(NormalizedBoomerangConfig boomerang)
-    {
-        return new NormalizedSecondaryModeConfig
-        {
-            Type = "copy",
-            Animation = boomerang.Animation,
-            ResourceMultiplier = boomerang.ResourceMultiplier,
-            OutputMultiplier = 1f,
-            DurabilityFactor = boomerang.DurabilityFactor,
-            CopyFrom = FixedThrowCarrierPrefab,
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
-        };
-    }
-
-    private static NormalizedSecondaryModeConfig CreateSpinningSweepSecondary(NormalizedSpinningSweepConfig spinningSweep)
-    {
-        return new NormalizedSecondaryModeConfig
-        {
-            Type = "copy",
-            Animation = string.IsNullOrWhiteSpace(spinningSweep.Animation)
-                ? "atgeir_secondary"
-                : spinningSweep.Animation,
-            ResourceMultiplier = spinningSweep.ResourceMultiplier,
-            OutputMultiplier = 1f,
-            DurabilityFactor = spinningSweep.DurabilityFactor,
-            CopyFrom = "",
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
-        };
-    }
-
 
     private static NormalizedSecondaryModeConfig CreateHarvestSweepSecondary(NormalizedHarvestSweepConfig? harvestSweep)
     {
@@ -894,59 +837,60 @@ internal static class SecondaryAttackWorldApplySystem
         return sneakAmbush != null ? MeleeSpecialPreset.SneakAmbush : MeleeSpecialPreset.None;
     }
 
-    private static void ApplyDefaultMeleeFallbacksIfNeeded(
+    private static NormalizedWeaponConfig ResolveDefaultMeleeFallbacks(
         ItemDrop itemDrop,
         NormalizedWeaponConfig weaponConfig,
         NormalizedWeaponConfig? globalMeleeFallback)
     {
         if (!weaponConfig.Enabled)
         {
-            return;
+            return weaponConfig;
         }
 
         if (!TryCreateDefaultMeleeFallback(itemDrop, globalMeleeFallback, out NormalizedWeaponConfig? defaultMeleeFallback) ||
             defaultMeleeFallback == null)
         {
-            return;
+            return weaponConfig;
         }
 
-        bool applyHarvestSweep = weaponConfig.HarvestSweep == null && defaultMeleeFallback.HarvestSweep != null;
-        weaponConfig.HarvestSweep ??= defaultMeleeFallback.HarvestSweep;
+        NormalizedWeaponConfig resolvedWeaponConfig = weaponConfig.Clone();
+        bool applyHarvestSweep = resolvedWeaponConfig.HarvestSweep == null && defaultMeleeFallback.HarvestSweep != null;
+        resolvedWeaponConfig.HarvestSweep ??= defaultMeleeFallback.HarvestSweep;
         if ((applyHarvestSweep || IsDefaultHarvestSweepWeapon(itemDrop.m_itemData?.m_shared)) &&
-            weaponConfig.HarvestSweep?.Enabled == true &&
-            weaponConfig.Secondary == null)
+            resolvedWeaponConfig.HarvestSweep?.Enabled == true &&
+            resolvedWeaponConfig.Secondary == null)
         {
-            weaponConfig.Secondary = CreateHarvestSweepSecondary(weaponConfig.HarvestSweep);
+            resolvedWeaponConfig.Secondary = CreateHarvestSweepSecondary(resolvedWeaponConfig.HarvestSweep);
         }
 
-        if (weaponConfig.HasExplicitMeleePreset || weaponConfig.MeleePreset != MeleeSpecialPreset.None)
+        if (resolvedWeaponConfig.HasExplicitMeleePreset || resolvedWeaponConfig.MeleePreset != MeleeSpecialPreset.None)
         {
-            return;
+            return resolvedWeaponConfig;
         }
 
-        bool applySneakAmbush = weaponConfig.SneakAmbush == null && defaultMeleeFallback.SneakAmbush != null;
-        bool applyCleavingThrust = weaponConfig.CleavingThrust == null && defaultMeleeFallback.CleavingThrust != null;
-        bool applyRiftTrail = weaponConfig.RiftTrail == null && defaultMeleeFallback.RiftTrail != null;
-        bool applyLaunchSlam = weaponConfig.LaunchSlam == null && defaultMeleeFallback.LaunchSlam != null;
-        bool applyKnockbackChain = weaponConfig.KnockbackChain == null && defaultMeleeFallback.KnockbackChain != null;
-        bool applyAftershock = weaponConfig.Aftershock == null && defaultMeleeFallback.Aftershock != null;
-        bool applyFractureLine = weaponConfig.FractureLine == null && defaultMeleeFallback.FractureLine != null;
-        bool applySpearRain = weaponConfig.SpearRain == null && defaultMeleeFallback.SpearRain?.Enabled == true;
-        bool applyImpactBurst = weaponConfig.ImpactBurst == null && defaultMeleeFallback.ImpactBurst != null;
-        bool applyBoomerang = weaponConfig.Boomerang == null && defaultMeleeFallback.Boomerang != null;
-        bool applySpinningSweep = weaponConfig.SpinningSweep == null && defaultMeleeFallback.SpinningSweep != null;
-        weaponConfig.SneakAmbush ??= defaultMeleeFallback.SneakAmbush;
-        weaponConfig.CleavingThrust ??= defaultMeleeFallback.CleavingThrust;
-        weaponConfig.RiftTrail ??= defaultMeleeFallback.RiftTrail;
-        weaponConfig.LaunchSlam ??= defaultMeleeFallback.LaunchSlam;
-        weaponConfig.KnockbackChain ??= defaultMeleeFallback.KnockbackChain;
-        weaponConfig.Aftershock ??= defaultMeleeFallback.Aftershock;
-        weaponConfig.FractureLine ??= defaultMeleeFallback.FractureLine;
-        weaponConfig.SpearRain ??= defaultMeleeFallback.SpearRain;
-        weaponConfig.ImpactBurst ??= defaultMeleeFallback.ImpactBurst;
-        weaponConfig.Boomerang ??= defaultMeleeFallback.Boomerang;
-        weaponConfig.SpinningSweep ??= defaultMeleeFallback.SpinningSweep;
-        weaponConfig.Secondary ??= CreateDefaultMeleeSecondary(
+        bool applySneakAmbush = resolvedWeaponConfig.SneakAmbush == null && defaultMeleeFallback.SneakAmbush != null;
+        bool applyCleavingThrust = resolvedWeaponConfig.CleavingThrust == null && defaultMeleeFallback.CleavingThrust != null;
+        bool applyRiftTrail = resolvedWeaponConfig.RiftTrail == null && defaultMeleeFallback.RiftTrail != null;
+        bool applyLaunchSlam = resolvedWeaponConfig.LaunchSlam == null && defaultMeleeFallback.LaunchSlam != null;
+        bool applyKnockbackChain = resolvedWeaponConfig.KnockbackChain == null && defaultMeleeFallback.KnockbackChain != null;
+        bool applyAftershock = resolvedWeaponConfig.Aftershock == null && defaultMeleeFallback.Aftershock != null;
+        bool applyFractureLine = resolvedWeaponConfig.FractureLine == null && defaultMeleeFallback.FractureLine != null;
+        bool applySpearRain = resolvedWeaponConfig.SpearRain == null && defaultMeleeFallback.SpearRain?.Enabled == true;
+        bool applyImpactBurst = resolvedWeaponConfig.ImpactBurst == null && defaultMeleeFallback.ImpactBurst != null;
+        bool applyBoomerang = resolvedWeaponConfig.Boomerang == null && defaultMeleeFallback.Boomerang != null;
+        bool applySpinningSweep = resolvedWeaponConfig.SpinningSweep == null && defaultMeleeFallback.SpinningSweep != null;
+        resolvedWeaponConfig.SneakAmbush ??= defaultMeleeFallback.SneakAmbush;
+        resolvedWeaponConfig.CleavingThrust ??= defaultMeleeFallback.CleavingThrust;
+        resolvedWeaponConfig.RiftTrail ??= defaultMeleeFallback.RiftTrail;
+        resolvedWeaponConfig.LaunchSlam ??= defaultMeleeFallback.LaunchSlam;
+        resolvedWeaponConfig.KnockbackChain ??= defaultMeleeFallback.KnockbackChain;
+        resolvedWeaponConfig.Aftershock ??= defaultMeleeFallback.Aftershock;
+        resolvedWeaponConfig.FractureLine ??= defaultMeleeFallback.FractureLine;
+        resolvedWeaponConfig.SpearRain ??= defaultMeleeFallback.SpearRain;
+        resolvedWeaponConfig.ImpactBurst ??= defaultMeleeFallback.ImpactBurst;
+        resolvedWeaponConfig.Boomerang ??= defaultMeleeFallback.Boomerang;
+        resolvedWeaponConfig.SpinningSweep ??= defaultMeleeFallback.SpinningSweep;
+        resolvedWeaponConfig.Secondary ??= CreateDefaultMeleeSecondary(
             defaultMeleeFallback.Secondary,
             applyAftershock ? defaultMeleeFallback.Aftershock : null,
             applyFractureLine ? defaultMeleeFallback.FractureLine : null,
@@ -958,8 +902,10 @@ internal static class SecondaryAttackWorldApplySystem
 
         if (applySneakAmbush || applyCleavingThrust || applyRiftTrail || applyLaunchSlam || applyKnockbackChain || applyAftershock || applyFractureLine || applySpearRain || applyImpactBurst || applyBoomerang || applySpinningSweep || applyHarvestSweep)
         {
-            weaponConfig.MeleePreset = defaultMeleeFallback.MeleePreset;
+            resolvedWeaponConfig.MeleePreset = defaultMeleeFallback.MeleePreset;
         }
+
+        return resolvedWeaponConfig;
     }
 
 }

@@ -126,6 +126,7 @@ internal static class LaunchSlamSystem
         SecondaryAttackNamedEffectSystem.Create(landingVfx, impactOrigin, vfxRotation, "launch_slam_landing_vfx_missing");
         SecondaryAttackNamedEffectSystem.Create(landingSfx, impactOrigin, effectRotation, "launch_slam_landing_sfx_missing");
 
+        bool wasApplyingLandingDamage = IsApplyingLandingDamage;
         IsApplyingLandingDamage = true;
         try
         {
@@ -136,7 +137,7 @@ internal static class LaunchSlamSystem
         }
         finally
         {
-            IsApplyingLandingDamage = false;
+            IsApplyingLandingDamage = wasApplyingLandingDamage;
         }
     }
 

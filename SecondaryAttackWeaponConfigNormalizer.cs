@@ -165,9 +165,11 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             return;
         }
 
-        rawConfig.Preset = presetName;
-        rawConfig.Enabled = null;
-        globalRangedPresets[presetName] = FromRangedRaw(rawConfig);
+        globalRangedPresets[presetName] = new NormalizedWeaponConfig
+        {
+            Enabled = true,
+            Secondary = NormalizeRanged(rawConfig, fallback: null, presetOverride: presetName)
+        };
     }
 
     private static void AddGlobalBloodMagicPreset(
@@ -180,8 +182,11 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             return;
         }
 
-        rawConfig.Preset = presetName;
-        globalBloodMagicPresets[presetName] = FromBloodMagicRaw(rawConfig);
+        globalBloodMagicPresets[presetName] = new NormalizedWeaponConfig
+        {
+            Enabled = rawConfig.Enabled ?? true,
+            Secondary = NormalizeBloodMagic(rawConfig, fallback: null, presetOverride: presetName)
+        };
     }
 
     private static NormalizedWeaponConfig? ResolveRangedPresetFallback(
@@ -786,7 +791,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         return NormalizeSpinningSweep(rawSpinningSweep ?? new SpinningSweepConfig(), fallback);
     }
 
-    private static NormalizedSecondaryModeConfig CreateImpactBurstSecondary(NormalizedImpactBurstConfig impactBurst)
+    internal static NormalizedSecondaryModeConfig CreateImpactBurstSecondary(NormalizedImpactBurstConfig impactBurst)
     {
         return new NormalizedSecondaryModeConfig
         {
@@ -820,7 +825,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         };
     }
 
-    private static NormalizedSecondaryModeConfig CreateBoomerangSecondary(NormalizedBoomerangConfig boomerang)
+    internal static NormalizedSecondaryModeConfig CreateBoomerangSecondary(NormalizedBoomerangConfig boomerang)
     {
         return new NormalizedSecondaryModeConfig
         {
@@ -836,12 +841,14 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         };
     }
 
-    private static NormalizedSecondaryModeConfig CreateSpinningSweepSecondary(NormalizedSpinningSweepConfig spinningSweep)
+    internal static NormalizedSecondaryModeConfig CreateSpinningSweepSecondary(NormalizedSpinningSweepConfig spinningSweep)
     {
         return new NormalizedSecondaryModeConfig
         {
             Type = "copy",
-            Animation = spinningSweep.Animation,
+            Animation = string.IsNullOrWhiteSpace(spinningSweep.Animation)
+                ? "atgeir_secondary"
+                : spinningSweep.Animation,
             ResourceMultiplier = spinningSweep.ResourceMultiplier,
             OutputMultiplier = 1f,
             DurabilityFactor = spinningSweep.DurabilityFactor,
@@ -854,10 +861,11 @@ internal static class SecondaryAttackWeaponConfigNormalizer
 
     private static NormalizedSecondaryModeConfig NormalizeRanged(
         RangedWeaponConfig rawRanged,
-        NormalizedSecondaryModeConfig? fallback)
+        NormalizedSecondaryModeConfig? fallback,
+        string? presetOverride = null)
     {
         NormalizedSecondaryModeConfig baseConfig = fallback ?? new NormalizedSecondaryModeConfig();
-        string preset = rawRanged.Preset?.Trim() ?? baseConfig.Projectile.Preset;
+        string preset = presetOverride?.Trim() ?? rawRanged.Preset?.Trim() ?? baseConfig.Projectile.Preset;
         bool isBombPreset = IsBombRangedPreset(preset);
         return new NormalizedSecondaryModeConfig
         {
@@ -1342,12 +1350,13 @@ internal static class SecondaryAttackWeaponConfigNormalizer
 
     private static NormalizedSecondaryModeConfig NormalizeBloodMagic(
         BloodMagicWeaponConfig rawBloodMagic,
-        NormalizedSecondaryModeConfig? fallback)
+        NormalizedSecondaryModeConfig? fallback,
+        string? presetOverride = null)
     {
         NormalizedSecondaryModeConfig baseConfig = fallback ?? new NormalizedSecondaryModeConfig();
         NormalizedSummonEmpowerSecondaryConfig summonEmpowerBase = fallback?.SummonEmpower ?? new NormalizedSummonEmpowerSecondaryConfig();
         NormalizedShieldConvertSecondaryConfig shieldConvertBase = fallback?.ShieldConvert ?? new NormalizedShieldConvertSecondaryConfig();
-        string preset = rawBloodMagic.Preset?.Trim() ?? baseConfig.Type;
+        string preset = presetOverride?.Trim() ?? rawBloodMagic.Preset?.Trim() ?? baseConfig.Type;
         float summonEmpowerRadius = rawBloodMagic.Radius ?? summonEmpowerBase.Radius;
         float shieldConvertRadius = rawBloodMagic.Radius ?? shieldConvertBase.Radius;
         return new NormalizedSecondaryModeConfig

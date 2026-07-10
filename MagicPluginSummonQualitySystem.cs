@@ -23,8 +23,6 @@ internal static class MagicSummonQualityPresetSystem
     private static readonly HashSet<string> ActiveGroupIds = new(StringComparer.OrdinalIgnoreCase);
     private static List<QualityRule> _activeRules = new();
 
-    internal static bool Enabled => true;
-
     internal static void RestoreObjectDb(ObjectDB objectDb)
     {
         if (objectDb == null)
@@ -50,7 +48,7 @@ internal static class MagicSummonQualityPresetSystem
         RebuildCoreRules(summonConfigs, objectDb);
         RulesBySharedName.Clear();
 
-        if (!Enabled || _activeRules.Count == 0)
+        if (_activeRules.Count == 0)
         {
             return;
         }
@@ -88,7 +86,7 @@ internal static class MagicSummonQualityPresetSystem
         RebuildCoreRules(summonConfigs, ObjectDB.instance);
         RulesBySpawnAbilityPrefab.Clear();
 
-        if (!Enabled || _activeRules.Count == 0)
+        if (_activeRules.Count == 0)
         {
             return;
         }
@@ -115,7 +113,7 @@ internal static class MagicSummonQualityPresetSystem
         Character? owner,
         ItemDrop.ItemData item)
     {
-        if (spawnAbility == null || item == null || !Enabled || !TryResolveRule(spawnAbility, item, out QualityRule rule))
+        if (spawnAbility == null || item == null || !TryResolveRule(spawnAbility, item, out QualityRule rule))
         {
             return null;
         }
@@ -206,7 +204,7 @@ internal static class MagicSummonQualityPresetSystem
 
     private static void EnforceSummonGroupLimit(Character? summoned, ZDOID ownerId)
     {
-        if (summoned == null || !Enabled)
+        if (summoned == null)
         {
             return;
         }
@@ -231,8 +229,7 @@ internal static class MagicSummonQualityPresetSystem
 
     private static void RegisterNewSummonsAndEnforceLimit(SpawnAbilityRuntimeState state)
     {
-        if (!Enabled ||
-            string.IsNullOrWhiteSpace(state.GroupId) ||
+        if (string.IsNullOrWhiteSpace(state.GroupId) ||
             state.OwnerId.IsNone())
         {
             return;
@@ -301,11 +298,6 @@ internal static class MagicSummonQualityPresetSystem
         AppendGlobalQualityRules(_activeRules, objectDb);
         RulesByItemPrefab.Clear();
         ActiveGroupIds.Clear();
-
-        if (!Enabled)
-        {
-            return;
-        }
 
         foreach (QualityRule rule in _activeRules)
         {

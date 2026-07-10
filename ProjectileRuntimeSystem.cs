@@ -89,7 +89,7 @@ internal static partial class ProjectileRuntimeSystem
         bool water,
         Vector3 normal)
     {
-        return TryHandleScatterRicochetProjectileHit(projectile, collider, hitPoint, water, normal) ||
+        return TryHandleScatterRicochetProjectileHit(projectile, collider, hitPoint, normal) ||
                TryHandlePiercingShotProjectileHit(projectile, collider, hitPoint, water, normal);
     }
 

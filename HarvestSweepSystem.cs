@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -25,24 +24,13 @@ internal static class HarvestSweepSystem
             return false;
         }
 
-        bool debugLogging = IsDebugLoggingEnabled();
         HarvestSweepController controller = humanoid.GetComponent<HarvestSweepController>();
         if (controller != null && controller.IsActive)
         {
             if (!controller.MatchesWeapon(attack.m_weapon))
             {
-                if (debugLogging)
-                {
-                    LogDebug($"active controller weapon mismatch; stopping. attackWeapon={SpinningSweepSystem.DescribeWeapon(attack.m_weapon)}.");
-                }
-
                 controller.StopAfterCurrentAttack();
                 return false;
-            }
-
-            if (debugLogging)
-            {
-                LogDebug($"attach repeat attack weapon={SpinningSweepSystem.DescribeWeapon(attack.m_weapon)} animation={attack.m_attackAnimation} inAttack={humanoid.InAttack()} currentAttackNull={(humanoid.m_currentAttack == null)}.");
             }
 
             controller.AttachAttack(attack, harvestSweep);
@@ -52,11 +40,6 @@ internal static class HarvestSweepSystem
 
         if (!MeleePresetCooldownSystem.TryConsume(humanoid, attack.m_weapon, PresetName, harvestSweep.PresetCooldown, out _))
         {
-            if (debugLogging)
-            {
-                LogDebug($"begin skipped: cooldown active weapon={SpinningSweepSystem.DescribeWeapon(attack.m_weapon)}.");
-            }
-
             return false;
         }
 
@@ -67,11 +50,6 @@ internal static class HarvestSweepSystem
 
         controller.Begin(attack, definition, harvestSweep);
         SweepObserverVisualSystem.SendStart(humanoid, true, attack.m_attackAnimation, harvestSweep.LoopStart, harvestSweep.LoopEnd, harvestSweep.AnimationSpeed);
-        if (debugLogging)
-        {
-            LogDebug($"begin weapon={SpinningSweepSystem.DescribeWeapon(attack.m_weapon)} animation={attack.m_attackAnimation} loop={harvestSweep.LoopStart:0.###}-{harvestSweep.LoopEnd:0.###} speed={harvestSweep.AnimationSpeed:0.###} move={harvestSweep.MoveSpeedFactor:0.###}.");
-        }
-
         return true;
     }
 
@@ -88,25 +66,12 @@ internal static class HarvestSweepSystem
 
     internal static bool StartRepeatAttack(Humanoid humanoid)
     {
-        bool started = humanoid.StartAttack(null, true);
-        if (IsDebugLoggingEnabled())
-        {
-            LogDebug($"repeat StartAttack result={started} inAttack={humanoid.InAttack()} currentAttackNull={(humanoid.m_currentAttack == null)} currentSecondary={humanoid.m_currentAttackIsSecondary}.");
-        }
-
-        return started;
+        return humanoid.StartAttack(null, true);
     }
 
     internal static float GetRepeatDelay() => RepeatDelay;
 
     internal static float GetRotationSpeedFactor() => RotationSpeedFactor;
-
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    internal static void LogDebug(string message)
-    {
-    }
-
-    internal static bool IsDebugLoggingEnabled() => false;
 
     internal static float ResolveHarvestRadius(ItemDrop.ItemData? weapon, Player? player)
     {
@@ -301,7 +266,6 @@ internal sealed class HarvestSweepController : MonoBehaviour
 
     private void Update()
     {
-        bool debugLogging = HarvestSweepSystem.IsDebugLoggingEnabled();
         if (_humanoid == null ||
             _weapon == null ||
             _definition == null ||
@@ -309,11 +273,6 @@ internal sealed class HarvestSweepController : MonoBehaviour
             _humanoid.IsDead() ||
             !SecondaryAttackManager.HasCharacterAuthority(_humanoid))
         {
-            if (debugLogging)
-            {
-                HarvestSweepSystem.LogDebug($"destroy: invalid state humanoidNull={(_humanoid == null)} weaponNull={(_weapon == null)} definitionNull={(_definition == null)} configNull={(_harvestSweep == null)} dead={(_humanoid?.IsDead() ?? false)} authority={(_humanoid != null && SecondaryAttackManager.HasCharacterAuthority(_humanoid))}.");
-            }
-
             Destroy(this);
             return;
         }
@@ -329,11 +288,6 @@ internal sealed class HarvestSweepController : MonoBehaviour
                     return;
                 }
             }
-            else if (debugLogging && Time.frameCount % 10 == 0)
-            {
-                HarvestSweepSystem.LogDebug($"active attack mismatch frame={Time.frameCount} activeAnimation={activeAttack.m_attackAnimation} currentAnimation={_currentAttack?.m_attackAnimation ?? "<null>"} inAttack={_humanoid.InAttack()} currentSecondary={_humanoid.m_currentAttackIsSecondary}.");
-            }
-
             return;
         }
 
@@ -344,39 +298,19 @@ internal sealed class HarvestSweepController : MonoBehaviour
 
         if (_stopRequested || !MatchesWeapon(_humanoid.GetCurrentWeapon()))
         {
-            if (debugLogging)
-            {
-                HarvestSweepSystem.LogDebug($"destroy: stop={_stopRequested} weaponMatch={MatchesWeapon(_humanoid.GetCurrentWeapon())} currentWeapon={SpinningSweepSystem.DescribeWeapon(_humanoid.GetCurrentWeapon())}.");
-            }
-
             Destroy(this);
             return;
         }
 
         if (Time.time < _nextRepeatTime || _humanoid.IsStaggering() || _humanoid.InAttack())
         {
-            if (debugLogging && Time.frameCount % 20 == 0)
-            {
-                HarvestSweepSystem.LogDebug($"waiting: time={Time.time:0.###} next={_nextRepeatTime:0.###} stagger={_humanoid.IsStaggering()} inAttack={_humanoid.InAttack()} currentAttackNull={(_humanoid.m_currentAttack == null)}.");
-            }
-
             return;
         }
 
-        if (!CanPayNextAttackCost(_weapon, out string costReason))
+        if (!CanPayNextAttackCost(_weapon))
         {
-            if (debugLogging)
-            {
-                HarvestSweepSystem.LogDebug($"destroy: cannot pay next cost reason={costReason} weapon={SpinningSweepSystem.DescribeWeapon(_weapon)}.");
-            }
-
             Destroy(this);
             return;
-        }
-
-        if (debugLogging)
-        {
-            HarvestSweepSystem.LogDebug($"try repeat weapon={SpinningSweepSystem.DescribeWeapon(_weapon)} currentAttackNull={(_humanoid.m_currentAttack == null)} inAttack={_humanoid.InAttack()} timeSinceLast={_humanoid.GetTimeSinceLastAttack():0.###}.");
         }
 
         if (!HarvestSweepSystem.StartRepeatAttack(_humanoid))
@@ -399,7 +333,6 @@ internal sealed class HarvestSweepController : MonoBehaviour
             return false;
         }
 
-        bool debugLogging = HarvestSweepSystem.IsDebugLoggingEnabled();
         _animator ??= _humanoid.GetComponentInChildren<Animator>();
         if (_animator == null)
         {
@@ -409,21 +342,12 @@ internal sealed class HarvestSweepController : MonoBehaviour
         AnimatorStateInfo state = GetAttackAnimatorState(_animator);
         if (!IsAttackState(state))
         {
-            if (debugLogging && Time.frameCount % 10 == 0)
-            {
-                HarvestSweepSystem.LogDebug($"loop wait: animator is not attack state frame={Time.frameCount} {DescribeState(state)} inTransition={_animator.IsInTransition(0)}.");
-            }
-
             return false;
         }
 
         if (_loopStateHash == 0 && state.fullPathHash != 0)
         {
             _loopStateHash = state.fullPathHash;
-            if (debugLogging)
-            {
-                HarvestSweepSystem.LogDebug($"captured loop state hash={_loopStateHash} normalized={state.normalizedTime:0.###}.");
-            }
         }
 
         float loopStart = _harvestSweep.LoopStart;
@@ -435,11 +359,6 @@ internal sealed class HarvestSweepController : MonoBehaviour
             {
                 SeekToLoopStart(state);
                 _loopRearmed = false;
-                if (debugLogging)
-                {
-                    HarvestSweepSystem.LogDebug($"seamless loop initial skip animation={activeAttack.m_attackAnimation} start={loopStart:0.###} current={state.normalizedTime:0.###}.");
-                }
-
                 return true;
             }
         }
@@ -451,23 +370,13 @@ internal sealed class HarvestSweepController : MonoBehaviour
 
         if (state.normalizedTime < loopEnd || _lastLoopFrame == Time.frameCount)
         {
-            if (debugLogging && Time.frameCount % 10 == 0)
-            {
-                HarvestSweepSystem.LogDebug($"loop wait frame={Time.frameCount} normalized={state.normalizedTime:0.###} end={loopEnd:0.###} harvested={_harvestedCurrentSweep} lastLoopFrame={_lastLoopFrame} animatorSpeed={_animator.speed:0.###}.");
-            }
-
             return false;
         }
 
         HarvestCurrentSweep(activeAttack);
-        if (!CanPayNextAttackCost(_weapon, out string costReason))
+        if (!CanPayNextAttackCost(_weapon))
         {
             _stopRequested = true;
-            if (debugLogging)
-            {
-                HarvestSweepSystem.LogDebug($"seamless loop ending: cannot pay next cost reason={costReason} weapon={SpinningSweepSystem.DescribeWeapon(_weapon)}.");
-            }
-
             return false;
         }
 
@@ -476,17 +385,11 @@ internal sealed class HarvestSweepController : MonoBehaviour
         SeekToLoopStart(state);
         _harvestedCurrentSweep = false;
         _loopRearmed = false;
-        if (debugLogging)
-        {
-            HarvestSweepSystem.LogDebug($"seamless loop rewind frame={Time.frameCount} animation={activeAttack.m_attackAnimation} normalizedBefore={state.normalizedTime:0.###} start={loopStart:0.###} end={loopEnd:0.###} configuredSpeed={_harvestSweep.AnimationSpeed:0.###} animatorSpeed={_animator.speed:0.###} inTransition={_animator.IsInTransition(0)}.");
-        }
-
         return true;
     }
 
     private bool TryRearmLoop(AnimatorStateInfo state, float loopStart, float loopEnd)
     {
-        bool debugLogging = HarvestSweepSystem.IsDebugLoggingEnabled();
         if (_loopRearmed)
         {
             return true;
@@ -495,17 +398,7 @@ internal sealed class HarvestSweepController : MonoBehaviour
         if (state.normalizedTime < loopEnd)
         {
             _loopRearmed = true;
-            if (debugLogging)
-            {
-                HarvestSweepSystem.LogDebug($"loop rearmed frame={Time.frameCount} normalized={state.normalizedTime:0.###} start={loopStart:0.###} end={loopEnd:0.###} animatorSpeed={_animator?.speed ?? 0f:0.###}.");
-            }
-
             return true;
-        }
-
-        if (debugLogging && Time.frameCount % 10 == 0)
-        {
-            HarvestSweepSystem.LogDebug($"loop wait: waiting for seek to apply frame={Time.frameCount} normalized={state.normalizedTime:0.###} start={loopStart:0.###} end={loopEnd:0.###} animatorSpeed={_animator?.speed ?? 0f:0.###}.");
         }
 
         return false;
@@ -549,51 +442,39 @@ internal sealed class HarvestSweepController : MonoBehaviour
         return state.fullPathHash != 0 && state.tagHash == AttackTagHash;
     }
 
-    private static string DescribeState(AnimatorStateInfo state)
+    private bool CanPayNextAttackCost(ItemDrop.ItemData weapon)
     {
-        return $"stateHash={state.fullPathHash} tagHash={state.tagHash} normalized={state.normalizedTime:0.###} length={state.length:0.###} speed={state.speed:0.###}";
-    }
-
-    private bool CanPayNextAttackCost(ItemDrop.ItemData weapon, out string reason)
-    {
-        reason = "";
         ItemDrop.ItemData.SharedData? sharedData = weapon.m_shared;
         Attack? secondaryAttack = sharedData?.m_secondaryAttack;
         if (secondaryAttack == null)
         {
-            reason = "secondary attack is null";
             return false;
         }
 
         float durabilityCost = Mathf.Max(0f, sharedData!.m_useDurabilityDrain * (_definition?.DurabilityFactor ?? 1f));
         if (durabilityCost > 0f && weapon.m_durability + 0.001f < durabilityCost)
         {
-            reason = $"durability {weapon.m_durability:0.###} < {durabilityCost:0.###}";
             return false;
         }
 
         float stamina = Mathf.Max(0f, secondaryAttack.m_attackStamina);
         if (stamina > 0f && !_humanoid!.HaveStamina(stamina))
         {
-            reason = $"stamina cost={stamina:0.###}";
             return false;
         }
 
         float eitr = Mathf.Max(0f, secondaryAttack.m_attackEitr);
         if (eitr > 0f && !_humanoid!.HaveEitr(eitr))
         {
-            reason = $"eitr cost={eitr:0.###}";
             return false;
         }
 
         float health = Mathf.Max(0f, secondaryAttack.m_attackHealth);
         if (health > 0f && !_humanoid!.HaveHealth(health) && secondaryAttack.m_attackHealthLowBlockUse)
         {
-            reason = $"health cost={health:0.###}";
             return false;
         }
 
-        reason = "ok";
         return true;
     }
 
@@ -638,20 +519,10 @@ internal sealed class HarvestSweepController : MonoBehaviour
     {
         if (_harvestedCurrentSweep)
         {
-            if (HarvestSweepSystem.IsDebugLoggingEnabled())
-            {
-                HarvestSweepSystem.LogDebug($"harvest skipped: already harvested current sweep frame={Time.frameCount} animation={activeAttack.m_attackAnimation}.");
-            }
-
             return;
         }
 
         _harvestedCurrentSweep = true;
-        if (HarvestSweepSystem.IsDebugLoggingEnabled())
-        {
-            HarvestSweepSystem.LogDebug($"harvest trigger frame={Time.frameCount} animation={activeAttack.m_attackAnimation}.");
-        }
-
         HarvestOnce(activeAttack);
     }
 
@@ -671,81 +542,67 @@ internal sealed class HarvestSweepController : MonoBehaviour
         Attack? harvestAttack = _weapon.m_shared?.m_attack;
         float radius = HarvestSweepSystem.ResolveHarvestRadius(_weapon, player);
         Vector3 center = ResolveHarvestCenter(activeAttack, harvestAttack);
-        int hitCount = Physics.OverlapSphereNonAlloc(
-            center,
-            radius,
-            Hits,
-            GetHarvestMask(),
-            QueryTriggerInteraction.UseGlobal);
-
-        int pickableCandidates = 0;
-        int harvestedPickables = 0;
-        int skippedPickables = 0;
-        int destroyedPlants = 0;
-        int otherColliders = 0;
+        int hitCount = 0;
         _seenThisTick.Clear();
-        for (int i = 0; i < hitCount; i++)
+        try
         {
-            Collider hit = Hits[i];
-            if (hit == null)
+            hitCount = Physics.OverlapSphereNonAlloc(
+                center,
+                radius,
+                Hits,
+                GetHarvestMask(),
+                QueryTriggerInteraction.UseGlobal);
+            for (int i = 0; i < hitCount; i++)
             {
-                continue;
-            }
-
-            Pickable? pickable = hit.GetComponentInParent<Pickable>();
-            if (pickable != null)
-            {
-                pickableCandidates++;
-                if (!_seenThisTick.Add(pickable) ||
-                    !CanHarvest(pickable))
+                Collider hit = Hits[i];
+                if (hit == null)
                 {
-                    skippedPickables++;
                     continue;
                 }
 
-                using (GroundworkCompat.SuppressForagingRangePickup())
-                using (HarvestSweepSystem.BeginSkillRaiseFactor(_harvestSweep.SkillRaiseFactor))
+                Pickable? pickable = hit.GetComponentInParent<Pickable>();
+                if (pickable != null)
                 {
-                    pickable.Interact(player, repeat: false, alt: false);
+                    if (!_seenThisTick.Add(pickable) ||
+                        !CanHarvest(pickable))
+                    {
+                        continue;
+                    }
+
+                    using (GroundworkCompat.SuppressForagingRangePickup())
+                    using (HarvestSweepSystem.BeginSkillRaiseFactor(_harvestSweep.SkillRaiseFactor))
+                    {
+                        pickable.Interact(player, repeat: false, alt: false);
+                    }
+
+                    continue;
                 }
 
-                harvestedPickables++;
-                continue;
-            }
-
-            if (TryDestroyUnhealthyPlant(hit))
-            {
-                destroyedPlants++;
-            }
-            else
-            {
-                otherColliders++;
+                DestroyUnhealthyPlantIfNeeded(hit);
             }
         }
-
-        _seenThisTick.Clear();
-        if (HarvestSweepSystem.IsDebugLoggingEnabled())
+        finally
         {
-            HarvestSweepSystem.LogDebug($"harvest result frame={Time.frameCount} hits={hitCount} pickableCandidates={pickableCandidates} harvested={harvestedPickables} skippedPickables={skippedPickables} destroyedPlants={destroyedPlants} otherColliders={otherColliders} radius={radius:0.###} center={FormatVector(center)}.");
+            _seenThisTick.Clear();
+            System.Array.Clear(Hits, 0, Hits.Length);
         }
     }
 
-    private bool TryDestroyUnhealthyPlant(Collider hit)
+    private void DestroyUnhealthyPlantIfNeeded(Collider hit)
     {
         Plant? plant = hit.GetComponentInParent<Plant>();
         if (plant == null || plant.GetStatus() == Plant.Status.Healthy)
         {
-            return false;
+            return;
         }
 
         Destructible? destructible = hit.GetComponentInParent<Destructible>();
         if (destructible == null || !_destroyedPlants.Add(destructible))
         {
-            return false;
+            return;
         }
 
         destructible.Destroy();
-        return true;
     }
 
     private static bool CanHarvest(Pickable pickable)
@@ -770,11 +627,6 @@ internal sealed class HarvestSweepController : MonoBehaviour
                Vector3.up * Mathf.Max(0f, geometryAttack.m_attackHeight) +
                character.transform.right * geometryAttack.m_attackOffset +
                attackDirection * attackRange;
-    }
-
-    private static string FormatVector(Vector3 value)
-    {
-        return $"{value.x:0.##},{value.y:0.##},{value.z:0.##}";
     }
 
     private static Transform ResolveAttackOrigin(Attack attack, Character character)

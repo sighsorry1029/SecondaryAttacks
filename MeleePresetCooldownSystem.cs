@@ -292,49 +292,6 @@ internal static class MeleePresetCooldownSystem
         keys.Clear();
     }
 
-    internal static string DescribeState(
-        Character attacker,
-        ItemDrop.ItemData? weapon,
-        string presetName,
-        MeleePresetCooldownDefinition cooldown)
-    {
-        if (attacker == null)
-        {
-            return "attacker=<null>";
-        }
-
-        if (cooldown == null)
-        {
-            return "cooldown=<null>";
-        }
-
-        float baseCooldown = Mathf.Max(0f, cooldown.Cooldown);
-        string key = string.IsNullOrWhiteSpace(presetName) ? "unknown" : presetName.Trim();
-        if (SecondaryAttackAdminAccessSystem.ShouldBypassPresetCooldowns(attacker))
-        {
-            return $"key={key} baseCooldown={baseCooldown:0.###} ready=true reason=admin-bypass";
-        }
-
-        if (baseCooldown <= 0f)
-        {
-            return $"key={key} baseCooldown={baseCooldown:0.###} ready=true reason=no-cooldown";
-        }
-
-        weapon ??= ResolveCurrentWeapon(attacker);
-        float skillLevel = ResolveCooldownSkillLevel(attacker, weapon, cooldown.CooldownSkill);
-        float reduction = Mathf.Clamp01(skillLevel / 100f) * Mathf.Clamp01(cooldown.CooldownReductionFactor);
-        float finalCooldown = Mathf.Max(0f, baseCooldown * (1f - reduction));
-        CharacterCooldownState state = Cooldowns.GetValue(attacker, _ => new CharacterCooldownState());
-        double now = SecondaryAttackManager.GetNetworkTimeSeconds();
-        double tableRemaining = state.ReadyAtByPreset.TryGetValue(key, out double readyAt)
-            ? Math.Max(0d, readyAt - now)
-            : 0d;
-        float statusTtl = TryGetActiveCooldownStatusTtl(attacker, key, out float ttl) ? ttl : 0f;
-        bool ready = tableRemaining <= 0d;
-        return
-            $"key={key} baseCooldown={baseCooldown:0.###} finalCooldown={finalCooldown:0.###} skill={skillLevel:0.###} reduction={reduction:0.###} tableRemaining={tableRemaining:0.###} statusTtl={statusTtl:0.###} ready={ready}";
-    }
-
     private static Dictionary<string, CooldownStatusRegistration> BuildStatusMap()
     {
         CooldownStatusRegistration[] registrations =
@@ -390,18 +347,6 @@ internal static class MeleePresetCooldownSystem
             statusEffect.m_ttl = cooldown;
             statusEffect.m_icon = ResolveWeaponIcon(weapon) ?? statusEffect.m_icon;
         }
-    }
-
-    private static bool TryGetActiveCooldownStatusTtl(Character attacker, string presetName, out float ttl)
-    {
-        if (!TryGetActiveCooldownStatus(attacker, presetName, out StatusEffect? statusEffect))
-        {
-            ttl = 0f;
-            return false;
-        }
-
-        ttl = Mathf.Max(0f, statusEffect!.GetRemaningTime());
-        return ttl > 0f;
     }
 
     private static void SyncCooldownStatusTtl(Character attacker, ItemDrop.ItemData? weapon, string presetName, float remaining)

@@ -30,16 +30,9 @@ internal static class SecondaryAttackRuntimeWeaponRebind
             Attack sourceAttack = SecondaryAttackManager.ResolveSourceAttack(ObjectDB.instance, prefabItemDrop, definition);
             Attack configuredSecondaryAttack = SecondaryAttackManager.BuildSecondaryAttack(sourceAttack, definition);
             SecondaryAttackManager.NormalizeCopiedProjectileAim(configuredSecondaryAttack, definition);
-            definition.ConfiguredSecondaryAttack = SecondaryAttackManager.CloneAttack(configuredSecondaryAttack);
             weapon.m_shared.m_secondaryAttack = ProjectilePresetCooldownFallback.UsesDynamicOriginalSecondary(definition)
                 ? SecondaryAttackManager.CloneAttack(definition.CooldownFallbackSecondaryAttack ?? prefabItemDrop.m_itemData?.m_shared?.m_secondaryAttack)
                 : configuredSecondaryAttack;
-            if (definition.BehaviorType == SecondaryAttackBehaviorType.SummonEmpower ||
-                definition.BehaviorType == SecondaryAttackBehaviorType.ShieldConvert)
-            {
-                SecondaryAttackManager.LogStaffDebug(
-                    $"Refreshed runtime secondary attack for '{definition.PrefabName}' at applyRevision {currentApplyRevision}: attackAnimation='{weapon.m_shared.m_secondaryAttack.m_attackAnimation}', attackType={weapon.m_shared.m_secondaryAttack.m_attackType}, rawAttackStamina={weapon.m_shared.m_secondaryAttack.m_attackStamina}, rawAttackEitr={weapon.m_shared.m_secondaryAttack.m_attackEitr}.");
-            }
         }
         else
         {

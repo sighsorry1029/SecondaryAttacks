@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Linq;
 using UnityEngine;
 
@@ -11,42 +10,6 @@ internal static class SecondaryAttackRuntimeFacade
 
     private const string StaffRapidFireAnimation = "staff_rapidfire";
     private const float FallbackHoldRepeatInterval = 0.2f;
-
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    internal static void LogRangedDebug(string message)
-    {
-    }
-
-    internal static string DescribeItemForRangedDebug(ItemDrop.ItemData? item)
-    {
-        if (item == null)
-        {
-            return "<null>";
-        }
-
-        string prefab = item.m_dropPrefab != null ? item.m_dropPrefab.name : "<no-prefab>";
-        string sharedName = item.m_shared?.m_name ?? "<no-shared>";
-        string itemType = item.m_shared != null ? item.m_shared.m_itemType.ToString() : "<no-type>";
-        string ammoType = item.m_shared != null ? item.m_shared.m_ammoType : "";
-        string loaded = item.m_customData != null && item.m_customData.TryGetValue(ReloadLoadedCustomDataKey, out string loadedValue)
-            ? loadedValue
-            : "0";
-        return $"{prefab}/{sharedName} type={itemType} stack={item.m_stack} quality={item.m_quality} durability={item.m_durability:0.###} ammoType={ammoType} loadedData={loaded}";
-    }
-
-    internal static string DescribeAttackForRangedDebug(Attack? attack)
-    {
-        if (attack == null)
-        {
-            return "<null>";
-        }
-
-        string loaded = attack.m_character is Player player && attack.m_weapon != null
-            ? (player.m_weaponLoaded == attack.m_weapon).ToString()
-            : attack.m_character?.IsWeaponLoaded().ToString() ?? "<no-character>";
-        return
-            $"animation={attack.m_attackAnimation ?? "<null>"} type={attack.m_attackType} projectile={attack.m_attackProjectile?.name ?? "<null>"} consumeItem={attack.m_consumeItem} requiresReload={attack.m_requiresReload} loaded={loaded} projectiles={attack.m_projectiles} bursts={attack.m_projectileBursts} perBurst={attack.m_perBurstResourceUsage} weapon=[{DescribeItemForRangedDebug(attack.m_weapon)}] ammo=[{DescribeItemForRangedDebug(attack.m_ammoItem)}] lastAmmo=[{DescribeItemForRangedDebug(attack.m_lastUsedAmmo)}]";
-    }
 
     internal static bool TryGetDefinition(ItemDrop.ItemData weapon, out SecondaryAttackDefinition definition)
     {
@@ -311,13 +274,6 @@ internal static class SecondaryAttackRuntimeFacade
             RiftTrailSystem.BeginSampling(attack, definition);
         }
 
-        if (definition.BehaviorType == SecondaryAttackBehaviorType.CopiedSecondary &&
-            (definition.OnProjectileHit != null || definition.Boomerang != null))
-        {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"active copied attack registered weapon={weapon.m_dropPrefab.name} preset={definition.OnProjectileHit?.Preset ?? "boomerang"} animation={attack.m_attackAnimation} attackType={attack.m_attackType} projectile={attack.m_attackProjectile?.name ?? "<null>"}.");
-        }
-
     }
 
     internal static bool TryHandleCustomAttackTrigger(Attack attack)
@@ -579,22 +535,16 @@ internal static class SecondaryAttackRuntimeFacade
 
         if (attack.m_consumeItem)
         {
-            LogRangedDebug($"attack side effect consumeItem before attack={DescribeAttackForRangedDebug(attack)}");
             attack.ConsumeItem();
-            LogRangedDebug($"attack side effect consumeItem after attack={DescribeAttackForRangedDebug(attack)}");
         }
 
         if (attack.m_requiresReload)
         {
             if (ProjectileRuntimeSystem.ShouldDeferBurstFireReloadReset(attack))
             {
-                LogRangedDebug($"attack side effect reset loaded deferred attack={DescribeAttackForRangedDebug(attack)}");
                 return;
             }
-
-            LogRangedDebug($"attack side effect reset loaded before attack={DescribeAttackForRangedDebug(attack)}");
             attack.m_character.ResetLoadedWeapon();
-            LogRangedDebug($"attack side effect reset loaded after attack={DescribeAttackForRangedDebug(attack)}");
         }
     }
 
@@ -730,17 +680,14 @@ internal static class SecondaryAttackRuntimeFacade
 
         if (string.IsNullOrWhiteSpace(attack.m_weapon.m_shared.m_ammoType))
         {
-            LogRangedDebug($"ammo skipped no ammo type definition={definition.PrefabName} attack={DescribeAttackForRangedDebug(attack)}");
             return true;
         }
 
         int ammoCountBefore = CountAmmo(attack.m_character.GetInventory(), attack.m_weapon.m_shared.m_ammoType);
-        LogRangedDebug($"ammo check definition={definition.PrefabName} ammoType={attack.m_weapon.m_shared.m_ammoType} configuredConsumption={projectileBehavior?.AmmoConsumption ?? 0} countBefore={ammoCountBefore} attack={DescribeAttackForRangedDebug(attack)}");
 
         ItemDrop.ItemData ammoItem = Attack.FindAmmo(attack.m_character, attack.m_weapon);
         if (ammoItem != null && !IsAmmoItemForType(ammoItem, attack.m_weapon.m_shared.m_ammoType))
         {
-            LogRangedDebug($"ammo selected item rejected because it is not an ammo item definition={definition.PrefabName} selected=[{DescribeItemForRangedDebug(ammoItem)}]");
             ammoItem = attack.m_character.GetInventory()
                 .GetAllItems()
                 .FirstOrDefault(item => IsAmmoItemForType(item, attack.m_weapon.m_shared.m_ammoType));
@@ -748,14 +695,12 @@ internal static class SecondaryAttackRuntimeFacade
 
         if (ammoItem == null)
         {
-            LogRangedDebug($"ammo failed no matching ammo definition={definition.PrefabName} ammoType={attack.m_weapon.m_shared.m_ammoType} countBefore={ammoCountBefore} attack={DescribeAttackForRangedDebug(attack)}");
             attack.m_character.Message(MessageHud.MessageType.Center, "$msg_outof " + attack.m_weapon.m_shared.m_ammoType);
             return false;
         }
 
         attack.m_ammoItem = ammoItem;
         attack.m_lastUsedAmmo = ammoItem;
-        LogRangedDebug($"ammo selected definition={definition.PrefabName} ammo=[{DescribeItemForRangedDebug(ammoItem)}] attack={DescribeAttackForRangedDebug(attack)}");
 
         if (projectileBehavior == null || projectileBehavior.AmmoConsumption <= 0)
         {
@@ -764,15 +709,11 @@ internal static class SecondaryAttackRuntimeFacade
 
         if (ammoCountBefore < projectileBehavior.AmmoConsumption)
         {
-            LogRangedDebug($"ammo failed insufficient definition={definition.PrefabName} ammoType={attack.m_weapon.m_shared.m_ammoType} required={projectileBehavior.AmmoConsumption} countBefore={ammoCountBefore}");
             attack.m_character.Message(MessageHud.MessageType.Center, "$msg_outof " + attack.m_weapon.m_shared.m_ammoType);
             return false;
         }
 
         RemoveAmmo(attack.m_character.GetInventory(), attack.m_weapon.m_shared.m_ammoType, projectileBehavior.AmmoConsumption);
-        int ammoCountAfter = CountAmmo(attack.m_character.GetInventory(), attack.m_weapon.m_shared.m_ammoType);
-        LogRangedDebug($"ammo consumed definition={definition.PrefabName} ammoType={attack.m_weapon.m_shared.m_ammoType} consumed={projectileBehavior.AmmoConsumption} countBefore={ammoCountBefore} countAfter={ammoCountAfter} attack={DescribeAttackForRangedDebug(attack)}");
-
         return true;
     }
 
@@ -793,7 +734,6 @@ internal static class SecondaryAttackRuntimeFacade
             }
 
             int removeCount = Mathf.Min(item.m_stack, amount);
-            LogRangedDebug($"ammo remove item=[{DescribeItemForRangedDebug(item)}] removeCount={removeCount} remainingBefore={amount}");
             inventory.RemoveItem(item, removeCount);
             amount -= removeCount;
         }

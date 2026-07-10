@@ -19,8 +19,7 @@ internal static class WeaponEffectManager
 
     public static void ApplyToObjectDb(
         ObjectDB objectDb,
-        IReadOnlyDictionary<string, SecondaryAttackDefinition> definitions,
-        IReadOnlyDictionary<string, EffectBehaviorConfig> effectConfigs)
+        IReadOnlyDictionary<string, SecondaryAttackDefinition> definitions)
     {
         RemoveGeneratedStatuses(objectDb);
         MeleePresetCooldownSystem.RegisterStatusEffects(objectDb);
@@ -262,35 +261,6 @@ internal static class WeaponEffectManager
         }
     }
 
-    private static void ApplyConfiguredEquipStatuses(ObjectDB objectDb, IReadOnlyDictionary<string, SecondaryAttackDefinition> definitions)
-    {
-        foreach (GameObject itemPrefab in objectDb.m_items)
-        {
-            if (itemPrefab == null)
-            {
-                continue;
-            }
-
-            ItemDrop? itemDrop = itemPrefab.GetComponent<ItemDrop>();
-            if (itemDrop == null || !definitions.TryGetValue(itemPrefab.name, out SecondaryAttackDefinition? definition))
-            {
-                continue;
-            }
-
-            if (definition.ConfiguredEffects.Count == 0)
-            {
-                continue;
-            }
-
-            if (itemDrop.m_itemData.m_shared.m_equipStatusEffect != null)
-            {
-                continue;
-            }
-
-            itemDrop.m_itemData.m_shared.m_equipStatusEffect = CreateEquipStatusEffect(itemPrefab.name, definition);
-        }
-    }
-
     private static StatusEffect? CreateRuntimeStatusEffect(ConfiguredWeaponEffectDefinition effect)
     {
         return effect.Type switch
@@ -308,25 +278,6 @@ internal static class WeaponEffectManager
         T statusEffect = ScriptableObject.CreateInstance<T>();
         statusEffect.Initialize(effect);
         return statusEffect;
-    }
-
-    private static StatusEffect CreateEquipStatusEffect(string weaponPrefabName, SecondaryAttackDefinition definition)
-    {
-        ConfiguredEquipStatusEffect statusEffect = ScriptableObject.CreateInstance<ConfiguredEquipStatusEffect>();
-        string label = string.Join(", ", definition.ConfiguredEffects.Select(effect => effect.Id));
-        string tooltip = string.Join("\n", definition.ConfiguredEffects.Select(effect => effect.Id));
-        statusEffect.Initialize(
-            $"{GeneratedStatusPrefix}equip_{NormalizeKey(weaponPrefabName)}",
-            label,
-            tooltip);
-        return statusEffect;
-    }
-
-    private static string NormalizeKey(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
     }
 
     private static void ApplyConfiguredEffect(Player attacker, Character target, string weaponPrefabName, ConfiguredWeaponEffectDefinition effect, ref HitData hit)
@@ -492,6 +443,7 @@ internal static class WeaponEffectManager
         effectHit.SetAttacker(attacker);
         SetDamageValue(ref effectHit.m_damage, damageType, damage);
 
+        bool wasApplyingEffectDamage = _isApplyingEffectDamage;
         _isApplyingEffectDamage = true;
         try
         {
@@ -499,7 +451,7 @@ internal static class WeaponEffectManager
         }
         finally
         {
-            _isApplyingEffectDamage = false;
+            _isApplyingEffectDamage = wasApplyingEffectDamage;
         }
     }
 
@@ -916,17 +868,6 @@ internal sealed class ConfiguredHasteStatusEffect : ConfiguredRuntimeStatusEffec
     {
         base.ModifySpeed(baseSpeed, ref speed, character, dir);
         speed *= Effect.MoveSpeedMultiplier;
-    }
-}
-
-internal sealed class ConfiguredEquipStatusEffect : StatusEffect
-{
-    public void Initialize(string statusName, string label, string tooltip)
-    {
-        ((Object)this).name = statusName;
-        m_name = label;
-        m_tooltip = tooltip;
-        m_ttl = 0f;
     }
 }
 

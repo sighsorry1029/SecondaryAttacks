@@ -17,23 +17,6 @@ internal static class GreatSwordSkillScalingSystem
     private static readonly Dictionary<Attack, List<Transform>> ScaledTrailTipsByAttack = new();
     private static readonly Dictionary<MeleeWeaponTrail, CleavingThrustObserverTrailScaleController> ObserverTrailScaleControllers = new();
 
-    internal static AttackRangeScope BeginAttackRangeScope(Attack attack)
-    {
-        return AttackRangeScope.Inactive;
-    }
-
-    internal static void EndAttackRangeScope(Attack attack, AttackRangeScope scope)
-    {
-        if (!scope.Active)
-        {
-            return;
-        }
-
-        attack.m_attackRange = scope.OriginalRange;
-        attack.m_attackRayWidth = scope.OriginalRayWidth;
-        attack.m_attackRayWidthCharExtra = scope.OriginalRayWidthCharExtra;
-    }
-
     internal static void ApplyTrailScaleForAttack(Attack attack)
     {
         if (!TryGetConfiguredTrailScale(attack, out float rangeScale))
@@ -258,6 +241,12 @@ internal static class GreatSwordSkillScalingSystem
         scope.Restore();
     }
 
+    internal static void EndObserverTrailSample(ref ObserverTrailSampleScope scope)
+    {
+        EndObserverTrailSample(scope);
+        scope = default;
+    }
+
     private static void RestoreTrailTips(List<Transform> scaledTips)
     {
         foreach (Transform tipTransform in scaledTips)
@@ -424,26 +413,6 @@ internal static class GreatSwordSkillScalingSystem
         }
     }
 
-    internal readonly struct AttackRangeScope
-    {
-        public static readonly AttackRangeScope Inactive = new(false, 0f, 0f, 0f);
-
-        public AttackRangeScope(bool active, float originalRange, float originalRayWidth, float originalRayWidthCharExtra)
-        {
-            Active = active;
-            OriginalRange = originalRange;
-            OriginalRayWidth = originalRayWidth;
-            OriginalRayWidthCharExtra = originalRayWidthCharExtra;
-        }
-
-        public bool Active { get; }
-
-        public float OriginalRange { get; }
-
-        public float OriginalRayWidth { get; }
-
-        public float OriginalRayWidthCharExtra { get; }
-    }
 }
 
 [HarmonyPatch(typeof(Attack), nameof(Attack.Start))]
@@ -477,22 +446,13 @@ internal static class MeleeWeaponTrailCleavingThrustObserverScalePatch
         __state = GreatSwordSkillScalingSystem.BeginObserverTrailSample(__instance);
     }
 
-    private static void Postfix(GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
+    private static void Postfix(ref GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
     {
-        GreatSwordSkillScalingSystem.EndObserverTrailSample(__state);
-    }
-}
-
-[HarmonyPatch(typeof(Attack), nameof(Attack.DoMeleeAttack))]
-internal static class AttackDoMeleeAttackGreatSwordSkillScalingPatch
-{
-    private static void Prefix(Attack __instance, out GreatSwordSkillScalingSystem.AttackRangeScope __state)
-    {
-        __state = GreatSwordSkillScalingSystem.BeginAttackRangeScope(__instance);
+        GreatSwordSkillScalingSystem.EndObserverTrailSample(ref __state);
     }
 
-    private static void Postfix(Attack __instance, GreatSwordSkillScalingSystem.AttackRangeScope __state)
+    private static void Finalizer(ref GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
     {
-        GreatSwordSkillScalingSystem.EndAttackRangeScope(__instance, __state);
+        GreatSwordSkillScalingSystem.EndObserverTrailSample(ref __state);
     }
 }

@@ -104,19 +104,6 @@ internal static partial class SecondaryAttackDefinitionCompiler
             summonEmpowerAttackSpeedFactor);
     }
 
-    private static void LogStaffDefinitionCreation(string prefabName, ItemDrop.ItemData.SharedData sharedData, DefinitionFeatures features)
-    {
-        if (!string.Equals(prefabName, "StaffSkeleton", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(prefabName, "StaffRedTroll", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(prefabName, "StaffShield", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        SecondaryAttackManager.LogStaffDebug(
-            $"CreateDefinition '{prefabName}': wantsSecondaryOverride={features.WantsSecondaryOverride}, secondaryType='{features.SecondaryType}', usesSummonEmpower={features.UsesSummonEmpower}, usesShieldConvert={features.UsesShieldConvert}, primaryAnimation='{sharedData.m_attack?.m_attackAnimation ?? "<null>"}', primaryProjectile='{sharedData.m_attack?.m_attackProjectile?.name ?? "<null>"}', summonMoveSpeedFactor={features.SummonEmpowerMoveSpeedFactor:0.###}, summonAttackSpeedFactor={features.SummonEmpowerAttackSpeedFactor:0.###}.");
-    }
-
     private static bool TryCreateValidatedDefinition(
         SecondaryAttackDefinitionBuildContext buildContext,
         string prefabName,

@@ -37,15 +37,11 @@ internal sealed class NormalizedWeaponConfig
     public MeleeSpecialPreset MeleePreset { get; set; } = MeleeSpecialPreset.None;
 
     public bool HasExplicitMeleePreset { get; set; }
-}
 
-internal sealed class NormalizedProjectileBehaviorConfig
-{
-    public NormalizedProjectileSecondaryConfig? Ranged { get; set; }
-
-    public NormalizedMeleeOnProjectileHitConfig? OnProjectileHit { get; set; }
-
-    public NormalizedBoomerangConfig? Boomerang { get; set; }
+    public NormalizedWeaponConfig Clone()
+    {
+        return (NormalizedWeaponConfig)MemberwiseClone();
+    }
 }
 
 internal sealed class NormalizedSecondaryModeConfig

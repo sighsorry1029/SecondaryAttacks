@@ -31,7 +31,7 @@ internal sealed class NormalizedSneakAmbushConfig
 
     public NormalizedSneakAmbushConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedSneakAmbushConfig)MemberwiseClone();
     }
 }
 
@@ -62,7 +62,7 @@ internal sealed class NormalizedCleavingThrustConfig
 
     public NormalizedCleavingThrustConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedCleavingThrustConfig)MemberwiseClone();
     }
 }
 
@@ -95,7 +95,7 @@ internal sealed class NormalizedLaunchSlamConfig
 
     public NormalizedLaunchSlamConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedLaunchSlamConfig)MemberwiseClone();
     }
 }
 
@@ -122,7 +122,7 @@ internal sealed class NormalizedKnockbackChainConfig
 
     public NormalizedKnockbackChainConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedKnockbackChainConfig)MemberwiseClone();
     }
 }
 
@@ -153,7 +153,7 @@ internal sealed class NormalizedAftershockConfig
 
     public NormalizedAftershockConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedAftershockConfig)MemberwiseClone();
     }
 }
 
@@ -198,7 +198,7 @@ internal sealed class NormalizedRiftTrailConfig
 
     public NormalizedRiftTrailConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedRiftTrailConfig)MemberwiseClone();
     }
 }
 
@@ -231,7 +231,7 @@ internal sealed class NormalizedFractureLineConfig
 
     public NormalizedFractureLineConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedFractureLineConfig)MemberwiseClone();
     }
 }
 
@@ -270,7 +270,7 @@ internal sealed class NormalizedSpinningSweepConfig
 
     public NormalizedSpinningSweepConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedSpinningSweepConfig)MemberwiseClone();
     }
 }
 
@@ -306,6 +306,6 @@ internal sealed class NormalizedHarvestSweepConfig
 
     public NormalizedHarvestSweepConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedHarvestSweepConfig)MemberwiseClone();
     }
 }

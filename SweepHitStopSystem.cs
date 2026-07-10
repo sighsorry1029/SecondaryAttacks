@@ -5,9 +5,8 @@ namespace SecondaryAttacks;
 
 internal static class SweepHitStopSystem
 {
-    internal static bool TryGetSuppression(Character? character, out string presetName)
+    private static bool HasSuppression(Character? character)
     {
-        presetName = "";
         if (character == null)
         {
             return false;
@@ -16,41 +15,21 @@ internal static class SweepHitStopSystem
         SpinningSweepController? spinningSweep = character.GetComponent<SpinningSweepController>();
         if (spinningSweep?.SuppressesHitStop == true)
         {
-            presetName = "spinningSweep";
             return true;
         }
 
         HarvestSweepController? harvestSweep = character.GetComponent<HarvestSweepController>();
         if (harvestSweep?.SuppressesHitStop == true)
         {
-            presetName = "harvestSweep";
             return true;
         }
 
         return false;
     }
 
-    internal static bool IsDebugLoggingEnabled(string presetName)
-    {
-        return presetName == "spinningSweep"
-            ? SpinningSweepSystem.IsDebugLoggingEnabled()
-            : presetName == "harvestSweep" && HarvestSweepSystem.IsDebugLoggingEnabled();
-    }
-
     internal static bool ShouldSuppress(Character? character, float duration)
     {
-        if (duration <= 0f || !TryGetSuppression(character, out string presetName))
-        {
-            return false;
-        }
-
-        if (IsDebugLoggingEnabled(presetName))
-        {
-            string characterName = character != null ? character.name : "<null>";
-            SecondaryAttacksPlugin.ModLogger.LogInfo($"[SweepHitStop] suppressed source=Character.FreezeFrame preset={presetName} character={characterName} duration={duration:0.###} frame={Time.frameCount}.");
-        }
-
-        return true;
+        return duration > 0f && HasSuppression(character);
     }
 
     internal static bool TryGetAnimationSpeed(Character? character, out float speed)

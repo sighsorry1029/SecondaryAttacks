@@ -71,14 +71,10 @@ internal static class CopiedThrowProjectileVisualSystem
     {
         if (!ShouldApplyCopiedThrowVisuals(attack))
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"burst skipped weapon={attack?.m_weapon?.m_dropPrefab?.name ?? "<null>"} attackType={attack?.m_attackType.ToString() ?? "<null>"} projectile={attack?.m_attackProjectile?.name ?? "<null>"}.");
             return default;
         }
 
         ActiveCopiedThrowBursts.Add(attack);
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"burst begin weapon={attack.m_weapon?.m_dropPrefab?.name ?? "<null>"} projectile={attack.m_attackProjectile?.name ?? "<null>"} activeBursts={ActiveCopiedThrowBursts.Count}.");
         return new BurstScope(attack);
     }
 
@@ -99,36 +95,30 @@ internal static class CopiedThrowProjectileVisualSystem
         ActiveCopiedThrowBursts.Remove(scope.Attack!);
     }
 
+    internal static void EndBurst(ref BurstScope scope)
+    {
+        EndBurst(scope);
+        scope = default;
+    }
+
     internal static void TryApplyToProjectileSetup(Projectile projectile, ItemDrop.ItemData item)
     {
-        if (MeleeProjectileHitCascadeSystem.TryDescribeSpearRainFollowupProjectile(projectile, out string followupDescription))
-        {
-            MeleeProjectileHitCascadeSystem.LogDebug($"setup observed spearRain follow-up: {followupDescription} activeBursts={ActiveCopiedThrowBursts.Count} setupItem={item?.m_dropPrefab?.name ?? "<null>"}.");
-        }
-
         if (projectile == null || ActiveCopiedThrowBursts.Count == 0)
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"setup skipped projectile={projectile?.name ?? "<null>"} activeBursts={ActiveCopiedThrowBursts.Count}.");
             return;
         }
 
         Attack attack = ActiveCopiedThrowBursts[ActiveCopiedThrowBursts.Count - 1];
         if (attack == null)
         {
-            MeleeProjectileHitCascadeSystem.LogDebug($"setup skipped projectile={projectile.name}: active attack is null.");
             return;
         }
 
         ItemDrop.ItemData? visualWeapon = attack.m_weapon ?? item;
         if (visualWeapon?.m_dropPrefab == null)
         {
-            MeleeProjectileHitCascadeSystem.LogDebug($"setup skipped projectile={projectile.name}: visual weapon prefab is null.");
             return;
         }
-
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"setup apply projectile={projectile.name} weapon={visualWeapon.m_dropPrefab.name} sourceProjectile={attack.m_attackProjectile?.name ?? "<null>"}.");
         MoveProjectileClearOfOwner(projectile, attack);
 
         SecondaryAttackDefinition? activeDefinition =
@@ -139,10 +129,8 @@ internal static class CopiedThrowProjectileVisualSystem
         ApplyCurrentWeaponHitEffects(projectile, visualWeapon);
         ApplyCopiedThrowAttribution(projectile, visualWeapon);
 
-        if (SecondaryAttackStartAttackDispatch.ShouldSkipProjectilePresetEffectsForCooldown(attack, out _))
+        if (SecondaryAttackStartAttackDispatch.ShouldSkipProjectilePresetEffectsForCooldown(attack))
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"setup skipped preset effects projectile={projectile.name} weapon={visualWeapon.m_dropPrefab.name}: cooldown fallback copiedSecondary.");
             return;
         }
 
@@ -310,7 +298,7 @@ internal static class CopiedThrowProjectileVisualSystem
             return false;
         }
 
-        if (SecondaryAttackStartAttackDispatch.IsProjectilePresetOriginalCooldownFallback(attack, out _))
+        if (SecondaryAttackStartAttackDispatch.IsProjectilePresetOriginalCooldownFallback(attack))
         {
             return false;
         }
@@ -371,8 +359,6 @@ internal static class CopiedThrowProjectileVisualSystem
 
         Vector3 adjustedPosition = currentPosition + direction * (clearDistance - distanceAlongDirection);
         projectile.transform.position = adjustedPosition;
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"setup moved projectile clear of owner projectile={projectile.name} owner={owner.name} from={FormatVector(currentPosition)} to={FormatVector(adjustedPosition)} direction={FormatVector(direction)} clearDistance={clearDistance:0.###} previousDistance={distanceAlongDirection:0.###}.");
     }
 
     private static void ApplyCopiedThrowAttribution(Projectile projectile, ItemDrop.ItemData weapon)
@@ -392,8 +378,7 @@ internal static class CopiedThrowProjectileVisualSystem
         SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
             ProjectileAccess.GetOriginalHitData(projectile),
             projectile,
-            weapon,
-            "CopiedThrowProjectileVisualSystem.Setup");
+            weapon);
     }
 
     private static void ApplyCurrentWeaponVisual(Projectile projectile, ItemDrop.ItemData weapon)
@@ -408,76 +393,24 @@ internal static class CopiedThrowProjectileVisualSystem
             return;
         }
 
-        System.Diagnostics.Stopwatch? totalPerf = SecondaryAttackPerformanceLog.Start();
-        string path = "none";
-        try
+        PrepareProjectileForVisualSwap(projectile);
+        MarkCopiedThrowProjectile(projectile, context);
+
+        ZNetView? nview = projectile.GetComponent<ZNetView>();
+        bool nviewValid = nview != null && nview.IsValid();
+        if (projectile.m_canChangeVisuals && projectile.m_visual != null && nviewValid)
         {
-            System.Diagnostics.Stopwatch? stepPerf = SecondaryAttackPerformanceLog.Start();
-            PrepareProjectileForVisualSwap(projectile);
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "copiedThrow.visual.prepare",
-                () => $"visual={context.VisualPrefabName} projectile={projectile.name} visualObject={projectile.m_visual?.name ?? "<null>"} canChange={projectile.m_canChangeVisuals}");
-
-            stepPerf = SecondaryAttackPerformanceLog.Start();
-            MarkCopiedThrowProjectile(projectile, context);
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "copiedThrow.visual.mark",
-                () => $"visual={context.VisualPrefabName} projectile={projectile.name}");
-
-            stepPerf = SecondaryAttackPerformanceLog.Start();
-            ZNetView? nview = projectile.GetComponent<ZNetView>();
-            bool nviewValid = nview != null && nview.IsValid();
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "copiedThrow.visual.getZNetView",
-                () => $"visual={context.VisualPrefabName} projectile={projectile.name} valid={nviewValid}");
-
-            if (projectile.m_canChangeVisuals && projectile.m_visual != null && nviewValid)
+            if (nview!.IsOwner())
             {
-                path = "updateVisual";
-                if (nview!.IsOwner())
-                {
-                    stepPerf = SecondaryAttackPerformanceLog.Start();
-                    nview.GetZDO().Set(ZDOVars.s_visual, context.VisualPrefabName);
-                    SecondaryAttackPerformanceLog.Stop(
-                        stepPerf,
-                        "copiedThrow.visual.zdoSet",
-                        () => $"visual={context.VisualPrefabName} projectile={projectile.name}");
-                }
-
-                stepPerf = SecondaryAttackPerformanceLog.Start();
-                projectile.UpdateVisual();
-                SecondaryAttackPerformanceLog.Stop(
-                    stepPerf,
-                    "copiedThrow.visual.updateVisual",
-                    () => $"visual={context.VisualPrefabName} projectile={projectile.name} changed={projectile.m_changedVisual} visualObject={projectile.m_visual?.name ?? "<null>"}");
-
-                stepPerf = SecondaryAttackPerformanceLog.Start();
-                ApplyCopiedThrowVisualSpin(projectile, context);
-                SecondaryAttackPerformanceLog.Stop(
-                    stepPerf,
-                    "copiedThrow.visual.spin",
-                    () => $"visual={context.VisualPrefabName} projectile={projectile.name} axis={context.SpinAxisMode}");
-                return;
+                nview.GetZDO().Set(ZDOVars.s_visual, context.VisualPrefabName);
             }
 
-            path = "localFallback";
-            stepPerf = SecondaryAttackPerformanceLog.Start();
-            ApplyLocalFallbackVisual(projectile, context);
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "copiedThrow.visual.fallback",
-                () => $"visual={context.VisualPrefabName} projectile={projectile.name} attachPrefab={context.AttachPrefab?.name ?? "<null>"} visualObject={projectile.m_visual?.name ?? "<null>"}");
+            projectile.UpdateVisual();
+            ApplyCopiedThrowVisualSpin(projectile, context);
+            return;
         }
-        finally
-        {
-            SecondaryAttackPerformanceLog.Stop(
-                totalPerf,
-                "copiedThrow.visual",
-                () => $"visual={context.VisualPrefabName} projectile={projectile.name} path={path} visualObject={projectile.m_visual?.name ?? "<null>"}");
-        }
+
+        ApplyLocalFallbackVisual(projectile, context);
     }
 
     private static void ApplyCurrentWeaponHitEffects(Projectile projectile, ItemDrop.ItemData weapon)
@@ -551,12 +484,7 @@ internal static class CopiedThrowProjectileVisualSystem
 
     private static void PrepareProjectileForVisualSwap(Projectile projectile)
     {
-        System.Diagnostics.Stopwatch? stepPerf = SecondaryAttackPerformanceLog.Start();
         Transform? existingVisualRoot = projectile.transform.Find(CopiedThrowProjectileVisualRootName);
-        SecondaryAttackPerformanceLog.Stop(
-            stepPerf,
-            "copiedThrow.visual.prepare.findRoot",
-            () => $"projectile={projectile.name} found={existingVisualRoot != null}");
         if (existingVisualRoot != null)
         {
             projectile.m_visual = existingVisualRoot.gameObject;
@@ -564,41 +492,35 @@ internal static class CopiedThrowProjectileVisualSystem
             return;
         }
 
-        stepPerf = SecondaryAttackPerformanceLog.Start();
         HideSourcePresentation(projectile);
-        SecondaryAttackPerformanceLog.Stop(
-            stepPerf,
-            "copiedThrow.visual.prepare.hideSource",
-            () => $"projectile={projectile.name}");
 
-        stepPerf = SecondaryAttackPerformanceLog.Start();
         GameObject visualRoot = new(CopiedThrowProjectileVisualRootName);
         visualRoot.transform.SetParent(projectile.transform, false);
         visualRoot.layer = projectile.gameObject.layer;
         projectile.m_visual = visualRoot;
         projectile.m_canChangeVisuals = true;
-        SecondaryAttackPerformanceLog.Stop(
-            stepPerf,
-            "copiedThrow.visual.prepare.createRoot",
-            () => $"projectile={projectile.name} visualObject={visualRoot.name}");
-
     }
 
     private static void HideSourcePresentation(Projectile projectile)
     {
         RendererBuffer.Clear();
-        projectile.GetComponentsInChildren(includeInactive: true, RendererBuffer);
-        foreach (Renderer renderer in RendererBuffer)
+        try
         {
-            if (renderer is TrailRenderer || renderer is ParticleSystemRenderer)
+            projectile.GetComponentsInChildren(includeInactive: true, RendererBuffer);
+            foreach (Renderer renderer in RendererBuffer)
             {
-                continue;
+                if (renderer is TrailRenderer || renderer is ParticleSystemRenderer)
+                {
+                    continue;
+                }
+
+                renderer.enabled = false;
             }
-
-            renderer.enabled = false;
         }
-
-        RendererBuffer.Clear();
+        finally
+        {
+            RendererBuffer.Clear();
+        }
     }
 
     private static void ApplyLocalFallbackVisual(Projectile projectile, ItemDrop.ItemData weapon)
@@ -608,30 +530,14 @@ internal static class CopiedThrowProjectileVisualSystem
 
     private static void ApplyLocalFallbackVisual(Projectile projectile, SpawnedProjectileVisualContext context)
     {
-        ApplyLocalFallbackVisual(
-            projectile,
-            context,
-            perfScopePrefix: "copiedThrow.visual.fallback");
-    }
-
-    private static void ApplyLocalFallbackVisual(
-        Projectile projectile,
-        SpawnedProjectileVisualContext context,
-        string perfScopePrefix)
-    {
         if (!context.Active || context.AttachPrefab == null)
         {
             return;
         }
 
         GameObject? previousVisual = projectile.m_visual;
-        System.Diagnostics.Stopwatch? stepPerf = SecondaryAttackPerformanceLog.Start();
         GameObject visual = Object.Instantiate(context.AttachPrefab, projectile.transform, false);
         visual.name = $"{context.AttachPrefab.name}(ProjectileVisual)";
-        SecondaryAttackPerformanceLog.Stop(
-            stepPerf,
-            $"{perfScopePrefix}.instantiate",
-            () => $"visual={context.VisualPrefabName} projectile={projectile.name} attachPrefab={context.AttachPrefab.name}");
         visual.transform.localPosition = Vector3.zero;
         visual.transform.localRotation = Quaternion.identity;
         if (previousVisual != null && previousVisual != visual)
@@ -639,20 +545,10 @@ internal static class CopiedThrowProjectileVisualSystem
             previousVisual.SetActive(false);
         }
 
-        stepPerf = SecondaryAttackPerformanceLog.Start();
         visual.GetComponentInChildren<IEquipmentVisual>()?.Setup(context.Weapon!.m_variant);
-        SecondaryAttackPerformanceLog.Stop(
-            stepPerf,
-            $"{perfScopePrefix}.equipmentSetup",
-            () => $"visual={context.VisualPrefabName} projectile={projectile.name} variant={context.Weapon!.m_variant}");
         projectile.m_visual = visual;
 
-        stepPerf = SecondaryAttackPerformanceLog.Start();
         ApplyCopiedThrowVisualSpin(projectile, context);
-        SecondaryAttackPerformanceLog.Stop(
-            stepPerf,
-            $"{perfScopePrefix}.spin",
-            () => $"visual={context.VisualPrefabName} projectile={projectile.name} axis={context.SpinAxisMode}");
     }
 
     private static void ApplyCopiedThrowVisualSpin(
@@ -956,11 +852,6 @@ internal static class CopiedThrowProjectileVisualSystem
         }
 
         return ObjectDB.instance.GetItemPrefab(visualPrefabName)?.GetComponent<ItemDrop>();
-    }
-
-    private static string FormatVector(Vector3 value)
-    {
-        return value.ToString("F2");
     }
 
     private sealed class CopiedThrowSpinState : MonoBehaviour

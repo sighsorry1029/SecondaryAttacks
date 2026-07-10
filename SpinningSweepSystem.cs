@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -20,24 +19,13 @@ internal static class SpinningSweepSystem
             return false;
         }
 
-        bool debugLogging = IsDebugLoggingEnabled();
         SpinningSweepController controller = humanoid.GetComponent<SpinningSweepController>();
         if (controller != null && controller.IsActive)
         {
             if (!controller.MatchesWeapon(attack.m_weapon))
             {
-                if (debugLogging)
-                {
-                    LogDebug($"active controller weapon mismatch; stopping. attackWeapon={DescribeWeapon(attack.m_weapon)}.");
-                }
-
                 controller.StopAfterCurrentAttack();
                 return false;
-            }
-
-            if (debugLogging)
-            {
-                LogDebug($"attach repeat attack weapon={DescribeWeapon(attack.m_weapon)} animation={attack.m_attackAnimation} inAttack={humanoid.InAttack()} currentAttackNull={(humanoid.m_currentAttack == null)}.");
             }
 
             controller.AttachAttack(attack, spinningSweep);
@@ -47,11 +35,6 @@ internal static class SpinningSweepSystem
 
         if (!MeleePresetCooldownSystem.TryConsume(humanoid, attack.m_weapon, PresetName, spinningSweep.PresetCooldown, out _))
         {
-            if (debugLogging)
-            {
-                LogDebug($"begin skipped: cooldown active weapon={DescribeWeapon(attack.m_weapon)}.");
-            }
-
             return false;
         }
 
@@ -62,11 +45,6 @@ internal static class SpinningSweepSystem
 
         controller.Begin(attack, definition, spinningSweep);
         SweepObserverVisualSystem.SendStart(humanoid, false, attack.m_attackAnimation, spinningSweep.LoopStart, spinningSweep.LoopEnd, spinningSweep.AnimationSpeed);
-        if (debugLogging)
-        {
-            LogDebug($"begin weapon={DescribeWeapon(attack.m_weapon)} animation={attack.m_attackAnimation} loop={spinningSweep.LoopStart:0.###}-{spinningSweep.LoopEnd:0.###} speed={spinningSweep.AnimationSpeed:0.###} move={spinningSweep.MoveSpeedFactor:0.###}.");
-        }
-
         return true;
     }
 
@@ -87,26 +65,9 @@ internal static class SpinningSweepSystem
 
     internal static bool StartRepeatAttack(Humanoid humanoid)
     {
-        bool started = humanoid.StartAttack(null, true);
-        if (IsDebugLoggingEnabled())
-        {
-            LogDebug($"repeat StartAttack result={started} inAttack={humanoid.InAttack()} currentAttackNull={(humanoid.m_currentAttack == null)} currentSecondary={humanoid.m_currentAttackIsSecondary}.");
-        }
-
-        return started;
+        return humanoid.StartAttack(null, true);
     }
 
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    internal static void LogDebug(string message)
-    {
-    }
-
-    internal static bool IsDebugLoggingEnabled() => false;
-
-    internal static string DescribeWeapon(ItemDrop.ItemData? weapon)
-    {
-        return weapon?.m_dropPrefab?.name ?? weapon?.m_shared?.m_name ?? "<null>";
-    }
 }
 
 internal sealed class SpinningSweepController : MonoBehaviour
@@ -217,13 +178,8 @@ internal sealed class SpinningSweepController : MonoBehaviour
 
         if (!secondaryAttackHold)
         {
-            bool wasArmed = _cancelArmed;
             _cancelArmed = Time.frameCount > _startedFrame + 1;
             _lastSecondaryHold = false;
-            if (!wasArmed && _cancelArmed)
-            {
-                SpinningSweepSystem.LogDebug("cancel armed after secondary input release.");
-            }
             return;
         }
 
@@ -235,20 +191,14 @@ internal sealed class SpinningSweepController : MonoBehaviour
         }
 
         StopAfterCurrentAttack();
-        SpinningSweepSystem.LogDebug("stop requested by secondary hold edge.");
     }
 
     private void UpdatePrimaryCancelInput(bool primaryAttackHold)
     {
         if (!primaryAttackHold)
         {
-            bool wasArmed = _primaryCancelArmed;
             _primaryCancelArmed = Time.frameCount > _startedFrame + 1;
             _lastPrimaryHold = false;
-            if (!wasArmed && _primaryCancelArmed)
-            {
-                SpinningSweepSystem.LogDebug("primary cancel armed after primary input release.");
-            }
             return;
         }
 
@@ -260,7 +210,6 @@ internal sealed class SpinningSweepController : MonoBehaviour
         }
 
         StopAfterCurrentAttack();
-        SpinningSweepSystem.LogDebug("stop requested by primary hold edge.");
     }
 
     internal void StopAfterCurrentAttack()
@@ -270,7 +219,6 @@ internal sealed class SpinningSweepController : MonoBehaviour
 
     private void Update()
     {
-        bool debugLogging = SpinningSweepSystem.IsDebugLoggingEnabled();
         if (_humanoid == null ||
             _weapon == null ||
             _definition == null ||
@@ -278,11 +226,6 @@ internal sealed class SpinningSweepController : MonoBehaviour
             _humanoid.IsDead() ||
             !SecondaryAttackManager.HasCharacterAuthority(_humanoid))
         {
-            if (debugLogging)
-            {
-                SpinningSweepSystem.LogDebug($"destroy: invalid state humanoidNull={(_humanoid == null)} weaponNull={(_weapon == null)} definitionNull={(_definition == null)} configNull={(_spinningSweep == null)} dead={(_humanoid?.IsDead() ?? false)} authority={(_humanoid != null && SecondaryAttackManager.HasCharacterAuthority(_humanoid))}.");
-            }
-
             Destroy(this);
             return;
         }
@@ -298,49 +241,24 @@ internal sealed class SpinningSweepController : MonoBehaviour
                     return;
                 }
             }
-            else if (debugLogging && Time.frameCount % 10 == 0)
-            {
-                SpinningSweepSystem.LogDebug($"active attack mismatch frame={Time.frameCount} activeAnimation={activeAttack.m_attackAnimation} currentAnimation={_currentAttack?.m_attackAnimation ?? "<null>"} inAttack={_humanoid.InAttack()} currentSecondary={_humanoid.m_currentAttackIsSecondary}.");
-            }
-
             return;
         }
 
         if (_stopRequested || !MatchesWeapon(_humanoid.GetCurrentWeapon()))
         {
-            if (debugLogging)
-            {
-                SpinningSweepSystem.LogDebug($"destroy: stop={_stopRequested} weaponMatch={MatchesWeapon(_humanoid.GetCurrentWeapon())} currentWeapon={SpinningSweepSystem.DescribeWeapon(_humanoid.GetCurrentWeapon())}.");
-            }
-
             Destroy(this);
             return;
         }
 
         if (Time.time < _nextRepeatTime || _humanoid.IsStaggering() || _humanoid.InAttack())
         {
-            if (debugLogging && Time.frameCount % 20 == 0)
-            {
-                SpinningSweepSystem.LogDebug($"waiting: time={Time.time:0.###} next={_nextRepeatTime:0.###} stagger={_humanoid.IsStaggering()} inAttack={_humanoid.InAttack()} currentAttackNull={(_humanoid.m_currentAttack == null)}.");
-            }
-
             return;
         }
 
-        if (!CanPayNextAttackCost(_weapon, out string costReason))
+        if (!CanPayNextAttackCost(_weapon))
         {
-            if (debugLogging)
-            {
-                SpinningSweepSystem.LogDebug($"destroy: cannot pay next cost reason={costReason} weapon={SpinningSweepSystem.DescribeWeapon(_weapon)}.");
-            }
-
             Destroy(this);
             return;
-        }
-
-        if (debugLogging)
-        {
-            SpinningSweepSystem.LogDebug($"try repeat weapon={SpinningSweepSystem.DescribeWeapon(_weapon)} currentAttackNull={(_humanoid.m_currentAttack == null)} inAttack={_humanoid.InAttack()} timeSinceLast={_humanoid.GetTimeSinceLastAttack():0.###}.");
         }
 
         if (!SpinningSweepSystem.StartRepeatAttack(_humanoid))
@@ -363,7 +281,6 @@ internal sealed class SpinningSweepController : MonoBehaviour
             return false;
         }
 
-        bool debugLogging = SpinningSweepSystem.IsDebugLoggingEnabled();
         _animator ??= _humanoid.GetComponentInChildren<Animator>();
         _zanim ??= _humanoid.GetZAnim();
         if (_animator == null)
@@ -374,21 +291,12 @@ internal sealed class SpinningSweepController : MonoBehaviour
         AnimatorStateInfo state = GetAttackAnimatorState(_animator);
         if (!IsAttackState(state))
         {
-            if (debugLogging && Time.frameCount % 10 == 0)
-            {
-                SpinningSweepSystem.LogDebug($"loop wait: animator is not attack state frame={Time.frameCount} {DescribeState(state)} inTransition={_animator.IsInTransition(0)}.");
-            }
-
             return false;
         }
 
         if (_loopStateHash == 0 && state.fullPathHash != 0)
         {
             _loopStateHash = state.fullPathHash;
-            if (debugLogging)
-            {
-                SpinningSweepSystem.LogDebug($"captured loop state hash={_loopStateHash} normalized={state.normalizedTime:0.###}.");
-            }
         }
 
         if (!_initialLoopStartApplied)
@@ -398,11 +306,6 @@ internal sealed class SpinningSweepController : MonoBehaviour
             {
                 SeekToLoopStart(state);
                 _loopRearmed = false;
-                if (debugLogging)
-                {
-                    SpinningSweepSystem.LogDebug($"seamless loop initial skip animation={activeAttack.m_attackAnimation} start={_spinningSweep.LoopStart:0.###} current={state.normalizedTime:0.###}.");
-                }
-
                 return true;
             }
         }
@@ -414,22 +317,12 @@ internal sealed class SpinningSweepController : MonoBehaviour
 
         if (state.normalizedTime < _spinningSweep.LoopEnd || _lastLoopFrame == Time.frameCount)
         {
-            if (debugLogging && Time.frameCount % 10 == 0)
-            {
-                SpinningSweepSystem.LogDebug($"loop wait frame={Time.frameCount} normalized={state.normalizedTime:0.###} end={_spinningSweep.LoopEnd:0.###} lastLoopFrame={_lastLoopFrame} animatorSpeed={_animator.speed:0.###}.");
-            }
-
             return false;
         }
 
-        if (!CanPayNextAttackCost(_weapon, out string costReason))
+        if (!CanPayNextAttackCost(_weapon))
         {
             _stopRequested = true;
-            if (debugLogging)
-            {
-                SpinningSweepSystem.LogDebug($"seamless loop ending: cannot pay next cost reason={costReason} weapon={SpinningSweepSystem.DescribeWeapon(_weapon)}.");
-            }
-
             return false;
         }
 
@@ -438,17 +331,11 @@ internal sealed class SpinningSweepController : MonoBehaviour
 
         SeekToLoopStart(state);
         _loopRearmed = false;
-        if (debugLogging)
-        {
-            SpinningSweepSystem.LogDebug($"seamless loop rewind frame={Time.frameCount} animation={activeAttack.m_attackAnimation} normalizedBefore={state.normalizedTime:0.###} start={_spinningSweep.LoopStart:0.###} end={_spinningSweep.LoopEnd:0.###} configuredSpeed={_spinningSweep.AnimationSpeed:0.###} animatorSpeed={_animator.speed:0.###} inTransition={_animator.IsInTransition(0)}.");
-        }
-
         return true;
     }
 
     private bool TryRearmLoop(AnimatorStateInfo state, float loopStart, float loopEnd)
     {
-        bool debugLogging = SpinningSweepSystem.IsDebugLoggingEnabled();
         if (_loopRearmed)
         {
             return true;
@@ -457,17 +344,7 @@ internal sealed class SpinningSweepController : MonoBehaviour
         if (state.normalizedTime < loopEnd)
         {
             _loopRearmed = true;
-            if (debugLogging)
-            {
-                SpinningSweepSystem.LogDebug($"loop rearmed frame={Time.frameCount} normalized={state.normalizedTime:0.###} start={loopStart:0.###} end={loopEnd:0.###} animatorSpeed={_animator?.speed ?? 0f:0.###}.");
-            }
-
             return true;
-        }
-
-        if (debugLogging && Time.frameCount % 10 == 0)
-        {
-            SpinningSweepSystem.LogDebug($"loop wait: waiting for seek to apply frame={Time.frameCount} normalized={state.normalizedTime:0.###} start={loopStart:0.###} end={loopEnd:0.###} animatorSpeed={_animator?.speed ?? 0f:0.###}.");
         }
 
         return false;
@@ -513,51 +390,39 @@ internal sealed class SpinningSweepController : MonoBehaviour
         return state.fullPathHash != 0 && state.tagHash == AttackTagHash;
     }
 
-    private static string DescribeState(AnimatorStateInfo state)
+    private bool CanPayNextAttackCost(ItemDrop.ItemData weapon)
     {
-        return $"stateHash={state.fullPathHash} tagHash={state.tagHash} normalized={state.normalizedTime:0.###} length={state.length:0.###} speed={state.speed:0.###}";
-    }
-
-    private bool CanPayNextAttackCost(ItemDrop.ItemData weapon, out string reason)
-    {
-        reason = "";
         ItemDrop.ItemData.SharedData? sharedData = weapon.m_shared;
         Attack? secondaryAttack = sharedData?.m_secondaryAttack;
         if (secondaryAttack == null)
         {
-            reason = "secondary attack is null";
             return false;
         }
 
         float durabilityCost = Mathf.Max(0f, sharedData!.m_useDurabilityDrain * (_definition?.DurabilityFactor ?? 1f));
         if (durabilityCost > 0f && weapon.m_durability + 0.001f < durabilityCost)
         {
-            reason = $"durability {weapon.m_durability:0.###} < {durabilityCost:0.###}";
             return false;
         }
 
         float stamina = Mathf.Max(0f, secondaryAttack.m_attackStamina);
         if (stamina > 0f && !_humanoid!.HaveStamina(stamina))
         {
-            reason = $"stamina cost={stamina:0.###}";
             return false;
         }
 
         float eitr = Mathf.Max(0f, secondaryAttack.m_attackEitr);
         if (eitr > 0f && !_humanoid!.HaveEitr(eitr))
         {
-            reason = $"eitr cost={eitr:0.###}";
             return false;
         }
 
         float health = Mathf.Max(0f, secondaryAttack.m_attackHealth);
         if (health > 0f && !_humanoid!.HaveHealth(health) && secondaryAttack.m_attackHealthLowBlockUse)
         {
-            reason = $"health cost={health:0.###}";
             return false;
         }
 
-        reason = "ok";
         return true;
     }
 

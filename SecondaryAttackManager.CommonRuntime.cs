@@ -11,15 +11,6 @@ internal static partial class SecondaryAttackManager
 {
     private static readonly Dictionary<Humanoid, ItemDrop.ItemData> ReloadConsumptionWeapons = new();
 
-    private static int GetCurrentSnapshotId()
-    {
-        return SecondaryAttackFacade.CurrentCompiledSnapshot.SnapshotId;
-    }
-
-    internal static void ResetWorldApplyTransientState()
-    {
-    }
-
     internal static bool TryMarkCompatibilityWarningReported(string warningKey)
     {
         return SecondaryAttackWarningLog.TryMarkWarning(warningKey);
@@ -86,25 +77,43 @@ internal static partial class SecondaryAttackManager
         }
     }
 
-    internal static bool BeginReloadStateConsumption(Attack attack)
+    internal static ReloadStateConsumptionScope BeginReloadStateConsumption(Attack attack)
     {
         if (attack?.m_character == null || attack.m_weapon == null || !attack.m_requiresReload)
         {
-            return false;
+            return default;
         }
 
-        ReloadConsumptionWeapons[attack.m_character] = attack.m_weapon;
-        return true;
+        Humanoid character = attack.m_character;
+        bool hadPreviousWeapon = ReloadConsumptionWeapons.TryGetValue(
+            character,
+            out ItemDrop.ItemData? previousWeapon);
+        ReloadConsumptionWeapons[character] = attack.m_weapon;
+        return new ReloadStateConsumptionScope(character, previousWeapon, hadPreviousWeapon);
     }
 
-    internal static void EndReloadStateConsumption(Attack attack, bool active)
+    internal static void EndReloadStateConsumption(ref ReloadStateConsumptionScope scope)
     {
-        if (!active || attack?.m_character == null)
+        if (!scope.Active)
         {
+            scope = default;
             return;
         }
 
-        ReloadConsumptionWeapons.Remove(attack.m_character);
+        Humanoid? character = scope.Character;
+        if (!ReferenceEquals(character, null))
+        {
+            if (scope.HadPreviousWeapon && scope.PreviousWeapon != null)
+            {
+                ReloadConsumptionWeapons[character] = scope.PreviousWeapon;
+            }
+            else
+            {
+                ReloadConsumptionWeapons.Remove(character);
+            }
+        }
+
+        scope = default;
     }
 
     private static bool IsReloadableWeapon(ItemDrop.ItemData weapon)
@@ -115,6 +124,28 @@ internal static partial class SecondaryAttackManager
     private static bool IsReloadStateConsumptionActive(Humanoid humanoid, ItemDrop.ItemData weapon)
     {
         return ReloadConsumptionWeapons.TryGetValue(humanoid, out ItemDrop.ItemData consumedWeapon) && consumedWeapon == weapon;
+    }
+
+    internal readonly struct ReloadStateConsumptionScope
+    {
+        internal ReloadStateConsumptionScope(
+            Humanoid character,
+            ItemDrop.ItemData? previousWeapon,
+            bool hadPreviousWeapon)
+        {
+            Character = character;
+            PreviousWeapon = previousWeapon;
+            HadPreviousWeapon = hadPreviousWeapon;
+            Active = true;
+        }
+
+        internal Humanoid? Character { get; }
+
+        internal ItemDrop.ItemData? PreviousWeapon { get; }
+
+        internal bool HadPreviousWeapon { get; }
+
+        internal bool Active { get; }
     }
 
     private static void SetPersistedReloadState(Player player, ItemDrop.ItemData weapon, bool loaded)
@@ -323,6 +354,12 @@ internal static partial class SecondaryAttackManager
             state.BeforeDurability - targetDrain,
             0f,
             Mathf.Max(state.Weapon.m_shared.m_maxDurability, state.BeforeDurability));
+    }
+
+    internal static void EndSecondaryAttackDurabilityAdjustment(ref SecondaryAttackDurabilityAdjustmentState state)
+    {
+        EndSecondaryAttackDurabilityAdjustment(state);
+        state = SecondaryAttackDurabilityAdjustmentState.Empty;
     }
 
     internal static float ResolveActiveAttackDurabilityFactor(ActiveSecondaryAttack activeAttack)

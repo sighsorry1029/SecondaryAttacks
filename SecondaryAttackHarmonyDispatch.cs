@@ -53,20 +53,39 @@ internal static class SecondaryAttackHarmonyDispatch
         Vector3 hitPoint,
         bool water,
         Vector3 normal,
-        ProjectileOnHitState state)
+        ref ProjectileOnHitState state)
     {
-        DirectWeaponHitContextSystem.End(state.DirectHitContext);
-        if (state.RuntimeContext)
+        DirectWeaponHitContextSystem.End(ref state.DirectHitContext);
+        try
         {
-            MeleeProjectileHitCascadeSystem.TryTrigger(projectile, collider, hitPoint, water, normal);
+            if (state.RuntimeContext)
+            {
+                MeleeProjectileHitCascadeSystem.TryTrigger(projectile, collider, hitPoint, water, normal);
+            }
+        }
+        finally
+        {
+            CleanupProjectileOnHitState(ref state);
         }
 
-        SecondaryAttackRuntimeFacade.EndProjectileHitContext(state.RuntimeContext);
-        ProjectileRuntimeSystem.EndScatterRicochetDamageScale(state.ScatterRicochetDamageScope);
-        MeleeProjectileHitCascadeSystem.DestroySpearRainFollowupAfterHit(projectile, collider, hitPoint, water, normal);
+        MeleeProjectileHitCascadeSystem.DestroySpearRainFollowupAfterHit(projectile);
     }
 
-    internal static void PlayerUpdatePostfix(Player player, bool primaryAttackHold, bool secondaryAttackHold, bool secondaryAttackPressed, ref bool blocking)
+    internal static void ProjectileOnHitFinalizer(ref ProjectileOnHitState state)
+    {
+        DirectWeaponHitContextSystem.End(ref state.DirectHitContext);
+        CleanupProjectileOnHitState(ref state);
+    }
+
+    private static void CleanupProjectileOnHitState(ref ProjectileOnHitState state)
+    {
+        SecondaryAttackRuntimeFacade.EndProjectileHitContext(state.RuntimeContext);
+        state.RuntimeContext = false;
+        ProjectileRuntimeSystem.EndScatterRicochetDamageScale(state.ScatterRicochetDamageScope);
+        state.ScatterRicochetDamageScope = default;
+    }
+
+    internal static void PlayerUpdatePostfix(Player player, bool primaryAttackHold, bool secondaryAttackHold, ref bool blocking)
     {
         if (player == Player.m_localPlayer)
         {
@@ -85,19 +104,6 @@ internal static class SecondaryAttackHarmonyDispatch
         }
     }
 
-    internal static void PlayerUpdatePlacementGhostPostfix(Player player)
-    {
-    }
-
-    internal static bool PlayerTryPlacePiecePrefix(Player player, Piece piece, ref bool result)
-    {
-        return true;
-    }
-
-    internal static void PlayerTryPlacePiecePostfix(Player player, Piece piece, bool result)
-    {
-    }
-
     internal static bool AttackFireProjectileBurstPrefix(
         Attack attack,
         out CopiedThrowProjectileVisualSystem.BurstScope state)
@@ -110,15 +116,15 @@ internal static class SecondaryAttackHarmonyDispatch
 
         if (state.Active && !SecondaryAttackStartAttackDispatch.TryConsumeProjectilePresetCooldownAtBurst(attack))
         {
-            CopiedThrowProjectileVisualSystem.EndBurst(state);
+            CopiedThrowProjectileVisualSystem.EndBurst(ref state);
             return false;
         }
 
         return true;
     }
 
-    internal static void AttackFireProjectileBurstPostfix(CopiedThrowProjectileVisualSystem.BurstScope state)
+    internal static void AttackFireProjectileBurstPostfix(ref CopiedThrowProjectileVisualSystem.BurstScope state)
     {
-        CopiedThrowProjectileVisualSystem.EndBurst(state);
+        CopiedThrowProjectileVisualSystem.EndBurst(ref state);
     }
 }

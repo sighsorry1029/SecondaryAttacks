@@ -82,8 +82,6 @@ internal static class SummonPrefabOverrideSystem
 
             spawnAbility.m_spawnPrefab = spawnPrefabs.ToArray();
             appliedCount++;
-            SecondaryAttackManager.LogStaffDebug(
-                $"Applied summon override '{summonOverride.EntryId}' to '{targetName}' with spawn prefabs: {string.Join(", ", spawnPrefabs.ConvertAll(prefab => prefab.name))}.");
         }
 
         state.LastAppliedSnapshotId = snapshotId;

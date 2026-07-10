@@ -21,21 +21,10 @@ internal static class MeleeBoomerangProjectileSystem
             return;
         }
 
-        System.Diagnostics.Stopwatch? perf = SecondaryAttackPerformanceLog.Start();
-        try
-        {
-            BoomerangProjectileController controller =
-                projectile.GetComponent<BoomerangProjectileController>() ??
-                projectile.gameObject.AddComponent<BoomerangProjectileController>();
-            controller.Configure(projectile, attack, definition.Boomerang);
-        }
-        finally
-        {
-            SecondaryAttackPerformanceLog.Stop(
-                perf,
-                "boomerang.setup",
-                $"weapon={weapon.m_dropPrefab.name} projectile={projectile.name} maxDistance={definition.Boomerang.MaxDistance:0.###} curve={definition.Boomerang.CurveFactor:0.###}");
-        }
+        BoomerangProjectileController controller =
+            projectile.GetComponent<BoomerangProjectileController>() ??
+            projectile.gameObject.AddComponent<BoomerangProjectileController>();
+        controller.Configure(projectile, attack, definition.Boomerang);
     }
 
     internal static void UpdateDeferredReturnAutoEquips(Player player)
@@ -70,16 +59,11 @@ internal static class MeleeBoomerangProjectileSystem
                 continue;
             }
 
-            System.Diagnostics.Stopwatch? perf = SecondaryAttackPerformanceLog.Start();
             pending.Owner.EquipItem(pending.Item);
-            SecondaryAttackPerformanceLog.Stop(
-                perf,
-                "boomerang.return.equipDeferred",
-                () => $"owner={pending.Owner.name} item={pending.ItemName} equipped={pending.Item.m_equipped}");
         }
     }
 
-    internal static void QueueReturnAutoEquip(Humanoid owner, ItemDrop.ItemData item, string itemName)
+    internal static void QueueReturnAutoEquip(Humanoid owner, ItemDrop.ItemData item)
     {
         int dueFrame = Time.frameCount + ReturnAutoEquipDelayFrames;
         for (int i = PendingReturnAutoEquips.Count - 1; i >= 0; i--)
@@ -91,22 +75,20 @@ internal static class MeleeBoomerangProjectileSystem
             }
         }
 
-        PendingReturnAutoEquips.Add(new PendingReturnAutoEquip(owner, item, itemName, dueFrame));
+        PendingReturnAutoEquips.Add(new PendingReturnAutoEquip(owner, item, dueFrame));
     }
 
     private readonly struct PendingReturnAutoEquip
     {
-        public PendingReturnAutoEquip(Humanoid owner, ItemDrop.ItemData item, string itemName, int dueFrame)
+        public PendingReturnAutoEquip(Humanoid owner, ItemDrop.ItemData item, int dueFrame)
         {
             Owner = owner;
             Item = item;
-            ItemName = itemName;
             DueFrame = dueFrame;
         }
 
         public Humanoid Owner { get; }
         public ItemDrop.ItemData Item { get; }
-        public string ItemName { get; }
         public int DueFrame { get; }
     }
 
@@ -191,28 +173,7 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
 
         aimDirection.Normalize();
         float configuredMaxDistance = Mathf.Max(0.5f, definition.MaxDistance);
-        System.Diagnostics.Stopwatch? reachPerf = SecondaryAttackPerformanceLog.Start();
-        float maxReach = configuredMaxDistance;
-        int reachHitCount = 0;
-        int validReachHitCount = 0;
-        bool resolvedReach = false;
-        try
-        {
-            maxReach = ResolveMaxReach(
-                projectile,
-                aimDirection,
-                configuredMaxDistance,
-                out reachHitCount,
-                out validReachHitCount);
-            resolvedReach = true;
-        }
-        finally
-        {
-            SecondaryAttackPerformanceLog.Stop(
-                reachPerf,
-                "boomerang.resolveMaxReach",
-                $"projectile={projectile.name} maxDistance={configuredMaxDistance:0.###} reach={maxReach:0.###} hits={reachHitCount} validHits={validReachHitCount} resolved={resolvedReach}");
-        }
+        float maxReach = ResolveMaxReach(projectile, aimDirection, configuredMaxDistance);
         _longRadius = Mathf.Max(0.1f, maxReach * 0.5f);
         _shortRadius = Mathf.Max(0f, _longRadius * Mathf.Max(0f, definition.CurveFactor));
         _flightTime = Mathf.Max(0.1f, EstimateEllipseCircumference(_longRadius, _shortRadius) / ProjectileSpeed);
@@ -346,8 +307,7 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
         SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
             hitData,
             _projectile,
-            ProjectileAccess.GetWeapon(_projectile!),
-            "MeleeBoomerangProjectileSystem.ApplyHit");
+            ProjectileAccess.GetWeapon(_projectile!));
         float decayScale = Mathf.Pow(1f - definition.HitDamageDecay, _hitCount);
         float damageScale = definition.DamageFactor * decayScale;
         if (!Mathf.Approximately(damageScale, 1f))
@@ -539,55 +499,57 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
     private static float ResolveMaxReach(
         Projectile projectile,
         Vector3 aimDirection,
-        float maxDistance,
-        out int hitCount,
-        out int validHitCount)
+        float maxDistance)
     {
         EnsureRayMask();
-        hitCount = Physics.RaycastNonAlloc(
-            projectile.transform.position,
-            aimDirection,
-            s_reachRaycastHits,
-            maxDistance,
-            s_rayMaskSolids,
-            QueryTriggerInteraction.Ignore);
-        validHitCount = 0;
-        if (hitCount == 0)
+        int hitCount = 0;
+        try
         {
-            return maxDistance;
-        }
+            hitCount = Physics.RaycastNonAlloc(
+                projectile.transform.position,
+                aimDirection,
+                s_reachRaycastHits,
+                maxDistance,
+                s_rayMaskSolids,
+                QueryTriggerInteraction.Ignore);
+            if (hitCount == 0)
+            {
+                return maxDistance;
+            }
 
-        Character? owner = ProjectileAccess.GetOwner(projectile);
-        float nearestDistance = maxDistance;
-        bool foundValidHit = false;
-        for (int i = 0; i < hitCount; i++)
+            Character? owner = ProjectileAccess.GetOwner(projectile);
+            float nearestDistance = maxDistance;
+            bool foundValidHit = false;
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit hit = s_reachRaycastHits[i];
+                if (hit.collider == null ||
+                    hit.collider.gameObject == projectile.gameObject ||
+                    hit.collider.transform.IsChildOf(projectile.transform))
+                {
+                    continue;
+                }
+
+                GameObject hitObject = Projectile.FindHitObject(hit.collider);
+                if (hitObject == projectile.gameObject ||
+                    owner != null && hitObject == owner.gameObject)
+                {
+                    continue;
+                }
+
+                if (hit.distance < nearestDistance)
+                {
+                    nearestDistance = hit.distance;
+                    foundValidHit = true;
+                }
+            }
+
+            return foundValidHit ? Mathf.Clamp(nearestDistance, 0.5f, maxDistance) : maxDistance;
+        }
+        finally
         {
-            RaycastHit hit = s_reachRaycastHits[i];
-            s_reachRaycastHits[i] = default;
-            if (hit.collider == null ||
-                hit.collider.gameObject == projectile.gameObject ||
-                hit.collider.transform.IsChildOf(projectile.transform))
-            {
-                continue;
-            }
-
-            GameObject hitObject = Projectile.FindHitObject(hit.collider);
-            if (hitObject == projectile.gameObject ||
-                owner != null && hitObject == owner.gameObject)
-            {
-                continue;
-            }
-
-            if (hit.distance < nearestDistance)
-            {
-                nearestDistance = hit.distance;
-                foundValidHit = true;
-            }
-
-            validHitCount++;
+            System.Array.Clear(s_reachRaycastHits, 0, s_reachRaycastHits.Length);
         }
-
-        return foundValidHit ? Mathf.Clamp(nearestDistance, 0.5f, maxDistance) : maxDistance;
     }
 
     private Character? ResolveOwner()
@@ -651,72 +613,36 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
             return false;
         }
 
-        System.Diagnostics.Stopwatch? totalPerf = SecondaryAttackPerformanceLog.Start();
-        string result = "completed";
         ItemDrop.ItemData? item = _projectile.m_spawnItem;
-        string itemName = item?.m_dropPrefab?.name ?? item?.m_shared?.m_name ?? "<null>";
-        try
+        Inventory? inventory = owner.GetInventory();
+        bool canAdd = item != null && inventory != null && inventory.CanAddItem(item);
+        if (item == null || inventory == null || !canAdd)
         {
-            System.Diagnostics.Stopwatch? stepPerf = SecondaryAttackPerformanceLog.Start();
-            Inventory? inventory = owner.GetInventory();
-            bool canAdd = item != null && inventory != null && inventory.CanAddItem(item);
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "boomerang.return.canAdd",
-                () => $"owner={owner.name} item={itemName} canAdd={canAdd} inventory={inventory != null}");
-            if (item == null || inventory == null || !canAdd)
-            {
-                result = "fallbackComplete";
-                CompleteReturnAtCurrentPosition();
-                return true;
-            }
-
-            item.m_equipped = false;
-            stepPerf = SecondaryAttackPerformanceLog.Start();
-            bool added = inventory.AddItem(item);
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "boomerang.return.addItem",
-                () => $"owner={owner.name} item={itemName} added={added}");
-            if (!added)
-            {
-                result = "fallbackComplete";
-                CompleteReturnAtCurrentPosition();
-                return true;
-            }
-
-            _complete = true;
-            _projectile.m_respawnItemOnHit = false;
-            _projectile.m_spawnItem = null;
-            _projectile.m_spawnOnTtl = false;
-            _projectile.m_gravity = _originalGravity;
-            ProjectileAccess.SetVelocity(_projectile, Vector3.zero);
-            if (_autoEquipOnCatch)
-            {
-                stepPerf = SecondaryAttackPerformanceLog.Start();
-                MeleeBoomerangProjectileSystem.QueueReturnAutoEquip(owner, item, itemName);
-                SecondaryAttackPerformanceLog.Stop(
-                    stepPerf,
-                    "boomerang.return.equipDispatch",
-                    () => $"owner={owner.name} item={itemName} dueFrame={Time.frameCount + MeleeBoomerangProjectileSystem.ReturnAutoEquipDelayFrames}");
-            }
-
-            stepPerf = SecondaryAttackPerformanceLog.Start();
-            ProjectileRuntimeSystem.DestroyProjectileObject(_projectile.gameObject);
-            SecondaryAttackPerformanceLog.Stop(
-                stepPerf,
-                "boomerang.return.destroy",
-                () => $"owner={owner.name} item={itemName}");
-            enabled = false;
+            CompleteReturnAtCurrentPosition();
             return true;
         }
-        finally
+
+        item.m_equipped = false;
+        if (!inventory.AddItem(item))
         {
-            SecondaryAttackPerformanceLog.Stop(
-                totalPerf,
-                "boomerang.return.total",
-                () => $"owner={owner.name} item={itemName} result={result} autoEquip={_autoEquipOnCatch}");
+            CompleteReturnAtCurrentPosition();
+            return true;
         }
+
+        _complete = true;
+        _projectile.m_respawnItemOnHit = false;
+        _projectile.m_spawnItem = null;
+        _projectile.m_spawnOnTtl = false;
+        _projectile.m_gravity = _originalGravity;
+        ProjectileAccess.SetVelocity(_projectile, Vector3.zero);
+        if (_autoEquipOnCatch)
+        {
+            MeleeBoomerangProjectileSystem.QueueReturnAutoEquip(owner, item);
+        }
+
+        ProjectileRuntimeSystem.DestroyProjectileObject(_projectile.gameObject);
+        enabled = false;
+        return true;
     }
 
     private void CompleteReturnAtCurrentPosition()
@@ -730,12 +656,7 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
         Projectile projectile = _projectile;
         projectile.m_gravity = _originalGravity;
         ProjectileAccess.SetVelocity(projectile, Vector3.zero);
-        System.Diagnostics.Stopwatch? perf = SecondaryAttackPerformanceLog.Start();
         projectile.OnHit(null, transform.position, false, Vector3.up);
-        SecondaryAttackPerformanceLog.Stop(
-            perf,
-            "boomerang.return.completeAtPosition",
-            () => $"projectile={projectile.name}");
         enabled = false;
     }
 

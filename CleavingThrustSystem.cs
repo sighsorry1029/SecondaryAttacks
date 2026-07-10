@@ -34,18 +34,20 @@ internal static class CleavingThrustSystem
         CleavingThrustDefinition cleavingThrust = definition.CleavingThrust;
         Character attacker = attack.m_character;
         Vector3 origin = ResolveOrigin(attack);
-        Vector3 forward = ResolveForward(attacker, origin);
+        Vector3 forward = ResolveForward(attacker);
         SecondaryAttackManager.PlayTriggeredAttackEffects(attack, definition.CleavingThrust?.DurabilityFactor ?? definition.DurabilityFactor);
-        GatherTargets(attack, cleavingThrust, origin, forward);
-
-        if (HitTargets.Count == 0)
+        try
         {
-            return;
+            GatherTargets(attack, cleavingThrust, origin, forward);
+            int targetCount = HitTargets.Count;
+            for (int i = 0; i < targetCount; i++)
+            {
+                ApplyHit(attack, cleavingThrust, HitTargets[i], targetCount);
+            }
         }
-
-        for (int i = 0; i < HitTargets.Count; i++)
+        finally
         {
-            ApplyHit(attack, cleavingThrust, HitTargets[i], HitTargets.Count);
+            HitTargets.Clear();
         }
     }
 
@@ -68,7 +70,7 @@ internal static class CleavingThrustSystem
                attackerTransform.right * attack.m_attackOffset;
     }
 
-    private static Vector3 ResolveForward(Character attacker, Vector3 origin)
+    private static Vector3 ResolveForward(Character attacker)
     {
         Vector3 forward = attacker.transform.forward;
         Vector3 horizontalForward = Vector3.ProjectOnPlane(forward, Vector3.up);

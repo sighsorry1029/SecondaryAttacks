@@ -45,7 +45,6 @@ internal static partial class SecondaryAttackDefinitionCompiler
         }
 
         DefinitionFeatures features = AnalyzeDefinitionFeatures(weaponConfig, configuredEffects);
-        LogStaffDefinitionCreation(prefabName, sharedData, features);
         DefinitionValidationResult validation = ValidateDefinitionRequest(prefabName, sharedData, weaponConfig, features);
         switch (validation.Disposition)
         {

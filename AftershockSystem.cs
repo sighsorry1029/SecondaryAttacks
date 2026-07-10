@@ -104,24 +104,13 @@ internal static class AftershockSystem
         float skillDamageFactor = attacker.GetRandomSkillFactor(weapon.m_shared.m_skillType);
         float maxAdrenalineMultiplier = 0f;
         HitObjects.Clear();
-        int layerMask = attack.m_hitTerrain ? GetAttackMaskTerrain() : GetAttackMask();
-        CheckHits(
-            controller,
-            origin,
-            Physics.OverlapSphereNonAlloc(origin, hitRadius, Hits, layerMask, QueryTriggerInteraction.UseGlobal),
-            damageScale,
-            pushScale,
-            skillDamageFactor,
-            ref hitCount,
-            ref averageHitPoint,
-            ref maxAdrenalineMultiplier);
-
-        if (attack.m_attackRayWidthCharExtra > 0f || attack.m_attackHeightChar1 != 0f)
+        try
         {
+            int layerMask = attack.m_hitTerrain ? GetAttackMaskTerrain() : GetAttackMask();
             CheckHits(
                 controller,
                 origin,
-                Physics.OverlapSphereNonAlloc(origin + Vector3.up * attack.m_attackHeightChar1, characterHitRadius, Hits, GetAttackMaskCharacters(), QueryTriggerInteraction.UseGlobal),
+                Physics.OverlapSphereNonAlloc(origin, hitRadius, Hits, layerMask, QueryTriggerInteraction.UseGlobal),
                 damageScale,
                 pushScale,
                 skillDamageFactor,
@@ -129,19 +118,38 @@ internal static class AftershockSystem
                 ref averageHitPoint,
                 ref maxAdrenalineMultiplier);
 
-            if (!Mathf.Approximately(attack.m_attackHeightChar2, attack.m_attackHeightChar1))
+            if (attack.m_attackRayWidthCharExtra > 0f || attack.m_attackHeightChar1 != 0f)
             {
                 CheckHits(
                     controller,
                     origin,
-                    Physics.OverlapSphereNonAlloc(origin + Vector3.up * attack.m_attackHeightChar2, characterHitRadius, Hits, GetAttackMaskCharacters(), QueryTriggerInteraction.UseGlobal),
+                    Physics.OverlapSphereNonAlloc(origin + Vector3.up * attack.m_attackHeightChar1, characterHitRadius, Hits, GetAttackMaskCharacters(), QueryTriggerInteraction.UseGlobal),
                     damageScale,
                     pushScale,
                     skillDamageFactor,
                     ref hitCount,
                     ref averageHitPoint,
                     ref maxAdrenalineMultiplier);
+
+                if (!Mathf.Approximately(attack.m_attackHeightChar2, attack.m_attackHeightChar1))
+                {
+                    CheckHits(
+                        controller,
+                        origin,
+                        Physics.OverlapSphereNonAlloc(origin + Vector3.up * attack.m_attackHeightChar2, characterHitRadius, Hits, GetAttackMaskCharacters(), QueryTriggerInteraction.UseGlobal),
+                        damageScale,
+                        pushScale,
+                        skillDamageFactor,
+                        ref hitCount,
+                        ref averageHitPoint,
+                        ref maxAdrenalineMultiplier);
+                }
             }
+        }
+        finally
+        {
+            HitObjects.Clear();
+            System.Array.Clear(Hits, 0, Hits.Length);
         }
 
         if (hitCount > 0)

@@ -101,50 +101,56 @@ internal static class KnockbackChainSystem
         }
 
         Vector3 sourceCenter = source.GetCenterPoint();
-        int hitCount = Physics.OverlapSphereNonAlloc(
-            sourceCenter,
-            config.CollisionRadius,
-            OverlapHits,
-            GetCharacterMask(),
-            QueryTriggerInteraction.Ignore);
-
-        for (int i = 0; i < hitCount; i++)
+        int hitCount = 0;
+        try
         {
-            Collider collider = OverlapHits[i];
-            OverlapHits[i] = null!;
-            if (collider == null)
+            hitCount = Physics.OverlapSphereNonAlloc(
+                sourceCenter,
+                config.CollisionRadius,
+                OverlapHits,
+                GetCharacterMask(),
+                QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hitCount; i++)
             {
-                continue;
-            }
+                Collider collider = OverlapHits[i];
+                if (collider == null)
+                {
+                    continue;
+                }
 
-            Character? target = ProjectileRuntimeSystem.GetHitCharacter(collider);
-            if (!IsValidCollisionTarget(state.Attacker, source, target) ||
-                !state.CanHit(target!, config.HitCooldown))
-            {
-                continue;
-            }
+                Character? target = ProjectileRuntimeSystem.GetHitCharacter(collider);
+                if (!IsValidCollisionTarget(state.Attacker, source, target) ||
+                    !state.CanHit(target!, config.HitCooldown))
+                {
+                    continue;
+                }
 
-            Vector3 hitDirection = ResolveCollisionDirection(sourceCenter, target!.GetCenterPoint(), travelDirection);
-            if (Vector3.Dot(hitDirection, travelDirection) < -0.25f)
-            {
-                continue;
-            }
+                Vector3 hitDirection = ResolveCollisionDirection(sourceCenter, target!.GetCenterPoint(), travelDirection);
+                if (Vector3.Dot(hitDirection, travelDirection) < -0.25f)
+                {
+                    continue;
+                }
 
-            if (!ApplyCollisionHit(source, target, collider, state, pushForce, chainPower, hitDirection))
-            {
-                continue;
-            }
+                if (!ApplyCollisionHit(source, target, collider, state, pushForce, chainPower, hitDirection))
+                {
+                    continue;
+                }
 
-            float nextPower = chainPower * config.ChainDecay;
-            if (state.CollateralHits < config.MaxChainTargets && nextPower >= MinChainPower)
-            {
-                AttachTracker(target, state, pushForce, nextPower, hitDirection);
-            }
+                float nextPower = chainPower * config.ChainDecay;
+                if (state.CollateralHits < config.MaxChainTargets && nextPower >= MinChainPower)
+                {
+                    AttachTracker(target, state, pushForce, nextPower, hitDirection);
+                }
 
-            if (state.CollateralHits >= config.MaxChainTargets)
-            {
-                return;
+                if (state.CollateralHits >= config.MaxChainTargets)
+                {
+                    return;
+                }
             }
+        }
+        finally
+        {
+            System.Array.Clear(OverlapHits, 0, OverlapHits.Length);
         }
     }
 
@@ -190,6 +196,7 @@ internal static class KnockbackChainSystem
         state.MarkHit(target);
         bool spawnDistanceEffects = ShouldSpawnCollisionDistanceEffects(config, state.Attacker, chainHit.m_point);
 
+        bool wasApplyingChainDamage = IsApplyingChainDamage;
         IsApplyingChainDamage = true;
         try
         {
@@ -197,7 +204,7 @@ internal static class KnockbackChainSystem
         }
         finally
         {
-            IsApplyingChainDamage = false;
+            IsApplyingChainDamage = wasApplyingChainDamage;
         }
 
         if (spawnDistanceEffects)

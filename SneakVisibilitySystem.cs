@@ -100,6 +100,12 @@ internal static class SneakVisibilitySystem
         }
     }
 
+    internal static void RestoreCrouchSpeed(ref CrouchSpeedState state)
+    {
+        RestoreCrouchSpeed(state);
+        state = default;
+    }
+
     private static float CalculateTargetVisibility(Player player, float factor)
     {
         float sneak = Mathf.Clamp01(player.m_skills.GetSkillFactor(Skills.SkillType.Sneak));
@@ -156,8 +162,13 @@ internal static class CharacterUpdateWalkingSneakMovementPatch
             : default;
     }
 
-    private static void Postfix(SneakVisibilitySystem.CrouchSpeedState __state)
+    private static void Postfix(ref SneakVisibilitySystem.CrouchSpeedState __state)
     {
-        SneakVisibilitySystem.RestoreCrouchSpeed(__state);
+        SneakVisibilitySystem.RestoreCrouchSpeed(ref __state);
+    }
+
+    private static void Finalizer(ref SneakVisibilitySystem.CrouchSpeedState __state)
+    {
+        SneakVisibilitySystem.RestoreCrouchSpeed(ref __state);
     }
 }

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -27,17 +26,11 @@ internal static class MeleeProjectileHitCascadeSystem
 
     internal static void RegisterOnProjectileHitSource(Projectile projectile, Attack attack, ItemDrop.ItemData weapon)
     {
-        if (TryDescribeSpearRainFollowupProjectile(projectile, out string followupDescription))
-        {
-            LogDebug($"register observed spearRain follow-up as source candidate: {followupDescription} attackWeapon={attack?.m_weapon?.m_dropPrefab?.name ?? "<null>"} setupWeapon={weapon?.m_dropPrefab?.name ?? "<null>"}.");
-        }
-
         if (projectile == null ||
             attack == null ||
             weapon?.m_dropPrefab == null ||
             attack.m_attackProjectile == null)
         {
-            LogDebug("register skipped: missing projectile, attack, weapon prefab, or attack projectile.");
             return;
         }
 
@@ -51,19 +44,16 @@ internal static class MeleeProjectileHitCascadeSystem
 
         if (!SecondaryAttackRuntimeFacade.TryGetDefinition(weapon, out SecondaryAttackDefinition definition))
         {
-            LogDebug($"register skipped for {weapon.m_dropPrefab.name}: no definition.");
             return;
         }
 
         if (definition.Behavior is not CopiedSecondaryBehavior)
         {
-            LogDebug($"register skipped for {weapon.m_dropPrefab.name}: behavior={definition.BehaviorType}.");
             return;
         }
 
         if (definition.OnProjectileHit == null)
         {
-            LogDebug($"register skipped for {weapon.m_dropPrefab.name}: onProjectileHit is null.");
             return;
         }
 
@@ -95,15 +85,13 @@ internal static class MeleeProjectileHitCascadeSystem
         HitData? baseHitData = projectile.m_originalHitData?.Clone();
         if (baseHitData == null)
         {
-            LogDebug($"register skipped for {weapon.m_dropPrefab.name}: projectile original hit data is null.");
             return;
         }
 
         SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
             baseHitData,
             projectile,
-            weapon,
-            "MeleeProjectileHitCascadeSystem.RegisterOnProjectileHitSource");
+            weapon);
         OnProjectileHitSources.Remove(projectile);
         OnProjectileHitSources.Add(
             projectile,
@@ -121,14 +109,11 @@ internal static class MeleeProjectileHitCascadeSystem
         projectile.m_adrenaline = 0f;
         if (IsSpearRainPreset(config.Preset))
         {
-            RegisterPendingSpearRain(projectile, owner, weapon);
+            RegisterPendingSpearRain(projectile, owner);
         }
-
-        LogDebug(
-            $"registered source projectile weapon={weapon.m_dropPrefab.name} projectile={projectile.name} preset={config.Preset} count={config.Count}.");
     }
 
-    internal static bool HasPendingSpearRain(Character owner, ItemDrop.ItemData? weapon)
+    internal static bool HasPendingSpearRain(Character owner)
     {
         if (owner == null ||
             !PendingSpearRainByOwner.TryGetValue(owner, out SpearRainPendingState? pending) ||
@@ -136,8 +121,6 @@ internal static class MeleeProjectileHitCascadeSystem
         {
             return false;
         }
-
-        LogDebug($"spearRain pending active owner={owner.name} weapon={weapon?.m_dropPrefab?.name ?? "<unknown>"} count={pending.Count}.");
         return true;
     }
 
@@ -150,10 +133,9 @@ internal static class MeleeProjectileHitCascadeSystem
 
         SpearRainPendingState pending = PendingSpearRainByOwner.GetValue(owner, _ => new SpearRainPendingState());
         pending.Count++;
-        LogDebug($"spearRain pending added owner={owner.name} count={pending.Count}.");
     }
 
-    internal static void RemovePendingSpearRain(Character owner, string reason)
+    internal static void RemovePendingSpearRain(Character owner)
     {
         if (owner == null ||
             !PendingSpearRainByOwner.TryGetValue(owner, out SpearRainPendingState? pending) ||
@@ -163,7 +145,6 @@ internal static class MeleeProjectileHitCascadeSystem
         }
 
         pending.Count--;
-        LogDebug($"spearRain pending removed owner={owner.name} count={pending.Count} reason={reason}.");
     }
 
     internal static void TryTrigger(Projectile projectile, Collider collider, Vector3 hitPoint, bool water, Vector3 normal)
@@ -174,43 +155,29 @@ internal static class MeleeProjectileHitCascadeSystem
             !OnProjectileHitSources.TryGetValue(projectile, out OnProjectileHitSourceState? state) ||
             state.Triggered)
         {
-            if (projectile != null)
-            {
-                bool hasState = OnProjectileHitSources.TryGetValue(projectile, out OnProjectileHitSourceState? skippedState);
-                string followup = TryDescribeSpearRainFollowupProjectile(projectile, out string followupDescription)
-                    ? $" followup=[{followupDescription}]"
-                    : "";
-                LogDebug($"trigger skipped: water={water} colliderNull={collider == null} hasState={hasState} alreadyTriggered={skippedState?.Triggered ?? false} projectile={projectile.name}.{followup}");
-            }
-
             return;
         }
 
         Character? target = ProjectileRuntimeSystem.GetHitCharacter(collider);
         if (state.Config.TriggerOnCharactersOnly && target == null)
         {
-            LogDebug($"trigger skipped for {state.WeaponPrefabName}: hit object is not a character collider={collider.name}.");
             return;
         }
 
         if (target != null && !IsValidTarget(state.Owner, target))
         {
-            LogDebug($"trigger skipped for {state.WeaponPrefabName}: invalid target={target.name}.");
             return;
         }
 
         state.Triggered = true;
         OnProjectileHitSources.Remove(projectile);
-        ReleasePendingSpearRain(projectile, "triggered");
+        ReleasePendingSpearRain(projectile);
 
         Vector3 targetPoint = target != null ? target.GetCenterPoint() : hitPoint;
         GameObject? directHitObject = Projectile.FindHitObject(collider);
         if (state.Config.Preset.Equals("impactBurst", System.StringComparison.OrdinalIgnoreCase))
         {
             TryGrantOnProjectileHitAdrenaline(state, target);
-            IDestructible? directDestructible = target != null ? target : directHitObject?.GetComponent<IDestructible>();
-            LogDebug(
-                $"triggering impactBurst weapon={state.WeaponPrefabName} target={DescribeCharacter(target)} radius={state.Config.Radius:0.##} origin={FormatVector(targetPoint)} hitPoint={FormatVector(hitPoint)} collider={DescribeCollider(collider)} hitObject={DescribeGameObject(directHitObject)} destructible={DescribeDestructible(directDestructible)}.");
             TriggerImpactBurst(state, targetPoint, ResolveImpactBurstVfxPoint(hitPoint, targetPoint), target, directHitObject, normal);
             return;
         }
@@ -222,7 +189,6 @@ internal static class MeleeProjectileHitCascadeSystem
 
         targetPoint = ResolveSpearRainTargetPoint(state, target, targetPoint);
         TryGrantOnProjectileHitAdrenaline(state, target);
-        LogDebug($"triggering spearRain weapon={state.WeaponPrefabName} target={DescribeCharacter(target)} count={state.Config.Count} point={FormatVector(targetPoint)} hitPoint={FormatVector(hitPoint)} collider={DescribeCollider(collider)}.");
         SpawnSpearRain(state, targetPoint, target);
     }
 
@@ -261,8 +227,6 @@ internal static class MeleeProjectileHitCascadeSystem
         {
             return false;
         }
-
-        LogDebug($"hit ignored for {state.WeaponPrefabName}: projectile touched owner={target.name} collider={collider.name}.");
         return true;
     }
 
@@ -292,188 +256,91 @@ internal static class MeleeProjectileHitCascadeSystem
         Vector3 normal)
     {
         MeleeOnProjectileHitDefinition config = state.Config;
-        Stopwatch? totalPerf = SecondaryAttackPerformanceLog.Start();
+        if (config.Radius <= 0f || config.DamageFactor <= 0f && config.PushFactor <= 0f)
+        {
+            return;
+        }
+
+        PlayImpactBurstVfx(config, vfxPoint, normal);
+
+        ImpactBurstTargets.Clear();
+        ImpactBurstTargetIds.Clear();
         int hitCount = 0;
-        int targetCount = 0;
-        int appliedCount = 0;
-        string result = "completed";
         try
         {
-            if (config.Radius <= 0f || config.DamageFactor <= 0f && config.PushFactor <= 0f)
-            {
-                result = "skipped";
-                LogDebug(
-                    $"impactBurst skipped weapon={state.WeaponPrefabName}: radius={config.Radius:0.###} damageFactor={config.DamageFactor:0.###} pushFactor={config.PushFactor:0.###}.");
-                return;
-            }
-
-            Stopwatch? vfxPerf = SecondaryAttackPerformanceLog.Start();
-            try
-            {
-                PlayImpactBurstVfx(config, state, impactPoint, vfxPoint, normal);
-            }
-            finally
-            {
-                SecondaryAttackPerformanceLog.Stop(
-                    vfxPerf,
-                    "impactBurst.vfx",
-                    $"weapon={state.WeaponPrefabName} vfx={config.Vfx} radius={config.Radius:0.###}");
-            }
-
-            ImpactBurstTargets.Clear();
-            ImpactBurstTargetIds.Clear();
             float radiusSqr = config.Radius * config.Radius;
-            Stopwatch? scanPerf = SecondaryAttackPerformanceLog.Start();
-            try
+            hitCount = Physics.OverlapSphereNonAlloc(
+                impactPoint,
+                config.Radius,
+                ImpactBurstColliders,
+                config.IncludeDestructibles ? GetImpactBurstMask() : GetCharacterMask(),
+                QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hitCount; i++)
             {
-                hitCount = Physics.OverlapSphereNonAlloc(
-                    impactPoint,
-                    config.Radius,
-                    ImpactBurstColliders,
-                    config.IncludeDestructibles ? GetImpactBurstMask() : GetCharacterMask(),
-                    QueryTriggerInteraction.Ignore);
-            }
-            finally
-            {
-                SecondaryAttackPerformanceLog.Stop(
-                    scanPerf,
-                    "impactBurst.scan",
-                    $"weapon={state.WeaponPrefabName} radius={config.Radius:0.###} includeDestructibles={config.IncludeDestructibles} colliders={hitCount}/{MaxImpactBurstColliders}");
-            }
-
-            LogDebug(
-                $"impactBurst scan weapon={state.WeaponPrefabName} origin={FormatVector(impactPoint)} radius={config.Radius:0.##} includeDestructibles={config.IncludeDestructibles} includeDirectTarget={config.IncludeDirectTarget} directTarget={DescribeCharacter(directTarget)} directHitObject={DescribeGameObject(directHitObject)} colliders={hitCount}/{MaxImpactBurstColliders}.");
-            if (hitCount >= MaxImpactBurstColliders)
-            {
-                LogDebug($"impactBurst scan weapon={state.WeaponPrefabName}: collider buffer is full; nearby targets may be missing.");
-            }
-
-            Stopwatch? collectPerf = SecondaryAttackPerformanceLog.Start();
-            try
-            {
-                for (int i = 0; i < hitCount; i++)
+                Collider collider = ImpactBurstColliders[i];
+                if (collider == null)
                 {
-                    Collider collider = ImpactBurstColliders[i];
-                    ImpactBurstColliders[i] = null!;
-                    if (collider == null)
-                    {
-                        continue;
-                    }
-
-                    GameObject hitObject = Projectile.FindHitObject(collider);
-                    if (hitObject == null)
-                    {
-                        LogDebug($"impactBurst candidate[{i}] skipped: no hit object collider={DescribeCollider(collider)}.");
-                        continue;
-                    }
-
-                    if (hitObject == state.Owner.gameObject)
-                    {
-                        LogDebug($"impactBurst candidate[{i}] skipped: owner object collider={DescribeCollider(collider)} hitObject={DescribeGameObject(hitObject)}.");
-                        continue;
-                    }
-
-                    Character? character = ProjectileRuntimeSystem.GetHitCharacter(collider);
-                    IDestructible? destructible = character != null ? character : hitObject.GetComponent<IDestructible>();
-                    if (destructible == null)
-                    {
-                        LogDebug(
-                            $"impactBurst candidate[{i}] skipped: no destructible collider={DescribeCollider(collider)} hitObject={DescribeGameObject(hitObject)} character={DescribeCharacter(character)}.");
-                        continue;
-                    }
-
-                    if (TryResolveImpactBurstSkipReason(
-                            state,
-                            config,
-                            directTarget,
-                            directHitObject,
-                            hitObject,
-                            character,
-                            destructible,
-                            out string skipReason))
-                    {
-                        LogDebug(
-                            $"impactBurst candidate[{i}] skipped: {skipReason} collider={DescribeCollider(collider)} hitObject={DescribeGameObject(hitObject)} character={DescribeCharacter(character)} destructible={DescribeDestructible(destructible)}.");
-                        continue;
-                    }
-
-                    if (!TryAddImpactBurstTarget(destructible, character, collider, hitObject))
-                    {
-                        LogDebug(
-                            $"impactBurst candidate[{i}] skipped: duplicate collider={DescribeCollider(collider)} hitObject={DescribeGameObject(hitObject)} character={DescribeCharacter(character)} destructible={DescribeDestructible(destructible)}.");
-                        continue;
-                    }
-
-                    Vector3 point = ResolveImpactPoint(collider, impactPoint, destructible);
-                    float distanceSqr = ResolveImpactBurstDistanceSqr(impactPoint, point, character, destructible, radiusSqr);
-                    ImpactBurstTargets.Add(new ImpactBurstTarget(destructible, character, collider, point, distanceSqr));
-                    LogDebug(
-                        $"impactBurst candidate[{i}] accepted: collider={DescribeCollider(collider)} hitObject={DescribeGameObject(hitObject)} character={DescribeCharacter(character)} destructible={DescribeDestructible(destructible)} point={FormatVector(point)} distance={Mathf.Sqrt(distanceSqr):0.###}.");
+                    continue;
                 }
 
-                ImpactBurstTargets.Sort((left, right) => left.DistanceSqr.CompareTo(right.DistanceSqr));
-                targetCount = ImpactBurstTargets.Count;
-            }
-            finally
-            {
-                SecondaryAttackPerformanceLog.Stop(
-                    collectPerf,
-                    "impactBurst.collect",
-                    $"weapon={state.WeaponPrefabName} colliders={hitCount} targets={ImpactBurstTargets.Count}");
-            }
-
-            Stopwatch? damagePerf = SecondaryAttackPerformanceLog.Start();
-            try
-            {
-                foreach (ImpactBurstTarget target in ImpactBurstTargets)
+                GameObject hitObject = Projectile.FindHitObject(collider);
+                if (hitObject == null || hitObject == state.Owner.gameObject)
                 {
-                    if (!ApplyImpactBurstHit(state, target, impactPoint, normal))
-                    {
-                        continue;
-                    }
-
-                    appliedCount++;
+                    continue;
                 }
-            }
-            finally
-            {
-                SecondaryAttackPerformanceLog.Stop(
-                    damagePerf,
-                    "impactBurst.damage",
-                    $"weapon={state.WeaponPrefabName} targets={targetCount} applied={appliedCount}");
+
+                Character? character = ProjectileRuntimeSystem.GetHitCharacter(collider);
+                IDestructible? destructible = character != null ? character : hitObject.GetComponent<IDestructible>();
+                if (destructible == null)
+                {
+                    continue;
+                }
+
+                if (ShouldSkipImpactBurstTarget(
+                        state,
+                        config,
+                        directTarget,
+                        directHitObject,
+                        hitObject,
+                        character,
+                        destructible) ||
+                    !TryAddImpactBurstTarget(destructible, character, collider, hitObject))
+                {
+                    continue;
+                }
+
+                Vector3 point = ResolveImpactPoint(collider, impactPoint, destructible);
+                float distanceSqr = ResolveImpactBurstDistanceSqr(impactPoint, point, character, destructible, radiusSqr);
+                ImpactBurstTargets.Add(new ImpactBurstTarget(destructible, character, collider, point, distanceSqr));
             }
 
-            LogDebug($"impactBurst applied weapon={state.WeaponPrefabName} hits={appliedCount} radius={config.Radius:0.##}.");
-            ImpactBurstTargets.Clear();
-            ImpactBurstTargetIds.Clear();
+            ImpactBurstTargets.Sort((left, right) => left.DistanceSqr.CompareTo(right.DistanceSqr));
+            foreach (ImpactBurstTarget target in ImpactBurstTargets)
+            {
+                ApplyImpactBurstHit(state, target, impactPoint, normal);
+            }
         }
         finally
         {
-            SecondaryAttackPerformanceLog.Stop(
-                totalPerf,
-                "impactBurst.total",
-                $"weapon={state.WeaponPrefabName} result={result} radius={config.Radius:0.###} includeDestructibles={config.IncludeDestructibles} colliders={hitCount} targets={targetCount} applied={appliedCount}");
+            ImpactBurstTargets.Clear();
+            ImpactBurstTargetIds.Clear();
+            System.Array.Clear(ImpactBurstColliders, 0, ImpactBurstColliders.Length);
         }
     }
 
     private static void PlayImpactBurstVfx(
         MeleeOnProjectileHitDefinition config,
-        OnProjectileHitSourceState state,
-        Vector3 impactPoint,
         Vector3 vfxPoint,
         Vector3 normal)
     {
         string vfx = config.Vfx?.Trim() ?? "";
         if (vfx.Length == 0)
         {
-            LogDebug($"impactBurst vfx skipped weapon={state.WeaponPrefabName}: empty vfx field origin={FormatVector(impactPoint)} vfxPoint={FormatVector(vfxPoint)} normal={FormatVector(normal)}.");
             return;
         }
 
         Quaternion rotation = SecondaryAttackNamedEffectSystem.RotationFromNormal(normal);
-        bool created = SecondaryAttackNamedEffectSystem.Create(vfx, vfxPoint, rotation, "impactBurst.vfx");
-        LogDebug(
-            $"impactBurst vfx {(created ? "created" : "failed")} weapon={state.WeaponPrefabName} prefab={vfx} origin={FormatVector(impactPoint)} vfxPoint={FormatVector(vfxPoint)} normal={FormatVector(normal)} rotation={rotation.eulerAngles.ToString("F2")}.");
+        SecondaryAttackNamedEffectSystem.Create(vfx, vfxPoint, rotation, "impactBurst.vfx");
     }
 
     private static Vector3 ResolveImpactBurstVfxPoint(Vector3 hitPoint, Vector3 fallbackPoint)
@@ -481,24 +348,21 @@ internal static class MeleeProjectileHitCascadeSystem
         return hitPoint.sqrMagnitude > 0.001f ? hitPoint : fallbackPoint;
     }
 
-    private static bool TryResolveImpactBurstSkipReason(
+    private static bool ShouldSkipImpactBurstTarget(
         OnProjectileHitSourceState state,
         MeleeOnProjectileHitDefinition config,
         Character? directTarget,
         GameObject? directHitObject,
         GameObject hitObject,
         Character? character,
-        IDestructible destructible,
-        out string reason)
+        IDestructible destructible)
     {
-        reason = string.Empty;
         if (!config.IncludeDirectTarget &&
             ((directTarget != null &&
               (character == directTarget ||
                character != null && character.gameObject == directTarget.gameObject)) ||
              (directHitObject != null && hitObject == directHitObject)))
         {
-            reason = "direct target excluded";
             return true;
         }
 
@@ -509,39 +373,34 @@ internal static class MeleeProjectileHitCascadeSystem
                 return false;
             }
 
-            reason = $"invalid character dead={character.IsDead()} enemy={BaseAI.IsEnemy(state.Owner, character)}";
             return true;
         }
 
         if (!config.IncludeDestructibles)
         {
-            reason = "destructibles disabled";
             return true;
         }
 
         if (state.Weapon?.m_shared?.m_tamedOnly == true)
         {
-            reason = "weapon is tamedOnly";
             return true;
         }
 
         DestructibleType type = destructible.GetDestructibleType();
         if (type == DestructibleType.None)
         {
-            reason = "destructible type is None";
             return true;
         }
 
         if (type == DestructibleType.Character)
         {
-            reason = "destructible type is Character without Character target";
             return true;
         }
 
         return false;
     }
 
-    private static bool ApplyImpactBurstHit(
+    private static void ApplyImpactBurstHit(
         OnProjectileHitSourceState state,
         ImpactBurstTarget target,
         Vector3 impactPoint,
@@ -551,8 +410,7 @@ internal static class MeleeProjectileHitCascadeSystem
         SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
             hitData,
             null,
-            state.Weapon,
-            "MeleeProjectileHitCascadeSystem.ImpactBurst");
+            state.Weapon);
         float damageScale = state.Config.DamageFactor;
         if (!Mathf.Approximately(damageScale, 1f))
         {
@@ -563,15 +421,11 @@ internal static class MeleeProjectileHitCascadeSystem
         if (totalDamage > 0f && totalDamage < MinPositiveImpactBurstDamage)
         {
             hitData.m_damage.Modify(MinPositiveImpactBurstDamage / totalDamage);
-            LogDebug(
-                $"impactBurst damage raised to minimum target={DescribeImpactBurstTarget(target)} before={totalDamage:0.###} after={hitData.m_damage.GetTotalDamage():0.###}.");
         }
 
         if (hitData.m_damage.GetTotalDamage() <= 0f && state.Config.PushFactor <= 0f)
         {
-            LogDebug(
-                $"impactBurst hit skipped: no damage or push target={DescribeImpactBurstTarget(target)} damage={hitData.m_damage.GetTotalDamage():0.###} pushFactor={state.Config.PushFactor:0.###}.");
-            return false;
+            return;
         }
 
         if (target.Character != null && hitData.m_dodgeable && target.Character.IsDodgeInvincible())
@@ -580,9 +434,7 @@ internal static class MeleeProjectileHitCascadeSystem
             {
                 dodgingPlayer.HitWhileDodging();
             }
-
-            LogDebug($"impactBurst hit skipped: target dodging target={DescribeImpactBurstTarget(target)}.");
-            return false;
+            return;
         }
 
         hitData.m_pushForce *= state.Config.PushFactor;
@@ -592,11 +444,10 @@ internal static class MeleeProjectileHitCascadeSystem
         hitData.m_hitCollider = target.Collider;
         hitData.SetAttacker(state.Owner);
 
+        bool wasApplyingImpactBurstDamage = IsApplyingImpactBurstDamage;
         IsApplyingImpactBurstDamage = true;
         try
         {
-            LogDebug(
-                $"impactBurst damaging target={DescribeImpactBurstTarget(target)} damage={hitData.m_damage.GetTotalDamage():0.###} push={hitData.m_pushForce:0.###} toolTier={hitData.m_toolTier} itemWorldLevel={hitData.m_itemWorldLevel} point={FormatVector(hitData.m_point)} dir={FormatVector(hitData.m_dir)}.");
             target.Destructible.Damage(hitData);
             if (target.Character != null && BaseAI.IsEnemy(state.Owner, target.Character))
             {
@@ -605,10 +456,8 @@ internal static class MeleeProjectileHitCascadeSystem
         }
         finally
         {
-            IsApplyingImpactBurstDamage = false;
+            IsApplyingImpactBurstDamage = wasApplyingImpactBurstDamage;
         }
-
-        return true;
     }
 
     private static bool TryAddImpactBurstTarget(
@@ -733,13 +582,8 @@ internal static class MeleeProjectileHitCascadeSystem
                 state.Config.PresetCooldown,
                 out _))
         {
-            LogDebug(
-                $"spearRain cooldown consumed on hit weapon={state.WeaponPrefabName} state=[{MeleePresetCooldownSystem.DescribeState(state.Owner, state.Weapon, SpearRainPresetName, state.Config.PresetCooldown)}].");
             return true;
         }
-
-        LogDebug(
-            $"spearRain skipped weapon={state.WeaponPrefabName}: cooldown active on projectile hit state=[{MeleePresetCooldownSystem.DescribeState(state.Owner, state.Weapon, SpearRainPresetName, state.Config.PresetCooldown)}].");
         return false;
     }
 
@@ -765,8 +609,6 @@ internal static class MeleeProjectileHitCascadeSystem
         }
 
         Vector3 predictedPoint = targetPoint + lead;
-        LogDebug(
-            $"spearRain lead weapon={state.WeaponPrefabName} target={target.name} center={FormatVector(targetPoint)} velocity={FormatVector(horizontalVelocity)} lead={FormatVector(lead)} predicted={FormatVector(predictedPoint)} flightTime={state.Config.FlightTime:0.###}.");
         return predictedPoint;
     }
 
@@ -783,63 +625,41 @@ internal static class MeleeProjectileHitCascadeSystem
 
     private static void SpawnSpearRain(OnProjectileHitSourceState state, Vector3 targetPoint, Character? markedTarget)
     {
-        Stopwatch? perf = SecondaryAttackPerformanceLog.Start();
-        int attemptedCount = 0;
-        string result = "completed";
-        try
+        Projectile? prefabProjectile = state.ProjectilePrefab.GetComponent<Projectile>();
+        if (prefabProjectile == null)
         {
-            Projectile? prefabProjectile = state.ProjectilePrefab.GetComponent<Projectile>();
-            if (prefabProjectile == null)
-            {
-                result = "missingProjectileComponent";
-                LogDebug($"spawn skipped for {state.WeaponPrefabName}: projectile prefab has no Projectile component prefab={state.ProjectilePrefab.name}.");
-                return;
-            }
-
-            float gravity = prefabProjectile.m_gravity;
-            SpearRainTargetMarker? targetMarker = CreateSpearRainTargetMarker(markedTarget, state.Config.FlightTime);
-            CopiedThrowProjectileVisualSystem.SpawnedProjectileVisualContext visualContext =
-                state.Definition.Behavior is CopiedSecondaryBehavior
-                    ? CopiedThrowProjectileVisualSystem.CreateSpawnedProjectileVisualContext(state.Weapon, state.ProjectilePrefab)
-                    : default;
-            LogDebug(
-                $"spearRain spawn begin weapon={state.WeaponPrefabName} count={state.Config.Count} target={DescribeCharacter(markedTarget)} targetPoint={FormatVector(targetPoint)} marker={DescribeSpearRainMarker(targetMarker)} gravity={gravity:0.###} flightTime={state.Config.FlightTime:0.###}.");
-            for (int projectileIndex = 0; projectileIndex < state.Config.Count; projectileIndex++)
-            {
-                Vector2 offset = UnityEngine.Random.insideUnitCircle * state.Config.SpawnRadius;
-                Vector3 spawnPoint = targetPoint + new Vector3(offset.x, state.Config.SpawnHeight, offset.y);
-                Vector3 launchVelocity = CalculateBallisticVelocity(spawnPoint, targetPoint, gravity, state.Config.FlightTime);
-                if (launchVelocity.sqrMagnitude < 0.001f)
-                {
-                    launchVelocity = Vector3.down;
-                }
-
-                attemptedCount++;
-                SpawnFollowupProjectile(
-                    state,
-                    projectileIndex,
-                    spawnPoint,
-                    launchVelocity,
-                    targetMarker,
-                    targetPoint,
-                    gravity,
-                    visualContext);
-            }
-
-            LogDebug($"spawned spearRain projectiles weapon={state.WeaponPrefabName} count={state.Config.Count}.");
+            return;
         }
-        finally
+
+        float gravity = prefabProjectile.m_gravity;
+        SpearRainTargetMarker? targetMarker = CreateSpearRainTargetMarker(markedTarget, state.Config.FlightTime);
+        CopiedThrowProjectileVisualSystem.SpawnedProjectileVisualContext visualContext =
+            state.Definition.Behavior is CopiedSecondaryBehavior
+                ? CopiedThrowProjectileVisualSystem.CreateSpawnedProjectileVisualContext(state.Weapon, state.ProjectilePrefab)
+                : default;
+        for (int spawned = 0; spawned < state.Config.Count; spawned++)
         {
-            SecondaryAttackPerformanceLog.Stop(
-                perf,
-                "spearRain.spawn",
-                $"weapon={state.WeaponPrefabName} result={result} count={state.Config.Count} attempted={attemptedCount} spawnHeight={state.Config.SpawnHeight:0.###} spawnRadius={state.Config.SpawnRadius:0.###} flightTime={state.Config.FlightTime:0.###}");
+            Vector2 offset = UnityEngine.Random.insideUnitCircle * state.Config.SpawnRadius;
+            Vector3 spawnPoint = targetPoint + new Vector3(offset.x, state.Config.SpawnHeight, offset.y);
+            Vector3 launchVelocity = CalculateBallisticVelocity(spawnPoint, targetPoint, gravity, state.Config.FlightTime);
+            if (launchVelocity.sqrMagnitude < 0.001f)
+            {
+                launchVelocity = Vector3.down;
+            }
+
+            SpawnFollowupProjectile(
+                state,
+                spawnPoint,
+                launchVelocity,
+                targetMarker,
+                targetPoint,
+                gravity,
+                visualContext);
         }
     }
 
     private static void SpawnFollowupProjectile(
         OnProjectileHitSourceState state,
-        int projectileIndex,
         Vector3 spawnPoint,
         Vector3 launchVelocity,
         SpearRainTargetMarker? targetMarker,
@@ -853,19 +673,11 @@ internal static class MeleeProjectileHitCascadeSystem
         IProjectile? projectileInterface = projectileObject.GetComponent<IProjectile>();
         if (projectile == null || projectileInterface == null)
         {
-            LogDebug($"follow-up spawn skipped for {state.WeaponPrefabName}: spawned object missing Projectile/IProjectile prefab={state.ProjectilePrefab.name}.");
             ProjectileRuntimeSystem.DestroyProjectileObject(projectileObject);
             return;
         }
 
-        RegisterSpearRainFollowupProjectile(
-            projectile,
-            state,
-            projectileIndex,
-            spawnPoint,
-            launchVelocity,
-            targetMarker,
-            fallbackTargetPoint);
+        RegisterSpearRainFollowupProjectile(projectile);
         SuppressProjectileItemDrops(projectile);
         HitData hitData = BuildFollowupHitData(state);
         projectileInterface.Setup(
@@ -903,146 +715,25 @@ internal static class MeleeProjectileHitCascadeSystem
             secondaryAttack: true,
             state.Definition,
             disableCurrentAttackFallback: false);
-        LogDebug(
-            $"spearRain follow-up spawned {DescribeSpearRainFollowupProjectile(projectile)} projectile={projectile.name} object={DescribeGameObject(projectile.gameObject)} marker={DescribeSpearRainMarker(targetMarker)} damageFactor={state.Config.DamageFactor:0.###}.");
     }
 
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    internal static void LogDebug(string message)
-    {
-    }
-
-    private static string DescribeImpactBurstTarget(ImpactBurstTarget target)
-    {
-        return
-            $"character={DescribeCharacter(target.Character)} destructible={DescribeDestructible(target.Destructible)} collider={DescribeCollider(target.Collider)} distance={target.Distance:0.###} point={FormatVector(target.Point)}";
-    }
-
-    private static string DescribeCharacter(Character? character)
-    {
-        if (character == null)
-        {
-            return "<none>";
-        }
-
-        return $"{character.name}(dead={character.IsDead()}, object={DescribeGameObject(character.gameObject)})";
-    }
-
-    private static string DescribeDestructible(IDestructible? destructible)
-    {
-        if (destructible == null)
-        {
-            return "<null>";
-        }
-
-        string objectName = destructible is Component component
-            ? DescribeGameObject(component.gameObject)
-            : "<non-component>";
-        return $"{destructible.GetType().Name}(type={destructible.GetDestructibleType()}, object={objectName})";
-    }
-
-    private static string DescribeCollider(Collider? collider)
-    {
-        if (collider == null)
-        {
-            return "<null>";
-        }
-
-        return $"{collider.name}(layer={DescribeLayer(collider.gameObject.layer)}, object={DescribeGameObject(collider.gameObject)})";
-    }
-
-    private static string DescribeGameObject(GameObject? gameObject)
-    {
-        if (gameObject == null)
-        {
-            return "<null>";
-        }
-
-        return $"{gameObject.name}(layer={DescribeLayer(gameObject.layer)})";
-    }
-
-    private static string DescribeLayer(int layer)
-    {
-        string layerName = LayerMask.LayerToName(layer);
-        return string.IsNullOrEmpty(layerName)
-            ? layer.ToString()
-            : $"{layer}:{layerName}";
-    }
-
-    internal static string FormatVector(Vector3 value)
-    {
-        return value.ToString("F2");
-    }
-
-    internal static bool TryDescribeSpearRainFollowupProjectile(Projectile? projectile, out string description)
-    {
-        if (projectile != null &&
-            SpearRainFollowupProjectiles.TryGetValue(projectile, out SpearRainFollowupProjectileState? state))
-        {
-            description = state.Describe(projectile);
-            return true;
-        }
-
-        description = "";
-        return false;
-    }
-
-    internal static void DestroySpearRainFollowupAfterHit(
-        Projectile? projectile,
-        Collider? collider,
-        Vector3 hitPoint,
-        bool water,
-        Vector3 normal)
+    internal static void DestroySpearRainFollowupAfterHit(Projectile? projectile)
     {
         if (projectile == null ||
-            !SpearRainFollowupProjectiles.TryGetValue(projectile, out SpearRainFollowupProjectileState? state))
+            !SpearRainFollowupProjectiles.TryGetValue(projectile, out _))
         {
             return;
         }
 
-        string description = state.Describe(projectile);
         SpearRainFollowupProjectiles.Remove(projectile);
-        LogDebug(
-            $"spearRain follow-up destroyed after hit {description} collider={DescribeCollider(collider)} hitPoint={FormatVector(hitPoint)} water={water} normal={FormatVector(normal)}.");
-        Stopwatch? perf = SecondaryAttackPerformanceLog.Start();
         ProjectileRuntimeSystem.DestroyProjectileObject(projectile.gameObject);
-        SecondaryAttackPerformanceLog.Stop(
-            perf,
-            "spearRain.followup.destroy",
-            () => $"projectile={projectile.name} collider={collider?.name ?? "<null>"} water={water}");
     }
 
-    private static string DescribeSpearRainFollowupProjectile(Projectile projectile) =>
-        TryDescribeSpearRainFollowupProjectile(projectile, out string description)
-            ? description
-            : "<unmarked follow-up>";
-
-    private static void RegisterSpearRainFollowupProjectile(
-        Projectile projectile,
-        OnProjectileHitSourceState state,
-        int projectileIndex,
-        Vector3 spawnPoint,
-        Vector3 launchVelocity,
-        SpearRainTargetMarker? targetMarker,
-        Vector3 fallbackTargetPoint)
+    private static void RegisterSpearRainFollowupProjectile(Projectile projectile)
     {
         SpearRainFollowupProjectiles.Remove(projectile);
-        SpearRainFollowupProjectileState followupState = new(
-            state.WeaponPrefabName,
-            projectileIndex,
-            state.Config.Count,
-            targetMarker != null ? targetMarker.DebugTargetName : "<none>",
-            targetMarker != null ? targetMarker.DebugId : 0,
-            Time.time,
-            spawnPoint,
-            launchVelocity,
-            fallbackTargetPoint);
-        SpearRainFollowupProjectiles.Add(projectile, followupState);
-        LogDebug($"spearRain follow-up marked {followupState.Describe(projectile)} projectile={projectile.name}.");
+        SpearRainFollowupProjectiles.Add(projectile, new SpearRainFollowupProjectileState());
     }
-
-    private static string DescribeSpearRainMarker(SpearRainTargetMarker? marker) =>
-        marker != null ? marker.DebugDescription : "<none>";
 
     private static HitData BuildFollowupHitData(OnProjectileHitSourceState state)
     {
@@ -1050,8 +741,7 @@ internal static class MeleeProjectileHitCascadeSystem
         SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
             hitData,
             null,
-            state.Weapon,
-            "MeleeProjectileHitCascadeSystem.FollowupProjectile");
+            state.Weapon);
         if (!Mathf.Approximately(state.Config.DamageFactor, 1f))
         {
             hitData.m_damage.Modify(state.Config.DamageFactor);
@@ -1072,7 +762,7 @@ internal static class MeleeProjectileHitCascadeSystem
     private static bool IsSpearRainPreset(string preset) =>
         preset.Equals(SpearRainPresetName, System.StringComparison.OrdinalIgnoreCase);
 
-    private static void RegisterPendingSpearRain(Projectile projectile, Character owner, ItemDrop.ItemData weapon)
+    private static void RegisterPendingSpearRain(Projectile projectile, Character owner)
     {
         if (projectile == null || owner == null)
         {
@@ -1083,17 +773,16 @@ internal static class MeleeProjectileHitCascadeSystem
             projectile.GetComponent<SpearRainPendingProjectileMarker>() ??
             projectile.gameObject.AddComponent<SpearRainPendingProjectileMarker>();
         marker.Initialize(owner);
-        LogDebug($"spearRain pending registered projectile={projectile.name} owner={owner.name} weapon={weapon?.m_dropPrefab?.name ?? "<unknown>"}.");
     }
 
-    private static void ReleasePendingSpearRain(Projectile projectile, string reason)
+    private static void ReleasePendingSpearRain(Projectile projectile)
     {
         if (projectile == null)
         {
             return;
         }
 
-        projectile.GetComponent<SpearRainPendingProjectileMarker>()?.Release(reason);
+        projectile.GetComponent<SpearRainPendingProjectileMarker>()?.Release();
     }
 
     private static SpearRainTargetMarker? CreateSpearRainTargetMarker(Character? target, float flightTime)
@@ -1200,48 +889,6 @@ internal static class MeleeProjectileHitCascadeSystem
 
     private sealed class SpearRainFollowupProjectileState
     {
-        public SpearRainFollowupProjectileState(
-            string weaponPrefabName,
-            int projectileIndex,
-            int projectileCount,
-            string targetName,
-            int markerId,
-            float createdAt,
-            Vector3 spawnPoint,
-            Vector3 initialVelocity,
-            Vector3 fallbackTargetPoint)
-        {
-            WeaponPrefabName = weaponPrefabName;
-            ProjectileIndex = projectileIndex;
-            ProjectileCount = projectileCount;
-            TargetName = targetName;
-            MarkerId = markerId;
-            CreatedAt = createdAt;
-            SpawnPoint = spawnPoint;
-            InitialVelocity = initialVelocity;
-            FallbackTargetPoint = fallbackTargetPoint;
-        }
-
-        private string WeaponPrefabName { get; }
-
-        private int ProjectileIndex { get; }
-
-        private int ProjectileCount { get; }
-
-        private string TargetName { get; }
-
-        private int MarkerId { get; }
-
-        private float CreatedAt { get; }
-
-        private Vector3 SpawnPoint { get; }
-
-        private Vector3 InitialVelocity { get; }
-
-        private Vector3 FallbackTargetPoint { get; }
-
-        public string Describe(Projectile projectile) =>
-            $"weapon={WeaponPrefabName} index={ProjectileIndex + 1}/{ProjectileCount} target={TargetName} marker={MarkerId} age={Time.time - CreatedAt:0.###}s spawn={FormatVector(SpawnPoint)} velocity={FormatVector(InitialVelocity)} fallback={FormatVector(FallbackTargetPoint)} current={FormatVector(projectile.transform.position)}";
     }
 }
 
@@ -1252,13 +899,13 @@ internal sealed class SpearRainPendingProjectileMarker : MonoBehaviour
 
     internal void Initialize(Character owner)
     {
-        Release("reinitialized");
+        Release();
         _owner = owner;
         _active = true;
         MeleeProjectileHitCascadeSystem.AddPendingSpearRain(owner);
     }
 
-    internal void Release(string reason)
+    internal void Release()
     {
         if (!_active)
         {
@@ -1270,13 +917,13 @@ internal sealed class SpearRainPendingProjectileMarker : MonoBehaviour
         _owner = null;
         if (owner != null)
         {
-            MeleeProjectileHitCascadeSystem.RemovePendingSpearRain(owner, reason);
+            MeleeProjectileHitCascadeSystem.RemovePendingSpearRain(owner);
         }
     }
 
     private void OnDestroy()
     {
-        Release("destroyed");
+        Release();
     }
 }
 
@@ -1285,26 +932,16 @@ internal sealed class SpearRainTargetMarker : MonoBehaviour
     private Character? _target;
     private Vector3 _lastKnownPoint;
     private float _expiresAt;
-    private bool _loggedDeathFreeze;
 
     internal bool IsValid => Time.time <= _expiresAt;
 
     internal Vector3 CurrentPoint => _lastKnownPoint;
-
-    internal int DebugId => GetInstanceID();
-
-    internal string DebugTargetName => _target != null ? _target.name : "<none>";
-
-    internal string DebugDescription =>
-        $"id={DebugId} target={DebugTargetName} dead={(_target?.IsDead() ?? false)} point={MeleeProjectileHitCascadeSystem.FormatVector(_lastKnownPoint)} expiresIn={_expiresAt - Time.time:0.###}";
 
     internal void Configure(Character target, float lifetime)
     {
         _target = target;
         _lastKnownPoint = target.GetCenterPoint();
         _expiresAt = Time.time + Mathf.Max(0.1f, lifetime);
-        _loggedDeathFreeze = false;
-        MeleeProjectileHitCascadeSystem.LogDebug($"spearRain marker configured {DebugDescription} lifetime={lifetime:0.###}.");
     }
 
     private void Update()
@@ -1313,15 +950,8 @@ internal sealed class SpearRainTargetMarker : MonoBehaviour
         {
             _lastKnownPoint = _target.GetCenterPoint();
         }
-        else if (_target != null && !_loggedDeathFreeze)
-        {
-            _loggedDeathFreeze = true;
-            MeleeProjectileHitCascadeSystem.LogDebug($"spearRain marker froze on dead target {DebugDescription}.");
-        }
-
         if (!IsValid)
         {
-            MeleeProjectileHitCascadeSystem.LogDebug($"spearRain marker expired {DebugDescription}.");
             Object.Destroy(this);
         }
     }
@@ -1361,8 +991,6 @@ internal sealed class SpearRainGuidedProjectileController : MonoBehaviour
         _maxSpeed = Mathf.Max(initialVelocity.magnitude * MaxSpeedFactor, initialVelocity.magnitude + MaxSpeedBonus);
         _active = true;
         projectile.m_ttl = Mathf.Max(projectile.m_ttl, _flightTime + 0.5f);
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"spearRain guidance configured projectile={projectile.name} marker={targetMarker.DebugDescription} fallback={MeleeProjectileHitCascadeSystem.FormatVector(fallbackTargetPoint)} flightTime={_flightTime:0.###} gravity={_gravity:0.###} initialVelocity={MeleeProjectileHitCascadeSystem.FormatVector(initialVelocity)} maxSpeed={_maxSpeed:0.###} ttl={projectile.m_ttl:0.###}.");
     }
 
     private void FixedUpdate()
@@ -1381,7 +1009,6 @@ internal sealed class SpearRainGuidedProjectileController : MonoBehaviour
         if (_elapsed >= _flightTime)
         {
             _active = false;
-            MeleeProjectileHitCascadeSystem.LogDebug($"spearRain guidance ended projectile={_projectile.name} elapsed={_elapsed:0.###} flightTime={_flightTime:0.###}.");
             return;
         }
 

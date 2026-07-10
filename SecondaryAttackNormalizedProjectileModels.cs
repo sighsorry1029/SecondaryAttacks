@@ -54,7 +54,7 @@ internal sealed class NormalizedMeleeOnProjectileHitConfig
 
     public NormalizedMeleeOnProjectileHitConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedMeleeOnProjectileHitConfig)MemberwiseClone();
     }
 }
 
@@ -97,7 +97,7 @@ internal sealed class NormalizedBoomerangConfig
 
     public NormalizedBoomerangConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedBoomerangConfig)MemberwiseClone();
     }
 }
 
@@ -136,7 +136,7 @@ internal sealed class NormalizedImpactBurstConfig
 
     public NormalizedImpactBurstConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedImpactBurstConfig)MemberwiseClone();
     }
 }
 
@@ -223,6 +223,6 @@ internal sealed class NormalizedProjectileSecondaryConfig
 
     public NormalizedProjectileSecondaryConfig Clone()
     {
-        return SecondaryAttackConfigClone.Shallow(this);
+        return (NormalizedProjectileSecondaryConfig)MemberwiseClone();
     }
 }

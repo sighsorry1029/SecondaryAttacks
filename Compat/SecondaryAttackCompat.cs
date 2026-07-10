@@ -10,8 +10,4 @@ internal static class SecondaryAttackCompat
     {
         MagicPluginCompat.TryInstall(harmony);
     }
-
-    internal static void TryInstallWorldApplyHooks()
-    {
-    }
 }

@@ -56,24 +56,32 @@ internal static class FractureLineSystem
         HitObjects.Clear();
         HitColliders.Clear();
         HitTargets.Clear();
-        float skillFactor = attacker.GetRandomSkillFactor(weapon.m_shared.m_skillType);
-        float hitRadius = Mathf.Max(0.1f, fractureLine.HitSpacing);
-        int sampleCount = Mathf.Max(2, Mathf.CeilToInt(controller.DamageLength / hitRadius) + 1);
-
-        for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+        try
         {
-            float t = sampleCount <= 1 ? 0f : sampleIndex / (float)(sampleCount - 1);
-            Vector3 samplePoint = controller.GetSurfacePoint(t);
-            CollectSamplePoint(controller, samplePoint, hitRadius);
-        }
+            float skillFactor = attacker.GetRandomSkillFactor(weapon.m_shared.m_skillType);
+            float hitRadius = Mathf.Max(0.1f, fractureLine.HitSpacing);
+            int sampleCount = Mathf.Max(2, Mathf.CeilToInt(controller.DamageLength / hitRadius) + 1);
 
-        float effectiveSkillFactor = skillFactor * ResolveMultiTargetPenalty(HitTargets.Count);
-        foreach (FractureLineHitTarget target in HitTargets)
+            for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+            {
+                float t = sampleCount <= 1 ? 0f : sampleIndex / (float)(sampleCount - 1);
+                Vector3 samplePoint = controller.GetSurfacePoint(t);
+                CollectSamplePoint(controller, samplePoint, hitRadius);
+            }
+
+            float effectiveSkillFactor = skillFactor * ResolveMultiTargetPenalty(HitTargets.Count);
+            foreach (FractureLineHitTarget target in HitTargets)
+            {
+                ApplyCollectedHit(controller, target, effectiveSkillFactor);
+            }
+        }
+        finally
         {
-            ApplyCollectedHit(controller, target, effectiveSkillFactor);
+            HitObjects.Clear();
+            HitColliders.Clear();
+            HitTargets.Clear();
+            System.Array.Clear(Hits, 0, Hits.Length);
         }
-
-        HitTargets.Clear();
     }
 
     private static void CollectSamplePoint(

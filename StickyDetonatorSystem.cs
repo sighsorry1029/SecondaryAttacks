@@ -495,6 +495,7 @@ internal static class StickyDetonatorSystem
             state.Ammo);
         projectile.m_aoe *= state.AoeRadiusFactor;
 
+        bool wasDetonating = _detonating;
         _detonating = true;
         try
         {
@@ -502,7 +503,7 @@ internal static class StickyDetonatorSystem
         }
         finally
         {
-            _detonating = false;
+            _detonating = wasDetonating;
         }
     }
 

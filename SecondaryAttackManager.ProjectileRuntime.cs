@@ -129,7 +129,6 @@ internal static partial class ProjectileRuntimeSystem
         aimDirection = ApplyLaunchAngle(attack, aimDirection);
         if (!TryResolveVolleyTargetPoint(attack, definition, launchData, originPoint, aimDirection, out Vector3 targetPoint))
         {
-            SecondaryAttackManager.LogRangedDebug($"volley skipped definition={definition.PrefabName}: no aimed target.");
             return false;
         }
 
@@ -141,18 +140,6 @@ internal static partial class ProjectileRuntimeSystem
 
         ResolveHorizontalAxes(attack, aimDirection, out Vector3 horizontalForward, out Vector3 horizontalRight);
         float gravity = GetProjectileGravity(launchData.ProjectilePrefab!);
-        SecondaryAttackManager.LogRangedDebug(
-            $"volley start definition={definition.PrefabName}"
-            + $" count={projectileBehavior.ProjectileCount}"
-            + $" projectile={launchData.ProjectilePrefab?.name ?? "<null>"}"
-            + $" ammo=[{SecondaryAttackManager.DescribeItemForRangedDebug(launchData.AmmoItem)}]"
-            + $" origin={FormatVector3(originPoint)}"
-            + $" target={FormatVector3(targetPoint)}"
-            + $" radius={projectileBehavior.VolleyRadius:0.###}"
-            + $" arcAngle={projectileBehavior.VolleyArcAngleMin:0.###}-{projectileBehavior.VolleyArcAngleMax:0.###}"
-            + $" maxRange={projectileBehavior.VolleyMaxRange:0.###}"
-            + $" interval={projectileBehavior.Interval:0.###}"
-            + $" attack={SecondaryAttackManager.DescribeAttackForRangedDebug(attack)}");
 
         if (projectileBehavior.Interval > 0f)
         {
@@ -173,13 +160,6 @@ internal static partial class ProjectileRuntimeSystem
         for (int projectileIndex = 0; projectileIndex < projectileBehavior.ProjectileCount; projectileIndex++)
         {
             CreateVolleyShot(projectileBehavior, launchData, originPoint, targetPoint, horizontalForward, horizontalRight, gravity, projectileIndex, projectileBehavior.ProjectileCount, volleyAngleOffset, out Vector3 spawnPoint, out Vector3 impactPoint, out Vector3 launchVelocity, out float projectileGravity, out float flightTime);
-            SecondaryAttackManager.LogRangedDebug(
-                $"volley shot index={projectileIndex}"
-                + $" spawn={FormatVector3(spawnPoint)}"
-                + $" impact={FormatVector3(impactPoint)}"
-                + $" flightTime={flightTime:0.###}"
-                + $" gravity={projectileGravity:0.###}"
-                + $" velocity={FormatVector3(launchVelocity)}");
             SpawnVolleyProjectile(attack, launchData, spawnPoint, launchVelocity, projectileGravity, flightTime);
         }
 
@@ -336,27 +316,26 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         bool contextActive = SecondaryAttackRuntimeFacade.BeginProjectileHitContext(projectile, collider, hitPoint, water: false, normal);
-            try
+        try
+        {
+            SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
+                hitData,
+                projectile,
+                ProjectileAccess.GetWeapon(projectile));
+            character.Damage(hitData);
+            if (state.HitCount == 0 &&
+                owner != null &&
+                projectile.m_adrenaline > 0f &&
+                character.m_enemyAdrenalineMultiplier > 0f &&
+                BaseAI.IsEnemy(owner, character))
             {
-                SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
-                    hitData,
-                    projectile,
-                    ProjectileAccess.GetWeapon(projectile),
-                    "ProjectileRuntimeSystem.ApplyPiercingShotHit");
-                character.Damage(hitData);
-                if (state.HitCount == 0 &&
-                    owner != null &&
-                    projectile.m_adrenaline > 0f &&
-                    character.m_enemyAdrenalineMultiplier > 0f &&
-                    BaseAI.IsEnemy(owner, character))
-                {
-                    owner.AddAdrenaline(projectile.m_adrenaline * character.m_enemyAdrenalineMultiplier);
-                }
+                owner.AddAdrenaline(projectile.m_adrenaline * character.m_enemyAdrenalineMultiplier);
             }
-            finally
-            {
-                SecondaryAttackRuntimeFacade.EndProjectileHitContext(contextActive);
-            }
+        }
+        finally
+        {
+            SecondaryAttackRuntimeFacade.EndProjectileHitContext(contextActive);
+        }
 
         Quaternion rotation = SecondaryAttackNamedEffectSystem.RotationFromNormal(normal);
         projectile.m_hitEffects.Create(hitPoint, rotation);
@@ -463,25 +442,12 @@ internal static partial class ProjectileRuntimeSystem
         ScatterRicochetProjectiles.Add(
             projectile,
             new ScatterRicochetState(attack, launchData, projectileBehavior, Mathf.Max(0.01f, speed)));
-
-        SecondaryAttackManager.LogRangedDebug(
-            "[Scatter] registered"
-            + $" projectile={DescribeProjectileForScatterDebug(projectile)}"
-            + $" payload={launchData.ProjectilePrefab?.name ?? "<null>"}"
-            + $" speed={speed:0.###}"
-            + $" count={projectileBehavior.ProjectileCount}"
-            + $" splitAngle={projectileBehavior.SplitAngle:0.###}"
-            + $" ricochetBounces={projectileBehavior.RicochetBounces}"
-            + $" ricochetDecay={projectileBehavior.RicochetDecay:0.###}"
-            + $" weapon=[{SecondaryAttackManager.DescribeItemForRangedDebug(attack.m_weapon)}]"
-            + $" ammo=[{SecondaryAttackManager.DescribeItemForRangedDebug(launchData.AmmoItem)}]");
     }
 
     internal static bool TryHandleScatterRicochetProjectileHit(
         Projectile projectile,
         Collider collider,
         Vector3 hitPoint,
-        bool water,
         Vector3 normal)
     {
         if (projectile == null || !ScatterRicochetProjectiles.TryGetValue(projectile, out ScatterRicochetState? state))
@@ -491,55 +457,24 @@ internal static partial class ProjectileRuntimeSystem
 
         if (collider == null)
         {
-            SecondaryAttackManager.LogRangedDebug(
-                "[Scatter] hit skipped null collider"
-                + $" projectile={DescribeProjectileForScatterDebug(projectile)}"
-                + $" hitPoint={FormatVector3(hitPoint)}"
-                + $" water={water}"
-                + $" normal={FormatVector3(normal)}"
-                + $" velocity={FormatVector3(projectile.GetVelocity())}");
             return false;
         }
 
         Character? hitCharacter = GetHitCharacter(collider);
         Character? owner = ProjectileAccess.GetOwner(projectile) ?? state.Attack?.m_character;
-        SecondaryAttackManager.LogRangedDebug(
-            "[Scatter] hit"
-            + $" projectile={DescribeProjectileForScatterDebug(projectile)}"
-            + $" collider={DescribeColliderForScatterDebug(collider)}"
-            + $" character={hitCharacter?.name ?? "<none>"}"
-            + $" owner={owner?.name ?? "<none>"}"
-            + $" hitPoint={FormatVector3(hitPoint)}"
-            + $" water={water}"
-            + $" normal={FormatVector3(normal)}"
-            + $" velocity={FormatVector3(projectile.GetVelocity())}");
 
         if (hitCharacter != null && hitCharacter == owner)
         {
-            SecondaryAttackManager.LogRangedDebug(
-                "[Scatter] ignored owner hit; source projectile remains armed"
-                + $" character={hitCharacter.name}"
-                + $" projectile={DescribeProjectileForScatterDebug(projectile)}");
             return true;
         }
 
         if (hitCharacter != null)
         {
             ScatterRicochetProjectiles.Remove(projectile);
-            SecondaryAttackManager.LogRangedDebug(
-                "[Scatter] source projectile hit a character; vanilla hit continues without splitting"
-                + $" character={hitCharacter.name}"
-                + $" projectile={DescribeProjectileForScatterDebug(projectile)}");
             return false;
         }
 
         ScatterRicochetProjectiles.Remove(projectile);
-        SecondaryAttackManager.LogRangedDebug(
-            "[Scatter] splitting on non-character hit"
-            + $" count={state.Behavior.ProjectileCount}"
-            + $" hitPoint={FormatVector3(hitPoint)}"
-            + $" normal={FormatVector3(normal)}"
-            + $" collider={DescribeColliderForScatterDebug(collider)}");
         SpawnScatterRicochetProjectiles(projectile, state, hitPoint, normal);
         if (state.Attack?.m_weapon != null && state.Attack.m_weapon.m_lastProjectile == projectile.gameObject)
         {
@@ -548,45 +483,6 @@ internal static partial class ProjectileRuntimeSystem
 
         DestroyProjectileObject(projectile.gameObject);
         return true;
-    }
-
-    private static string DescribeProjectileForScatterDebug(Projectile projectile)
-    {
-        if (projectile == null)
-        {
-            return "<null>";
-        }
-
-        string spawnOnHit = projectile.m_spawnOnHit != null ? projectile.m_spawnOnHit.name : "<null>";
-        return projectile.name
-               + $" aoe={projectile.m_aoe:0.###}"
-               + $" ttl={projectile.m_ttl:0.###}"
-               + $" gravity={projectile.m_gravity:0.###}"
-               + $" drag={projectile.m_drag:0.###}"
-               + $" rayRadius={projectile.m_rayRadius:0.###}"
-               + $" doOwnerRaytest={projectile.m_doOwnerRaytest}"
-               + $" canHitWater={projectile.m_canHitWater}"
-               + $" spawnOnHit={spawnOnHit}"
-               + $" spawnOnTtl={projectile.m_spawnOnTtl}"
-               + $" stayStatic={projectile.m_stayAfterHitStatic}"
-               + $" stayDynamic={projectile.m_stayAfterHitDynamic}"
-               + $" bounce={projectile.m_bounce}";
-    }
-
-    private static string DescribeColliderForScatterDebug(Collider collider)
-    {
-        if (collider == null)
-        {
-            return "<null>";
-        }
-
-        GameObject colliderObject = collider.gameObject;
-        string layerName = LayerMask.LayerToName(colliderObject.layer);
-        string rigidbodyName = collider.attachedRigidbody != null ? collider.attachedRigidbody.name : "<none>";
-        return colliderObject.name
-               + $" layer={colliderObject.layer}:{layerName}"
-               + $" tag={colliderObject.tag}"
-               + $" rigidbody={rigidbodyName}";
     }
 
     private static void SpawnScatterRicochetProjectiles(
@@ -1165,7 +1061,6 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         ProjectileLaunchData launchData = new(projectilePrefab, ammoItem, projectileVelocity, projectileVelocityMin, projectileAccuracy, projectileAccuracyMin, attackHitNoise, damageFactor, configuredDamageFactor, configuredSkillRaiseFactor, configuredAdrenalineFactor, attack.m_randomVelocity && !attack.m_bowDraw);
-        DumpRuntimeLaunchProfile(attack, launchData);
         return launchData;
     }
 
@@ -1302,15 +1197,6 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         direction.Normalize();
-        SecondaryAttackManager.LogRangedDebug(
-            $"projectile spawn prefab={launchData.ProjectilePrefab?.name ?? "<null>"}"
-            + $" setLast={setLastProjectile}"
-            + $" speed={speed:0.###}"
-            + $" spawn={FormatVector3(spawnPoint)}"
-            + $" direction={FormatVector3(direction)}"
-            + $" weapon=[{SecondaryAttackManager.DescribeItemForRangedDebug(attack.m_weapon)}]"
-            + $" ammo=[{SecondaryAttackManager.DescribeItemForRangedDebug(launchData.AmmoItem)}]"
-            + $" lastAmmo=[{SecondaryAttackManager.DescribeItemForRangedDebug(attack.m_lastUsedAmmo)}]");
         GameObject projectileObject = Object.Instantiate(launchData.ProjectilePrefab!, spawnPoint, Quaternion.LookRotation(direction));
         HitData hitData = CreateProjectileHitData(attack, launchData.AmmoItem, launchData.DamageFactor, launchData.ConfiguredDamageFactor, launchData.ConfiguredSkillRaiseFactor);
         IProjectile projectile = projectileObject.GetComponent<IProjectile>();
@@ -1335,11 +1221,6 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         return projectileObject;
-    }
-
-    private static string FormatVector3(Vector3 value)
-    {
-        return $"({value.x:0.###},{value.y:0.###},{value.z:0.###})";
     }
 
     internal static void RegisterProjectileAttackAttribution(Projectile projectile, Attack attack)
@@ -1862,43 +1743,6 @@ internal static partial class ProjectileRuntimeSystem
         Object.Destroy(projectileObject);
     }
 
-    private static void DumpRuntimeLaunchProfile(Attack attack, ProjectileLaunchData launchData)
-    {
-        string weaponPrefabName = attack.m_weapon?.m_dropPrefab?.name ?? string.Empty;
-        if (!SecondaryAttackManager.ShouldDumpRuntimeProfileForProjectileRuntime(weaponPrefabName))
-        {
-            return;
-        }
-
-        string key = "launch|" + weaponPrefabName;
-        if (!SecondaryAttackManager.TryMarkRuntimeDumpReported(key))
-        {
-            return;
-        }
-
-        Projectile? projectile = launchData.ProjectilePrefab?.GetComponent<Projectile>();
-        SecondaryAttacksPlugin.ModLogger.LogInfo(
-            "[RuntimeDump] "
-            + weaponPrefabName
-            + " launch"
-            + $" payload={launchData.ProjectilePrefab?.name ?? "<null>"}"
-            + $" speed={launchData.ProjectileVelocity}"
-            + $" speedMin={launchData.ProjectileVelocityMin}"
-            + $" accuracy={launchData.ProjectileAccuracy}"
-            + $" accuracyMin={launchData.ProjectileAccuracyMin}"
-            + $" useRandomVelocity={launchData.UseRandomVelocity}"
-            + $" damageFactor={launchData.DamageFactor}"
-            + $" configuredDamageFactor={launchData.ConfiguredDamageFactor}"
-            + $" configuredSkillRaiseFactor={launchData.ConfiguredSkillRaiseFactor}"
-            + $" configuredAdrenalineFactor={launchData.ConfiguredAdrenalineFactor}"
-            + $" hitNoise={launchData.AttackHitNoise}"
-            + $" gravity={projectile?.m_gravity ?? 0f}"
-            + $" drag={projectile?.m_drag ?? 0f}"
-            + $" ttl={projectile?.m_ttl ?? 0f}"
-            + $" rayRadius={projectile?.m_rayRadius ?? 0f}"
-            + $" aoe={projectile?.m_aoe ?? 0f}");
-    }
-
     internal readonly struct ProjectileLaunchData
     {
         public static readonly ProjectileLaunchData Invalid = new(null, null, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, false);
@@ -2149,9 +1993,16 @@ internal static partial class ProjectileRuntimeSystem
                 return;
             }
 
-            bool reloadState = SecondaryAttackManager.BeginReloadStateConsumption(_attack);
-            _attack.m_character.ResetLoadedWeapon();
-            SecondaryAttackManager.EndReloadStateConsumption(_attack, reloadState);
+            SecondaryAttackManager.ReloadStateConsumptionScope reloadState =
+                SecondaryAttackManager.BeginReloadStateConsumption(_attack);
+            try
+            {
+                _attack.m_character.ResetLoadedWeapon();
+            }
+            finally
+            {
+                SecondaryAttackManager.EndReloadStateConsumption(ref reloadState);
+            }
         }
     }
 

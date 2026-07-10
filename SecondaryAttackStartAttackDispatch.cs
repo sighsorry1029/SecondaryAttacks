@@ -1,4 +1,3 @@
-using System.Diagnostics;
 
 namespace SecondaryAttacks;
 
@@ -17,13 +16,13 @@ internal static class SecondaryAttackStartAttackDispatch
             ItemDrop.ItemData? cooldownFallbackWeapon = null,
             Attack? configuredSecondaryAttack = null,
             bool skipActiveRegistration = false,
-            string originalCooldownFallbackPresetName = "")
+            bool originalCooldownFallback = false)
         {
             ReloadCostContext = reloadCostContext;
             CooldownFallbackWeapon = cooldownFallbackWeapon;
             ConfiguredSecondaryAttack = configuredSecondaryAttack;
             SkipActiveRegistration = skipActiveRegistration;
-            OriginalCooldownFallbackPresetName = originalCooldownFallbackPresetName;
+            IsOriginalCooldownFallback = originalCooldownFallback;
         }
 
         internal SecondaryAttackManager.ReloadSecondaryResourceCostContext ReloadCostContext { get; }
@@ -34,9 +33,7 @@ internal static class SecondaryAttackStartAttackDispatch
 
         internal bool SkipActiveRegistration { get; }
 
-        internal string OriginalCooldownFallbackPresetName { get; }
-
-        internal bool IsOriginalCooldownFallback => !string.IsNullOrWhiteSpace(OriginalCooldownFallbackPresetName);
+        internal bool IsOriginalCooldownFallback { get; }
 
         internal void RestoreCooldownFallbackSecondary()
         {
@@ -83,8 +80,6 @@ internal static class SecondaryAttackStartAttackDispatch
         {
             return;
         }
-
-        LogStaffStartDebugIfNeeded(humanoid, result);
         if (!result || humanoid.m_currentAttack == null)
         {
             return;
@@ -92,7 +87,7 @@ internal static class SecondaryAttackStartAttackDispatch
 
         if (state.IsOriginalCooldownFallback)
         {
-            MarkProjectilePresetOriginalCooldownFallback(humanoid.m_currentAttack, state.OriginalCooldownFallbackPresetName);
+            MarkProjectilePresetOriginalCooldownFallback(humanoid.m_currentAttack);
         }
 
         if (humanoid is Player player)
@@ -120,7 +115,6 @@ internal static class SecondaryAttackStartAttackDispatch
         SecondaryAttackManager.EnsureRuntimeWeaponDefinitionApplied(currentWeapon);
         if (currentWeapon == null)
         {
-            MeleeProjectileHitCascadeSystem.LogDebug("cooldown start probe skipped: current weapon is null.");
             return true;
         }
 
@@ -174,18 +168,14 @@ internal static class SecondaryAttackStartAttackDispatch
             return true;
         }
 
-        if (IsProjectilePresetOriginalCooldownFallback(attack, out string originalFallbackPresetName))
+        if (IsProjectilePresetOriginalCooldownFallback(attack))
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"projectile burst cooldown skipped weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} preset={originalFallbackPresetName}: original secondary cooldown fallback attack.");
             return true;
         }
 
         ClearProjectilePresetCooldownFallback(attack);
-        if (ProjectilePresetCooldownConsumedAttacks.TryGetValue(attack, out ProjectilePresetCooldownConsumedState? consumedState))
+        if (ProjectilePresetCooldownConsumedAttacks.TryGetValue(attack, out _))
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"projectile burst cooldown already consumed weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} preset={consumedState.PresetName}: allowing same attack burst.");
             return true;
         }
 
@@ -202,17 +192,13 @@ internal static class SecondaryAttackStartAttackDispatch
         if (IsSpearRainPreset(presetName))
         {
             bool cooldownReady = MeleePresetCooldownSystem.IsReady(attack.m_character, attack.m_weapon, presetName, cooldown!);
-            bool pending = MeleeProjectileHitCascadeSystem.HasPendingSpearRain(attack.m_character, attack.m_weapon);
+            bool pending = MeleeProjectileHitCascadeSystem.HasPendingSpearRain(attack.m_character);
             if (cooldownReady && !pending)
             {
-                MeleeProjectileHitCascadeSystem.LogDebug(
-                    $"spearRain projectile burst armed weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} animation={attack.m_attackAnimation} projectile={attack.m_attackProjectile?.name ?? "<null>"} state=[{MeleePresetCooldownSystem.DescribeState(attack.m_character, attack.m_weapon, presetName, cooldown!)}].");
                 return true;
             }
 
             attack.Stop();
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"spearRain projectile burst blocked weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} cooldownReady={cooldownReady} pending={pending} animation={attack.m_attackAnimation} projectile={attack.m_attackProjectile?.name ?? "<null>"} state=[{MeleePresetCooldownSystem.DescribeState(attack.m_character, attack.m_weapon, presetName, cooldown!)}].");
             return false;
         }
 
@@ -223,53 +209,28 @@ internal static class SecondaryAttackStartAttackDispatch
                 cooldown!,
                 out _))
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"projectile burst cooldown consumed weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName} fallback={ResolveProjectilePresetCooldownFallback(definition!)} animation={attack.m_attackAnimation} projectile={attack.m_attackProjectile?.name ?? "<null>"} state=[{MeleePresetCooldownSystem.DescribeState(attack.m_character, attack.m_weapon, presetName, cooldown!)}].");
-            MarkProjectilePresetCooldownConsumed(attack, presetName);
+            MarkProjectilePresetCooldownConsumed(attack);
             return true;
         }
 
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"projectile burst cooldown active weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName} fallback={ResolveProjectilePresetCooldownFallback(definition!)} animation={attack.m_attackAnimation} projectile={attack.m_attackProjectile?.name ?? "<null>"} state=[{MeleePresetCooldownSystem.DescribeState(attack.m_character, attack.m_weapon, presetName, cooldown!)}].");
-
         if (ProjectilePresetCooldownFallback.IsCopiedSecondary(ResolveProjectilePresetCooldownFallback(definition!)))
         {
-            MarkProjectilePresetCooldownFallback(attack, presetName);
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"projectile burst cooldown fallback weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: using copied secondary without preset effects.");
+            MarkProjectilePresetCooldownFallback(attack);
             return true;
         }
 
         attack.Stop();
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"projectile burst blocked weapon={attack.m_weapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: cooldown is active.");
         return false;
     }
 
-    internal static bool ShouldSkipProjectilePresetEffectsForCooldown(Attack? attack, out string presetName)
+    internal static bool ShouldSkipProjectilePresetEffectsForCooldown(Attack? attack)
     {
-        presetName = "";
-        if (attack == null ||
-            !ProjectilePresetCooldownFallbackAttacks.TryGetValue(attack, out ProjectilePresetCooldownFallbackState? state))
-        {
-            return false;
-        }
-
-        presetName = state.PresetName;
-        return true;
+        return attack != null && ProjectilePresetCooldownFallbackAttacks.TryGetValue(attack, out _);
     }
 
-    internal static bool IsProjectilePresetOriginalCooldownFallback(Attack? attack, out string presetName)
+    internal static bool IsProjectilePresetOriginalCooldownFallback(Attack? attack)
     {
-        presetName = "";
-        if (attack == null ||
-            !ProjectilePresetOriginalCooldownFallbackAttacks.TryGetValue(attack, out ProjectilePresetOriginalCooldownFallbackState? state))
-        {
-            return false;
-        }
-
-        presetName = state.PresetName;
-        return true;
+        return attack != null && ProjectilePresetOriginalCooldownFallbackAttacks.TryGetValue(attack, out _);
     }
 
     private static bool TryPrepareOriginalSecondaryForProjectilePresetCooldown(
@@ -288,17 +249,14 @@ internal static class SecondaryAttackStartAttackDispatch
                 out MeleePresetCooldownDefinition? cooldown,
                 out SecondaryAttackDefinition? definition))
         {
-            LogCooldownStartProbeResolveMiss(currentWeapon);
             return false;
         }
 
         string cooldownFallback = ResolveProjectilePresetCooldownFallback(definition!);
         bool cooldownReady = MeleePresetCooldownSystem.IsReady(humanoid, currentWeapon, presetName, cooldown!);
         bool spearRainPending = IsSpearRainPreset(presetName) &&
-                                MeleeProjectileHitCascadeSystem.HasPendingSpearRain(humanoid, currentWeapon);
+                                MeleeProjectileHitCascadeSystem.HasPendingSpearRain(humanoid);
         bool ready = cooldownReady && !spearRainPending;
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"cooldown start probe weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName} fallback={cooldownFallback} cooldownReady={cooldownReady} pending={spearRainPending} ready={ready} currentSecondary={DescribeAttack(currentWeapon.m_shared?.m_secondaryAttack)} state=[{MeleePresetCooldownSystem.DescribeState(humanoid, currentWeapon, presetName, cooldown!)}].");
         if (ready)
         {
             if (ProjectilePresetCooldownFallback.UsesDynamicOriginalSecondary(definition!))
@@ -306,7 +264,6 @@ internal static class SecondaryAttackStartAttackDispatch
                 return TryPrepareDynamicProjectilePresetSecondary(
                     currentWeapon,
                     definition!,
-                    presetName,
                     ref result,
                     out state,
                     out runOriginal);
@@ -317,8 +274,6 @@ internal static class SecondaryAttackStartAttackDispatch
 
         if (ProjectilePresetCooldownFallback.IsCopiedSecondary(cooldownFallback))
         {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"cooldown fallback weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: keeping copied secondary carrier.");
             return false;
         }
 
@@ -326,7 +281,6 @@ internal static class SecondaryAttackStartAttackDispatch
             TryPrepareDynamicOriginalSecondaryFallback(
                 currentWeapon,
                 definition!,
-                presetName,
                 out state))
         {
             return true;
@@ -337,13 +291,10 @@ internal static class SecondaryAttackStartAttackDispatch
                 definition!,
                 secondaryBeforeRuntimeApply,
                 definition!.ConfiguredSecondaryAttack ?? currentWeapon.m_shared?.m_secondaryAttack,
-                out Attack? originalSecondaryAttack,
-                out string originalSecondarySource))
+                out Attack? originalSecondaryAttack))
         {
             result = false;
             runOriginal = false;
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"cooldown fallback blocked weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: original secondary attack could not be resolved. storedFallback={DescribeAttack(definition!.CooldownFallbackSecondaryAttack)} currentSecondary={DescribeAttack(currentWeapon.m_shared?.m_secondaryAttack)}.");
             return true;
         }
 
@@ -351,8 +302,6 @@ internal static class SecondaryAttackStartAttackDispatch
         {
             result = false;
             runOriginal = false;
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"cooldown fallback blocked weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: shared data is null.");
             return true;
         }
 
@@ -363,16 +312,13 @@ internal static class SecondaryAttackStartAttackDispatch
             currentWeapon,
             configuredSecondaryAttack,
             skipActiveRegistration: true,
-            originalCooldownFallbackPresetName: presetName);
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"cooldown fallback weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: using original secondary attack source={originalSecondarySource} original={DescribeAttack(originalSecondaryAttack)} configured={DescribeAttack(configuredSecondaryAttack)}.");
+            originalCooldownFallback: true);
         return true;
     }
 
     private static bool TryPrepareDynamicProjectilePresetSecondary(
         ItemDrop.ItemData currentWeapon,
         SecondaryAttackDefinition definition,
-        string presetName,
         ref bool result,
         out StartAttackState state,
         out bool runOriginal)
@@ -384,8 +330,6 @@ internal static class SecondaryAttackStartAttackDispatch
         {
             result = false;
             runOriginal = false;
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"cooldown ready blocked weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: configured copied secondary attack could not be resolved. configured={DescribeAttack(definition.ConfiguredSecondaryAttack)} currentSecondary={DescribeAttack(currentWeapon.m_shared?.m_secondaryAttack)}.");
             return true;
         }
 
@@ -395,15 +339,12 @@ internal static class SecondaryAttackStartAttackDispatch
             SecondaryAttackManager.ReloadSecondaryResourceCostContext.Empty,
             currentWeapon,
             originalSecondaryAttack);
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"cooldown ready weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: using copied secondary carrier configured={DescribeAttack(definition.ConfiguredSecondaryAttack)} restore={DescribeAttack(originalSecondaryAttack)}.");
         return true;
     }
 
     private static bool TryPrepareDynamicOriginalSecondaryFallback(
         ItemDrop.ItemData currentWeapon,
         SecondaryAttackDefinition definition,
-        string presetName,
         out StartAttackState state)
     {
         state = StartAttackState.Empty;
@@ -417,29 +358,8 @@ internal static class SecondaryAttackStartAttackDispatch
         state = new StartAttackState(
             SecondaryAttackManager.ReloadSecondaryResourceCostContext.Empty,
             skipActiveRegistration: true,
-            originalCooldownFallbackPresetName: presetName);
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"cooldown fallback weapon={currentWeapon.m_dropPrefab?.name ?? "<unknown>"} preset={presetName}: using current original secondary attack source=dynamicCurrent original={DescribeAttack(currentSecondaryAttack)} configured={DescribeAttack(definition.ConfiguredSecondaryAttack)}.");
+            originalCooldownFallback: true);
         return true;
-    }
-
-    private static void LogCooldownStartProbeResolveMiss(ItemDrop.ItemData currentWeapon)
-    {
-        if (currentWeapon?.m_dropPrefab == null)
-        {
-            MeleeProjectileHitCascadeSystem.LogDebug("cooldown start probe skipped: weapon or drop prefab is null.");
-            return;
-        }
-
-        if (!SecondaryAttackRuntimeFacade.TryGetDefinition(currentWeapon, out SecondaryAttackDefinition definition))
-        {
-            MeleeProjectileHitCascadeSystem.LogDebug(
-                $"cooldown start probe skipped weapon={currentWeapon.m_dropPrefab.name}: no definition currentSecondary={DescribeAttack(currentWeapon.m_shared?.m_secondaryAttack)}.");
-            return;
-        }
-
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"cooldown start probe skipped weapon={currentWeapon.m_dropPrefab.name}: behavior={definition.BehaviorType} boomerang={(definition.Boomerang != null)} onProjectileHit={definition.OnProjectileHit?.Preset ?? "<null>"} currentSecondary={DescribeAttack(currentWeapon.m_shared?.m_secondaryAttack)}.");
     }
 
     private static bool TryResolveProjectilePresetCooldown(
@@ -485,22 +405,22 @@ internal static class SecondaryAttackStartAttackDispatch
     private static bool IsSpearRainPreset(string presetName) =>
         presetName.Equals("spearRain", System.StringComparison.OrdinalIgnoreCase);
 
-    private static void MarkProjectilePresetCooldownFallback(Attack attack, string presetName)
+    private static void MarkProjectilePresetCooldownFallback(Attack attack)
     {
         ProjectilePresetCooldownFallbackAttacks.Remove(attack);
-        ProjectilePresetCooldownFallbackAttacks.Add(attack, new ProjectilePresetCooldownFallbackState(presetName));
+        ProjectilePresetCooldownFallbackAttacks.Add(attack, new ProjectilePresetCooldownFallbackState());
     }
 
-    private static void MarkProjectilePresetCooldownConsumed(Attack attack, string presetName)
+    private static void MarkProjectilePresetCooldownConsumed(Attack attack)
     {
         ProjectilePresetCooldownConsumedAttacks.Remove(attack);
-        ProjectilePresetCooldownConsumedAttacks.Add(attack, new ProjectilePresetCooldownConsumedState(presetName));
+        ProjectilePresetCooldownConsumedAttacks.Add(attack, new ProjectilePresetCooldownConsumedState());
     }
 
-    private static void MarkProjectilePresetOriginalCooldownFallback(Attack attack, string presetName)
+    private static void MarkProjectilePresetOriginalCooldownFallback(Attack attack)
     {
         ProjectilePresetOriginalCooldownFallbackAttacks.Remove(attack);
-        ProjectilePresetOriginalCooldownFallbackAttacks.Add(attack, new ProjectilePresetOriginalCooldownFallbackState(presetName));
+        ProjectilePresetOriginalCooldownFallbackAttacks.Add(attack, new ProjectilePresetOriginalCooldownFallbackState());
     }
 
     private static void ClearProjectilePresetCooldownFallback(Attack attack)
@@ -513,12 +433,10 @@ internal static class SecondaryAttackStartAttackDispatch
         SecondaryAttackDefinition definition,
         Attack? secondaryBeforeRuntimeApply,
         Attack? configuredSecondaryAttack,
-        out Attack? originalSecondaryAttack,
-        out string source)
+        out Attack? originalSecondaryAttack)
     {
         originalSecondaryAttack = null;
-        source = "";
-        bool rejectCopiedCarrier = ShouldRejectMatchingCopiedCarrier(currentWeapon, definition, out string copiedSourcePrefab);
+        bool rejectCopiedCarrier = ShouldRejectMatchingCopiedCarrier(currentWeapon, definition);
         if (HasUsableSecondaryAttack(secondaryBeforeRuntimeApply))
         {
             if (!ShouldSkipOriginalSecondaryCandidate(
@@ -527,16 +445,8 @@ internal static class SecondaryAttackStartAttackDispatch
                     rejectCopiedCarrier))
             {
                 originalSecondaryAttack = SecondaryAttackManager.CloneAttack(secondaryBeforeRuntimeApply);
-                source = "runtimeBeforeApply";
                 return true;
             }
-
-            LogSkippedOriginalSecondaryCandidate(
-                currentWeapon,
-                "runtimeBeforeApply",
-                copiedSourcePrefab,
-                secondaryBeforeRuntimeApply,
-                configuredSecondaryAttack);
         }
 
         if (HasUsableSecondaryAttack(definition.CooldownFallbackSecondaryAttack))
@@ -547,16 +457,8 @@ internal static class SecondaryAttackStartAttackDispatch
                     rejectCopiedCarrier))
             {
                 originalSecondaryAttack = SecondaryAttackManager.CloneAttack(definition.CooldownFallbackSecondaryAttack);
-                source = "definition";
                 return true;
             }
-
-            LogSkippedOriginalSecondaryCandidate(
-                currentWeapon,
-                "definition",
-                copiedSourcePrefab,
-                definition.CooldownFallbackSecondaryAttack,
-                configuredSecondaryAttack);
         }
 
         if (ObjectDB.instance != null &&
@@ -571,16 +473,8 @@ internal static class SecondaryAttackStartAttackDispatch
             if (!ShouldSkipOriginalSecondaryCandidate(originalAttack, configuredSecondaryAttack, rejectCopiedCarrier))
             {
                 originalSecondaryAttack = originalAttack;
-                source = "objectDb";
                 return true;
             }
-
-            LogSkippedOriginalSecondaryCandidate(
-                currentWeapon,
-                "objectDb",
-                copiedSourcePrefab,
-                originalAttack,
-                configuredSecondaryAttack);
         }
 
         return false;
@@ -588,10 +482,8 @@ internal static class SecondaryAttackStartAttackDispatch
 
     private static bool ShouldRejectMatchingCopiedCarrier(
         ItemDrop.ItemData currentWeapon,
-        SecondaryAttackDefinition definition,
-        out string copiedSourcePrefab)
+        SecondaryAttackDefinition definition)
     {
-        copiedSourcePrefab = "";
         if (currentWeapon?.m_dropPrefab == null ||
             definition.Behavior is not CopiedSecondaryBehavior copiedBehavior ||
             string.IsNullOrWhiteSpace(copiedBehavior.SourcePrefabName))
@@ -599,9 +491,8 @@ internal static class SecondaryAttackStartAttackDispatch
             return false;
         }
 
-        copiedSourcePrefab = copiedBehavior.SourcePrefabName.Trim();
         return !string.Equals(
-            copiedSourcePrefab,
+            copiedBehavior.SourcePrefabName.Trim(),
             currentWeapon.m_dropPrefab.name,
             System.StringComparison.OrdinalIgnoreCase);
     }
@@ -630,48 +521,9 @@ internal static class SecondaryAttackStartAttackDispatch
                    System.StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void LogSkippedOriginalSecondaryCandidate(
-        ItemDrop.ItemData? currentWeapon,
-        string source,
-        string copiedSourcePrefab,
-        Attack? candidate,
-        Attack? configuredSecondaryAttack)
-    {
-        MeleeProjectileHitCascadeSystem.LogDebug(
-            $"cooldown fallback candidate skipped weapon={currentWeapon?.m_dropPrefab?.name ?? "<unknown>"} source={source}: candidate matches copied secondary carrier copiedSource={copiedSourcePrefab}. candidate={DescribeAttack(candidate)} configured={DescribeAttack(configuredSecondaryAttack)}.");
-    }
-
     private static bool HasUsableSecondaryAttack(Attack? attack)
     {
         return attack != null && !string.IsNullOrWhiteSpace(attack.m_attackAnimation);
-    }
-
-    private static string DescribeAttack(Attack? attack)
-    {
-        if (attack == null)
-        {
-            return "<null>";
-        }
-
-        return
-            $"animation={attack.m_attackAnimation ?? "<null>"}, type={attack.m_attackType}, projectile={attack.m_attackProjectile?.name ?? "<null>"}, consumeItem={attack.m_consumeItem}, projectiles={attack.m_projectiles}, bursts={attack.m_projectileBursts}";
-    }
-
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    private static void LogStaffStartDebugIfNeeded(Humanoid humanoid, bool result)
-    {
-        ItemDrop.ItemData currentWeaponForDebug = humanoid.GetCurrentWeapon();
-        SecondaryAttackManager.EnsureRuntimeWeaponDefinitionApplied(currentWeaponForDebug);
-        if (currentWeaponForDebug == null ||
-            !SecondaryAttackRuntimeFacade.TryGetDefinition(currentWeaponForDebug, out SecondaryAttackDefinition debugDefinition) ||
-            (debugDefinition.BehaviorType != SecondaryAttackBehaviorType.SummonEmpower &&
-             debugDefinition.BehaviorType != SecondaryAttackBehaviorType.ShieldConvert))
-        {
-            return;
-        }
-
-        SecondaryAttackManager.LogStaffDebug(
-            $"Humanoid.StartAttack secondary result for '{debugDefinition.PrefabName}': started={result}, currentAttackNull={(humanoid.m_currentAttack == null)}.");
     }
 
     private static void RegisterActiveAttackIfNeeded(Humanoid humanoid)
@@ -687,31 +539,13 @@ internal static class SecondaryAttackStartAttackDispatch
 
     private sealed class ProjectilePresetCooldownFallbackState
     {
-        internal ProjectilePresetCooldownFallbackState(string presetName)
-        {
-            PresetName = presetName;
-        }
-
-        internal string PresetName { get; }
     }
 
     private sealed class ProjectilePresetCooldownConsumedState
     {
-        internal ProjectilePresetCooldownConsumedState(string presetName)
-        {
-            PresetName = presetName;
-        }
-
-        internal string PresetName { get; }
     }
 
     private sealed class ProjectilePresetOriginalCooldownFallbackState
     {
-        internal ProjectilePresetOriginalCooldownFallbackState(string presetName)
-        {
-            PresetName = presetName;
-        }
-
-        internal string PresetName { get; }
     }
 }

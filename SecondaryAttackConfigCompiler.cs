@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SecondaryAttacks;
@@ -23,12 +24,27 @@ internal static class SecondaryAttackConfigCompiler
         IReadOnlyDictionary<string, BloodMagicWeaponConfig> parsedBloodMagic,
         IReadOnlyDictionary<string, EffectBehaviorConfig> parsedEffects)
     {
+        SecondaryAttackWeaponNormalizationResult weaponNormalization =
+            SecondaryAttackWeaponConfigNormalizer.Normalize(parsedRanged, parsedMelee, parsedBloodMagic);
+        Dictionary<string, EffectBehaviorConfig> normalizedEffects = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string effectId, EffectBehaviorConfig effectConfig) in parsedEffects)
+        {
+            if (!string.IsNullOrWhiteSpace(effectId) && effectConfig != null)
+            {
+                normalizedEffects[effectId.Trim()] = effectConfig;
+            }
+        }
+
         return new SecondaryAttackCompiledSnapshot(
             snapshotId,
-            SecondaryAttackNormalizedConfigFacade.FromParsed(
-                parsedRanged,
-                parsedMelee,
-                parsedBloodMagic,
-                parsedEffects));
+            new NormalizedSecondaryAttackConfigFile
+            {
+                Weapons = weaponNormalization.Weapons,
+                GlobalRangedPresets = weaponNormalization.GlobalRangedPresets,
+                GlobalBloodMagicPresets = weaponNormalization.GlobalBloodMagicPresets,
+                GlobalMeleeFallback = weaponNormalization.GlobalMeleeFallback,
+                Effects = normalizedEffects,
+                MagicSummons = SecondaryAttackMagicSummonNormalizer.Normalize(parsedBloodMagic)
+            });
     }
 }

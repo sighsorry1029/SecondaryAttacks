@@ -225,17 +225,6 @@ internal static class OverheadStatusUiManager
         ActiveTexts.Remove(instanceId);
     }
 
-    private static void HideAll()
-    {
-        foreach (TextMeshProUGUI text in ActiveTexts.Values)
-        {
-            if (text != null)
-            {
-                text.gameObject.SetActive(false);
-            }
-        }
-    }
-
     private static StatusTextState GetOrCreateStatusState(int instanceId)
     {
         if (!StatusStates.TryGetValue(instanceId, out StatusTextState? state))

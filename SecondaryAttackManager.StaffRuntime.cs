@@ -26,8 +26,6 @@ internal static class StaffRuntimeSystem
         }
 
         activeAttack.Triggered = true;
-        SecondaryAttackManager.LogStaffDebug(
-            $"Triggering staff special for '{activeAttack.Definition.PrefabName}': summonEmpower={activeAttack.Definition.BehaviorType == SecondaryAttackBehaviorType.SummonEmpower}, shieldConvert={activeAttack.Definition.BehaviorType == SecondaryAttackBehaviorType.ShieldConvert}, attackAnimation='{attack.m_attackAnimation}', attackType={attack.m_attackType}.");
         SecondaryAttackManager.PlayTriggeredAttackEffects(attack, activeAttack.Definition.DurabilityFactor);
 
         if (activeAttack.Definition.BehaviorType == SecondaryAttackBehaviorType.SummonEmpower)
@@ -109,7 +107,6 @@ internal static class StaffRuntimeSystem
     {
         if (attack.m_character is not Player player)
         {
-            SecondaryAttackManager.LogStaffDebug($"Summon empower aborted for '{definition.PrefabName}': attacker is not a local player.");
             return;
         }
 
@@ -123,7 +120,6 @@ internal static class StaffRuntimeSystem
         float attackSpeedFactor = Mathf.Max(0.05f, behavior.AttackSpeedFactor);
         float expiry = (float)SecondaryAttackManager.GetNetworkTimeSeconds() + Mathf.Max(0.1f, behavior.Duration);
         Vector3 origin = player.GetCenterPoint();
-        int affectedTargets = 0;
 
         foreach (Character candidate in Character.GetAllCharacters())
         {
@@ -132,21 +128,14 @@ internal static class StaffRuntimeSystem
                 continue;
             }
 
-            if (TryApplySummonEmpower(candidate, expiry, moveSpeedFactor, attackSpeedFactor))
-            {
-                affectedTargets++;
-            }
+            ApplySummonEmpower(candidate, expiry, moveSpeedFactor, attackSpeedFactor);
         }
-
-        SecondaryAttackManager.LogStaffDebug(
-            $"Summon empower '{definition.PrefabName}' applied: moveSpeedFactor={moveSpeedFactor:0.###}, attackSpeedFactor={attackSpeedFactor:0.###}, duration={behavior.Duration:0.##}, targets={affectedTargets}, summonPrefabs=[{string.Join(", ", behavior.SummonSourcePrefabs)}].");
     }
 
     private static void StartShieldConvert(Attack attack, SecondaryAttackDefinition definition)
     {
         if (attack.m_character is not Player player)
         {
-            SecondaryAttackManager.LogStaffDebug($"Shield convert aborted for '{definition.PrefabName}': attacker is not a local player.");
             return;
         }
 
@@ -157,7 +146,6 @@ internal static class StaffRuntimeSystem
         }
 
         Vector3 origin = player.GetCenterPoint();
-        int convertedTargets = 0;
         foreach (Character candidate in Character.GetAllCharacters())
         {
             if (!IsValidShieldConvertTarget(player, candidate, behavior.Radius, origin))
@@ -165,17 +153,11 @@ internal static class StaffRuntimeSystem
                 continue;
             }
 
-            if (TryConvertShieldToHeal(
+            ConvertShieldToHeal(
                 candidate,
                 behavior.HealFactor,
-                behavior.ShieldStatusEffectHash))
-            {
-                convertedTargets++;
-            }
+                behavior.ShieldStatusEffectHash);
         }
-
-        SecondaryAttackManager.LogStaffDebug(
-            $"Shield convert '{definition.PrefabName}' applied: radius={behavior.Radius:0.##}, healFactor={behavior.HealFactor:0.###}, targets={convertedTargets}.");
     }
 
     private static bool IsMatchingSummonEmpowerTarget(Player player, Character candidate, SecondaryAttackDefinition definition, Vector3 origin)
@@ -216,47 +198,46 @@ internal static class StaffRuntimeSystem
         return candidate == player || !BaseAI.IsEnemy(player, candidate);
     }
 
-    private static bool TryApplySummonEmpower(Character target, float expiry, float moveSpeedFactor, float attackSpeedFactor)
+    private static void ApplySummonEmpower(Character target, float expiry, float moveSpeedFactor, float attackSpeedFactor)
     {
         if (target == null)
         {
-            return false;
+            return;
         }
 
         if (SecondaryAttackManager.HasCharacterAuthority(target))
         {
             ApplySummonEmpowerState(target, expiry, moveSpeedFactor, attackSpeedFactor);
-            return true;
+            return;
         }
 
         if (!SecondaryAttackManager.TryGetCharacterZdo(target, out ZNetView? nview, out _))
         {
-            return false;
+            return;
         }
 
         nview!.InvokeRPC(SecondaryAttackManager.ApplySummonEmpowerRpcNameForStaffRuntime, expiry, moveSpeedFactor, attackSpeedFactor);
-        return true;
     }
 
-    private static bool TryConvertShieldToHeal(Character target, float healFactor, int shieldStatusEffectHash)
+    private static void ConvertShieldToHeal(Character target, float healFactor, int shieldStatusEffectHash)
     {
         if (target == null)
         {
-            return false;
+            return;
         }
 
         if (SecondaryAttackManager.HasCharacterAuthority(target))
         {
-            return ApplyShieldConvertToCharacter(target, healFactor, shieldStatusEffectHash);
+            ApplyShieldConvertToCharacter(target, healFactor, shieldStatusEffectHash);
+            return;
         }
 
         if (!SecondaryAttackManager.TryGetCharacterZdo(target, out ZNetView? nview, out _))
         {
-            return false;
+            return;
         }
 
         nview!.InvokeRPC(SecondaryAttackManager.ConvertShieldToHealRpcNameForStaffRuntime, healFactor, shieldStatusEffectHash);
-        return true;
     }
 
     internal static void ApplySummonEmpowerState(Character character, float expiry, float moveSpeedFactor, float attackSpeedFactor)

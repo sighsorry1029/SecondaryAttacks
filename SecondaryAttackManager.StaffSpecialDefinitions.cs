@@ -16,16 +16,11 @@ internal static partial class SecondaryAttackManager
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
-        LogStaffDebug(
-            $"TryCreateSummonEmpowerDefinition '{prefabName}': primaryAnimation='{primaryAttack.m_attackAnimation}', primaryProjectile='{primaryAttack.m_attackProjectile?.name ?? "<null>"}'.");
         if (!TryResolveSummonSourcePrefabs(primaryAttack, out List<string> summonSourcePrefabs))
         {
-            LogStaffDebug($"TryCreateSummonEmpowerDefinition '{prefabName}' failed: could not resolve summon source prefabs.");
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: summon empower requires a summon projectile with a SpawnAbility payload.");
             return false;
         }
-
-        LogStaffDebug($"TryCreateSummonEmpowerDefinition '{prefabName}' resolved summon prefabs: {string.Join(", ", summonSourcePrefabs)}.");
 
         string resolvedAttackAnimation = GetNormalizedAttackAnimation(weaponConfig);
         bool hasCustomAttackAnimation = !string.IsNullOrWhiteSpace(resolvedAttackAnimation);
@@ -131,15 +126,12 @@ internal static partial class SecondaryAttackManager
         summonSourcePrefabs = new List<string>();
         if (primaryAttack?.m_attackProjectile == null)
         {
-            LogStaffDebug("TryResolveSummonSourcePrefabs: primary projectile is <null>.");
             return false;
         }
 
         SpawnAbility spawnAbility = primaryAttack.m_attackProjectile.GetComponent<SpawnAbility>();
         if (spawnAbility == null || spawnAbility.m_spawnPrefab == null || spawnAbility.m_spawnPrefab.Length == 0)
         {
-            LogStaffDebug(
-                $"TryResolveSummonSourcePrefabs: projectile '{primaryAttack.m_attackProjectile.name}' missing SpawnAbility or spawn prefabs. Components={DescribeComponents(primaryAttack.m_attackProjectile)}.");
             return false;
         }
 

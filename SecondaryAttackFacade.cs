@@ -302,13 +302,13 @@ internal static class SecondaryAttackFacade
         _pendingCompiledSnapshot = snapshot;
         _pendingYamlFingerprint = fingerprint;
         _hasPendingConfig = true;
-        CommitPendingConfig(force: true, applyToObjectDbImmediately: true);
+        CommitPendingConfig(force: false, applyToObjectDbImmediately: true);
     }
 
     private static void StageWorldReapply()
     {
         _hasPendingWorldReapply = true;
-        CommitPendingWorldReapply(force: true);
+        CommitPendingWorldReapply(force: false);
     }
 
     private static bool CommitPendingConfig(bool force, bool applyToObjectDbImmediately)
@@ -381,7 +381,7 @@ internal static class SecondaryAttackFacade
         SecondaryAttackCompiledSnapshot compiledSnapshot,
         bool emitMissingWarnings)
     {
-        SecondaryAttackWorldApplyContributors.ApplyToZNetScene(scene, compiledSnapshot, emitMissingWarnings);
+        SecondaryAttackWorldApplySystem.ApplyToZNetScene(scene, compiledSnapshot, emitMissingWarnings);
     }
 
     private static bool CanApplyPendingConfigNow()

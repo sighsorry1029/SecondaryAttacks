@@ -1,11 +1,10 @@
-using System.Diagnostics;
 using UnityEngine;
 
 namespace SecondaryAttacks;
 
 internal static class SecondaryAttackProjectileToolTierSystem
 {
-    internal static void ApplyCurrentProjectileHitToolTierIfNeeded(HitData? hit, string source)
+    internal static void ApplyCurrentProjectileHitToolTierIfNeeded(HitData? hit)
     {
         if (hit == null ||
             !SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext? context) ||
@@ -15,10 +14,10 @@ internal static class SecondaryAttackProjectileToolTierSystem
             return;
         }
 
-        ApplyToHitData(hit, context.Projectile, ProjectileAccess.GetWeapon(context.Projectile), source);
+        ApplyToHitData(hit, context.Projectile, ProjectileAccess.GetWeapon(context.Projectile));
     }
 
-    internal static void ApplyToHitData(HitData? hit, Projectile? projectile, ItemDrop.ItemData? weapon, string source)
+    internal static void ApplyToHitData(HitData? hit, Projectile? projectile, ItemDrop.ItemData? weapon)
     {
         if (hit == null)
         {
@@ -29,16 +28,12 @@ internal static class SecondaryAttackProjectileToolTierSystem
         byte itemWorldLevel = ResolveItemWorldLevel(projectile, weapon);
         if (toolTier > hit.m_toolTier)
         {
-            short previousToolTier = hit.m_toolTier;
             hit.m_toolTier = toolTier;
-            LogDebug($"{source} applied projectile toolTier {previousToolTier}->{toolTier}");
         }
 
         if (itemWorldLevel > hit.m_itemWorldLevel)
         {
-            byte previousItemWorldLevel = hit.m_itemWorldLevel;
             hit.m_itemWorldLevel = itemWorldLevel;
-            LogDebug($"{source} applied projectile itemWorldLevel {previousItemWorldLevel}->{itemWorldLevel}");
         }
     }
 
@@ -93,10 +88,5 @@ internal static class SecondaryAttackProjectileToolTierSystem
         }
 
         return itemWorldLevel;
-    }
-
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    private static void LogDebug(string message)
-    {
     }
 }

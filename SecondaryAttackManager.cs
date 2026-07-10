@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -20,7 +19,6 @@ internal static partial class SecondaryAttackManager
     private const string SummonEmpowerAttackCooldownReductionZdoKey = "SecondaryAttacks_SummonEmpowerAttackCooldownReduction";
     private const string ShieldRemainingDisplayZdoKey = "SecondaryAttacks_ShieldRemainingDisplay";
     private const string ShieldDisplayExpiryZdoKey = "SecondaryAttacks_ShieldDisplayExpiry";
-    private const string CharacterRpcComponentName = "SecondaryAttacks_CharacterRpc";
     private const string ApplySummonEmpowerRpcName = "SecondaryAttacks_ApplySummonEmpower";
     private const string ConvertShieldToHealRpcName = "SecondaryAttacks_ConvertShieldToHeal";
     private const string StaffRapidFireAnimation = "staff_rapidfire";
@@ -28,7 +26,6 @@ internal static partial class SecondaryAttackManager
     private static readonly ConditionalWeakTable<Player, BowSecondaryState> BowSecondaryStates = new();
     private static readonly ConditionalWeakTable<Character, AsyncSecondaryActivityState> AsyncSecondaryActivityStates = new();
     private static readonly ConditionalWeakTable<ItemDrop.ItemData, RuntimeWeaponDefinitionState> RuntimeWeaponDefinitionStates = new();
-    private static readonly HashSet<string> ReportedRuntimeDumps = new(StringComparer.OrdinalIgnoreCase);
     private static readonly SortedSet<string> PlayerAnimatorTriggers = new(StringComparer.Ordinal);
     private static bool _animatorDumpWritten;
     private static bool _customAnimationDumpWritten;
@@ -46,27 +43,6 @@ internal static partial class SecondaryAttackManager
     internal static string ShieldRemainingDisplayZdoKeyForStaffRuntime => ShieldRemainingDisplayZdoKey;
 
     internal static string ShieldDisplayExpiryZdoKeyForStaffRuntime => ShieldDisplayExpiryZdoKey;
-
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    internal static void LogStaffDebug(string message)
-    {
-    }
-
-    [Conditional("SECONDARY_ATTACKS_DEBUG_LOGGING")]
-    internal static void LogRangedDebug(string message)
-    {
-    }
-
-    internal static string DescribeItemForRangedDebug(ItemDrop.ItemData? item)
-    {
-        return SecondaryAttackRuntimeFacade.DescribeItemForRangedDebug(item);
-    }
-
-    internal static string DescribeAttackForRangedDebug(Attack? attack)
-    {
-        return SecondaryAttackRuntimeFacade.DescribeAttackForRangedDebug(attack);
-    }
-
 
     // Public compatibility bridge for external integrations. Internal runtime code should call SecondaryAttackRuntimeFacade directly.
     public static bool TryGetDefinition(ItemDrop.ItemData weapon, out SecondaryAttackDefinition definition)
@@ -347,21 +323,18 @@ internal static partial class SecondaryAttackManager
         Attack primaryAttack = weapon.m_shared.m_attack;
         if (!primaryAttack.m_requiresReload || !IsCurrentReloadWeaponLoaded(humanoid, weapon))
         {
-            LogRangedDebug($"reload secondary cost skipped weapon=[{DescribeItemForRangedDebug(weapon)}] requiresReload={primaryAttack.m_requiresReload} loaded={IsCurrentReloadWeaponLoaded(humanoid, weapon)}");
             return true;
         }
 
         float multiplierDelta = Mathf.Max(0f, definition.ResourceMultiplier) - 1f;
         if (Mathf.Approximately(multiplierDelta, 0f))
         {
-            LogRangedDebug($"reload secondary cost skipped zero multiplier delta weapon=[{DescribeItemForRangedDebug(weapon)}] resourceMultiplier={definition.ResourceMultiplier:0.###}");
             return true;
         }
 
         float reloadTime = Mathf.Max(0f, weapon.GetWeaponLoadingTime());
         if (reloadTime <= 0f)
         {
-            LogRangedDebug($"reload secondary cost skipped zero reload time weapon=[{DescribeItemForRangedDebug(weapon)}]");
             return true;
         }
 
@@ -369,7 +342,6 @@ internal static partial class SecondaryAttackManager
         float eitrDelta = Mathf.Max(0f, primaryAttack.m_reloadEitrDrain) * reloadTime * multiplierDelta;
         if (staminaDelta > 0f && !humanoid.HaveStamina(staminaDelta))
         {
-            LogRangedDebug($"reload secondary cost failed stamina weapon=[{DescribeItemForRangedDebug(weapon)}] staminaDelta={staminaDelta:0.###} eitrDelta={eitrDelta:0.###}");
             if (humanoid.IsPlayer())
             {
                 Hud.instance?.StaminaBarEmptyFlash();
@@ -380,12 +352,10 @@ internal static partial class SecondaryAttackManager
 
         if (eitrDelta > 0f && !humanoid.TryUseEitr(eitrDelta))
         {
-            LogRangedDebug($"reload secondary cost failed eitr weapon=[{DescribeItemForRangedDebug(weapon)}] staminaDelta={staminaDelta:0.###} eitrDelta={eitrDelta:0.###}");
             return false;
         }
 
         context = new ReloadSecondaryResourceCostContext(staminaDelta, eitrDelta);
-        LogRangedDebug($"reload secondary cost prepared weapon=[{DescribeItemForRangedDebug(weapon)}] reloadTime={reloadTime:0.###} resourceMultiplier={definition.ResourceMultiplier:0.###} staminaDelta={staminaDelta:0.###} eitrDelta={eitrDelta:0.###}");
         return true;
     }
 
@@ -423,8 +393,6 @@ internal static partial class SecondaryAttackManager
         {
             humanoid.AddEitr(-context.EitrDelta);
         }
-
-        LogRangedDebug($"reload secondary cost applied staminaDelta={context.StaminaDelta:0.###} eitrDelta={context.EitrDelta:0.###} currentWeapon=[{DescribeItemForRangedDebug(humanoid.GetCurrentWeapon())}]");
     }
 
     private static bool TryParsePreset(string presetText, out SecondaryAttackPreset preset)
@@ -481,7 +449,11 @@ internal static partial class SecondaryAttackManager
                 return aftershockSourceAttack!;
             }
 
-            return itemDrop.m_itemData.m_shared.m_secondaryAttack ?? itemDrop.m_itemData.m_shared.m_attack;
+            return ResolveOriginalSecondaryAttack(
+                       objectDb,
+                       itemDrop.m_itemData.m_dropPrefab?.name ?? itemDrop.name,
+                       itemDrop) ??
+                   itemDrop.m_itemData.m_shared.m_attack;
         }
 
         if (definition.BehaviorType == SecondaryAttackBehaviorType.FractureLine)
@@ -495,7 +467,11 @@ internal static partial class SecondaryAttackManager
                 return fractureLineSourceAttack!;
             }
 
-            return itemDrop.m_itemData.m_shared.m_secondaryAttack ?? itemDrop.m_itemData.m_shared.m_attack;
+            return ResolveOriginalSecondaryAttack(
+                       objectDb,
+                       itemDrop.m_itemData.m_dropPrefab?.name ?? itemDrop.name,
+                       itemDrop) ??
+                   itemDrop.m_itemData.m_shared.m_attack;
         }
 
         CopiedSecondaryBehavior? copiedBehavior = definition.Behavior as CopiedSecondaryBehavior;
@@ -507,7 +483,11 @@ internal static partial class SecondaryAttackManager
             return sourceAttack!;
         }
 
-        return itemDrop.m_itemData.m_shared.m_secondaryAttack;
+        return ResolveOriginalSecondaryAttack(
+                   objectDb,
+                   itemDrop.m_itemData.m_dropPrefab?.name ?? itemDrop.name,
+                   itemDrop) ??
+               itemDrop.m_itemData.m_shared.m_attack;
     }
 
     internal static bool TryResolveSecondarySourceAttack(ObjectDB objectDb, string sourcePrefabName, out Attack? sourceAttack, out string reason)
@@ -521,7 +501,7 @@ internal static partial class SecondaryAttackManager
             return false;
         }
 
-        sourceAttack = sourceItemDrop.m_itemData.m_shared.m_secondaryAttack;
+        sourceAttack = ResolveOriginalSecondaryAttack(objectDb, sourcePrefabName, sourceItemDrop);
         if (sourceAttack == null || string.IsNullOrWhiteSpace(sourceAttack.m_attackAnimation))
         {
             reason = $"source weapon '{sourcePrefabName}' does not have a valid secondary attack.";
@@ -549,7 +529,7 @@ internal static partial class SecondaryAttackManager
             return true;
         }
 
-        Attack? secondaryAttack = sourceItemDrop.m_itemData.m_shared.m_secondaryAttack;
+        Attack? secondaryAttack = ResolveOriginalSecondaryAttack(objectDb, sourcePrefabName, sourceItemDrop);
         if (IsValidAftershockSourceAttack(secondaryAttack))
         {
             sourceAttack = secondaryAttack;
@@ -579,7 +559,7 @@ internal static partial class SecondaryAttackManager
             return false;
         }
 
-        Attack? secondaryAttack = sourceItemDrop.m_itemData.m_shared.m_secondaryAttack;
+        Attack? secondaryAttack = ResolveOriginalSecondaryAttack(objectDb, sourcePrefabName, sourceItemDrop);
         if (IsValidFractureLineSourceAttack(secondaryAttack))
         {
             sourceAttack = secondaryAttack;
@@ -602,6 +582,19 @@ internal static partial class SecondaryAttackManager
         return attack != null &&
                (attack.m_attackType == Attack.AttackType.Horizontal || attack.m_attackType == Attack.AttackType.Vertical) &&
                !string.IsNullOrWhiteSpace(attack.m_attackAnimation);
+    }
+
+    private static Attack? ResolveOriginalSecondaryAttack(
+        ObjectDB objectDb,
+        string sourcePrefabName,
+        ItemDrop sourceItemDrop)
+    {
+        return SecondaryAttackObjectDbStateStore.TryGetOriginalSecondaryAttack(
+            objectDb,
+            sourcePrefabName,
+            out Attack? originalSecondaryAttack)
+            ? originalSecondaryAttack
+            : sourceItemDrop.m_itemData.m_shared.m_secondaryAttack;
     }
 
     private static ItemDrop? FindItemDropByPrefabName(ObjectDB objectDb, string prefabName)

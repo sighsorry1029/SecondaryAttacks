@@ -196,6 +196,12 @@ internal static class OverchargedBombSystem
         }
     }
 
+    internal static void EndProjectileHit(ref ProjectileHitScaleState state)
+    {
+        EndProjectileHit(state);
+        state = default;
+    }
+
     internal static void ScaleCreatedVisuals(GameObject? instance)
     {
         if (instance == null || !TryGetActiveVisualScale(out float scale))

@@ -208,8 +208,11 @@ internal static class ProjectileOnHitPatch
     }
 
     [HarmonyPriority(Priority.First)]
-    private static void Postfix(Projectile __instance, Collider collider, Vector3 hitPoint, bool water, Vector3 normal, SecondaryAttackHarmonyDispatch.ProjectileOnHitState __state) =>
-        SecondaryAttackHarmonyDispatch.ProjectileOnHitPostfix(__instance, collider, hitPoint, water, normal, __state);
+    private static void Postfix(Projectile __instance, Collider collider, Vector3 hitPoint, bool water, Vector3 normal, ref SecondaryAttackHarmonyDispatch.ProjectileOnHitState __state) =>
+        SecondaryAttackHarmonyDispatch.ProjectileOnHitPostfix(__instance, collider, hitPoint, water, normal, ref __state);
+
+    private static void Finalizer(ref SecondaryAttackHarmonyDispatch.ProjectileOnHitState __state) =>
+        SecondaryAttackHarmonyDispatch.ProjectileOnHitFinalizer(ref __state);
 }
 
 [HarmonyPatch(typeof(Projectile), nameof(Projectile.OnHit))]
@@ -222,9 +225,15 @@ internal static class ProjectileOnHitOverchargedBombPatch
     }
 
     [HarmonyPriority(Priority.Last)]
-    private static void Postfix(OverchargedBombSystem.ProjectileHitScaleState __state)
+    private static void Postfix(ref OverchargedBombSystem.ProjectileHitScaleState __state)
     {
-        OverchargedBombSystem.EndProjectileHit(__state);
+        OverchargedBombSystem.EndProjectileHit(ref __state);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Finalizer(ref OverchargedBombSystem.ProjectileHitScaleState __state)
+    {
+        OverchargedBombSystem.EndProjectileHit(ref __state);
     }
 }
 
@@ -233,7 +242,7 @@ internal static class DestructibleDamageProjectileToolTierPatch
 {
     private static void Prefix(HitData hit)
     {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit, "Destructible.Damage");
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }
 
@@ -242,7 +251,7 @@ internal static class MineRockDamageProjectileToolTierPatch
 {
     private static void Prefix(HitData hit)
     {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit, "MineRock.Damage");
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }
 
@@ -251,7 +260,7 @@ internal static class MineRock5DamageProjectileToolTierPatch
 {
     private static void Prefix(HitData hit)
     {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit, "MineRock5.Damage");
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }
 
@@ -260,7 +269,7 @@ internal static class TreeBaseDamageProjectileToolTierPatch
 {
     private static void Prefix(HitData hit)
     {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit, "TreeBase.Damage");
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }
 
@@ -269,7 +278,7 @@ internal static class TreeLogDamageProjectileToolTierPatch
 {
     private static void Prefix(HitData hit)
     {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit, "TreeLog.Damage");
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }
 
@@ -278,7 +287,7 @@ internal static class WearNTearDamageProjectileToolTierPatch
 {
     private static void Prefix(HitData hit)
     {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit, "WearNTear.Damage");
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }
 
@@ -312,9 +321,9 @@ internal static class EnemyHudLateUpdatePatch
 [HarmonyPatch(typeof(Player), "Update")]
 internal static class PlayerUpdatePendingConfigPatch
 {
-    private static void Postfix(Player __instance, bool ___m_attackHold, bool ___m_secondaryAttackHold, bool ___m_secondaryAttack, ref bool ___m_blocking)
+    private static void Postfix(Player __instance, bool ___m_attackHold, bool ___m_secondaryAttackHold, ref bool ___m_blocking)
     {
-        SecondaryAttackHarmonyDispatch.PlayerUpdatePostfix(__instance, ___m_attackHold, ___m_secondaryAttackHold, ___m_secondaryAttack, ref ___m_blocking);
+        SecondaryAttackHarmonyDispatch.PlayerUpdatePostfix(__instance, ___m_attackHold, ___m_secondaryAttackHold, ref ___m_blocking);
     }
 }
 
@@ -330,29 +339,6 @@ internal static class HumanoidIsBlockingStickyDetonatorPatch
 
         __result = false;
         return false;
-    }
-}
-
-[HarmonyPatch(typeof(Player), "UpdatePlacementGhost")]
-internal static class PlayerUpdatePlacementGhostPatch
-{
-    private static void Postfix(Player __instance)
-    {
-        SecondaryAttackHarmonyDispatch.PlayerUpdatePlacementGhostPostfix(__instance);
-    }
-}
-
-[HarmonyPatch(typeof(Player), nameof(Player.TryPlacePiece))]
-internal static class PlayerTryPlacePiecePatch
-{
-    private static bool Prefix(Player __instance, Piece piece, ref bool __result)
-    {
-        return SecondaryAttackHarmonyDispatch.PlayerTryPlacePiecePrefix(__instance, piece, ref __result);
-    }
-
-    private static void Postfix(Player __instance, Piece piece, bool __result)
-    {
-        SecondaryAttackHarmonyDispatch.PlayerTryPlacePiecePostfix(__instance, piece, __result);
     }
 }
 
@@ -514,9 +500,11 @@ internal static class HumanoidGetTimeSinceLastAttackPatch
 [HarmonyPatch(typeof(Attack), nameof(Attack.Start))]
 internal static class AttackStartCooldownAdjustmentPatch
 {
-    private static void Prefix(Attack __instance, out float __state)
+    private static void Prefix(Attack __instance, out AttackStartState __state)
     {
-        __state = __instance?.m_attackUseAdrenaline ?? 0f;
+        __state = __instance != null
+            ? new AttackStartState(__instance.m_attackUseAdrenaline)
+            : default;
         if (__instance != null &&
             (SecondaryAttackAdrenalineSystem.ShouldSuppressAttackUseAdrenaline(__instance) ||
              SecondaryAttackAdrenalineSystem.TryBeginAttackUseAdrenalineProjectileHitConversion(__instance)))
@@ -525,14 +513,14 @@ internal static class AttackStartCooldownAdjustmentPatch
         }
     }
 
-    private static void Postfix(Attack __instance, bool __result, float __state)
+    private static void Postfix(Attack __instance, bool __result, ref AttackStartState __state)
     {
         if (__instance == null)
         {
             return;
         }
 
-        __instance.m_attackUseAdrenaline = __state;
+        RestoreAttackUseAdrenaline(__instance, ref __state);
 
         if (!__result || __instance.m_character == null || __instance.m_weapon == null)
         {
@@ -547,6 +535,38 @@ internal static class AttackStartCooldownAdjustmentPatch
 
         float intervalReduction = 1f - 1f / Mathf.Max(0.05f, attackSpeedFactor);
         __instance.m_weapon.m_lastAttackTime -= __instance.m_weapon.m_shared.m_aiAttackInterval * intervalReduction;
+    }
+
+    private static void Finalizer(Attack __instance, ref AttackStartState __state)
+    {
+        if (__instance != null)
+        {
+            RestoreAttackUseAdrenaline(__instance, ref __state);
+        }
+    }
+
+    private static void RestoreAttackUseAdrenaline(Attack attack, ref AttackStartState state)
+    {
+        if (!state.Pending)
+        {
+            return;
+        }
+
+        attack.m_attackUseAdrenaline = state.OriginalAttackUseAdrenaline;
+        state = default;
+    }
+
+    private readonly struct AttackStartState
+    {
+        internal AttackStartState(float originalAttackUseAdrenaline)
+        {
+            OriginalAttackUseAdrenaline = originalAttackUseAdrenaline;
+            Pending = true;
+        }
+
+        internal float OriginalAttackUseAdrenaline { get; }
+
+        internal bool Pending { get; }
     }
 }
 
@@ -695,28 +715,26 @@ internal static class HumanoidStartAttackPatch
 internal static class AttackOnAttackTriggerPatch
 {
     [HarmonyPriority(Priority.First)]
-    private static bool Prefix(Attack __instance, out AttackOnAttackTriggerState __state)
+    private static bool Prefix(
+        Attack __instance,
+        out SecondaryAttackManager.ReloadStateConsumptionScope __state)
     {
-        bool reloadState = SecondaryAttackManager.BeginReloadStateConsumption(__instance);
-        __state = new AttackOnAttackTriggerState(reloadState);
+        __state = SecondaryAttackManager.BeginReloadStateConsumption(__instance);
         return !SecondaryAttackRuntimeFacade.TryHandleCustomAttackTrigger(__instance);
     }
 
-    private static void Postfix(Attack __instance, AttackOnAttackTriggerState __state)
+    private static void Postfix(
+        Attack __instance,
+        ref SecondaryAttackManager.ReloadStateConsumptionScope __state)
     {
-        SecondaryAttackManager.EndReloadStateConsumption(__instance, __state.ReloadState);
+        SecondaryAttackManager.EndReloadStateConsumption(ref __state);
         SecondaryAttackRuntimeFacade.TryTriggerRiftTrailAfterAttack(__instance);
         SecondaryAttackRuntimeFacade.TryTriggerFractureLineAfterAttack(__instance);
     }
 
-    private readonly struct AttackOnAttackTriggerState
+    private static void Finalizer(ref SecondaryAttackManager.ReloadStateConsumptionScope __state)
     {
-        internal AttackOnAttackTriggerState(bool reloadState)
-        {
-            ReloadState = reloadState;
-        }
-
-        internal bool ReloadState { get; }
+        SecondaryAttackManager.EndReloadStateConsumption(ref __state);
     }
 }
 
@@ -728,9 +746,14 @@ internal static class AttackDoMeleeAttackSecondaryDurabilityFactorPatch
         __state = SecondaryAttackManager.BeginSecondaryAttackDurabilityAdjustment(__instance);
     }
 
-    private static void Postfix(SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
+    private static void Postfix(ref SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
     {
-        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(__state);
+        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(ref __state);
+    }
+
+    private static void Finalizer(ref SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
+    {
+        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(ref __state);
     }
 }
 
@@ -742,9 +765,14 @@ internal static class AttackDoAreaAttackSecondaryDurabilityFactorPatch
         __state = SecondaryAttackManager.BeginSecondaryAttackDurabilityAdjustment(__instance);
     }
 
-    private static void Postfix(SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
+    private static void Postfix(ref SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
     {
-        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(__state);
+        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(ref __state);
+    }
+
+    private static void Finalizer(ref SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
+    {
+        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(ref __state);
     }
 }
 
@@ -756,9 +784,14 @@ internal static class AttackProjectileAttackTriggeredSecondaryDurabilityFactorPa
         __state = SecondaryAttackManager.BeginSecondaryAttackDurabilityAdjustment(__instance);
     }
 
-    private static void Postfix(SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
+    private static void Postfix(ref SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
     {
-        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(__state);
+        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(ref __state);
+    }
+
+    private static void Finalizer(ref SecondaryAttackManager.SecondaryAttackDurabilityAdjustmentState __state)
+    {
+        SecondaryAttackManager.EndSecondaryAttackDurabilityAdjustment(ref __state);
     }
 }
 
@@ -770,8 +803,13 @@ internal static class AttackFireProjectileBurstPatch
         return SecondaryAttackHarmonyDispatch.AttackFireProjectileBurstPrefix(__instance, out __state);
     }
 
-    private static void Postfix(CopiedThrowProjectileVisualSystem.BurstScope __state)
+    private static void Postfix(ref CopiedThrowProjectileVisualSystem.BurstScope __state)
     {
-        SecondaryAttackHarmonyDispatch.AttackFireProjectileBurstPostfix(__state);
+        SecondaryAttackHarmonyDispatch.AttackFireProjectileBurstPostfix(ref __state);
+    }
+
+    private static void Finalizer(ref CopiedThrowProjectileVisualSystem.BurstScope __state)
+    {
+        SecondaryAttackHarmonyDispatch.AttackFireProjectileBurstPostfix(ref __state);
     }
 }

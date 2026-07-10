@@ -172,30 +172,35 @@ internal static class RiftTrailSystem
 
         HitObjects.Clear();
         HitTargets.Clear();
-        float skillFactor = attacker.GetRandomSkillFactor(weapon.m_shared.m_skillType);
-
-        GatherSweepTargets(controller, attack);
-
-        float effectiveSkillFactor = skillFactor * ResolveMultiTargetPenalty(HitTargets.Count);
-        foreach (RiftTrailHitTarget target in HitTargets)
+        try
         {
-            HitData hitData = CreateHitData(attack, target.Collider, target.Point, target.HitDirection, effectiveSkillFactor, riftTrail);
-            attacker.GetSEMan().ModifyAttack(weapon.m_shared.m_skillType, ref hitData);
-            target.Destructible.Damage(hitData);
-            CreateHitEffects(attack, weapon, target.Point, target.HitDirection);
+            float skillFactor = attacker.GetRandomSkillFactor(weapon.m_shared.m_skillType);
+            GatherSweepTargets(controller, attack);
 
-            if (target.Character != null)
+            float effectiveSkillFactor = skillFactor * ResolveMultiTargetPenalty(HitTargets.Count);
+            foreach (RiftTrailHitTarget target in HitTargets)
             {
-                if (attack.m_attackHealthReturnHit > 0f && target.IsEnemy)
+                HitData hitData = CreateHitData(attack, target.Collider, target.Point, target.HitDirection, effectiveSkillFactor, riftTrail);
+                attacker.GetSEMan().ModifyAttack(weapon.m_shared.m_skillType, ref hitData);
+                target.Destructible.Damage(hitData);
+                CreateHitEffects(attack, weapon, target.Point, target.HitDirection);
+
+                if (target.Character != null &&
+                    attack.m_attackHealthReturnHit > 0f &&
+                    target.IsEnemy)
                 {
                     attacker.Heal(attack.m_attackHealthReturnHit);
                 }
+
+                controller.DrainDurabilityOnce();
             }
-
-            controller.DrainDurabilityOnce();
         }
-
-        HitTargets.Clear();
+        finally
+        {
+            HitObjects.Clear();
+            HitTargets.Clear();
+            System.Array.Clear(SweepHits, 0, SweepHits.Length);
+        }
     }
 
     private static void GatherSweepTargets(RiftTrailController controller, Attack attack)
