@@ -199,7 +199,7 @@ internal static class OverchargedBombSystem
     internal static void EndProjectileHit(ref ProjectileHitScaleState state)
     {
         EndProjectileHit(state);
-        state = default;
+        state = ProjectileHitScaleState.Empty;
     }
 
     internal static void ScaleCreatedVisuals(GameObject? instance)
@@ -603,8 +603,8 @@ internal static class OverchargedBombSystem
         public bool VisualScalePushed { get; }
 
         public bool Applies => Projectile != null ||
-                               ScaledAoes.Length > 0 ||
-                               ScaledTransforms.Length > 0 ||
+                               ScaledAoes is { Length: > 0 } ||
+                               ScaledTransforms is { Length: > 0 } ||
                                VisualScalePushed;
     }
 }
