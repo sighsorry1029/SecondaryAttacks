@@ -499,6 +499,7 @@
         <Compile Include="SecondaryAttackCompiledSnapshot.cs" />
         <Compile Include="SecondaryAttackConfigFiles.cs" />
         <Compile Include="SecondaryAttackConfigLoader.cs" />
+        <Compile Include="SecondaryAttackReloadDebouncer.cs" />
         <Compile Include="SecondaryAttackLocalization.cs" />
         <Compile Include="SecondaryAttackAdrenalineSystem.cs" />
         <Compile Include="SecondaryAttackAdminAccessSystem.cs" />

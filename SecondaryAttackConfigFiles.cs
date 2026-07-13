@@ -52,8 +52,6 @@ internal static class SecondaryAttackYamlDomainRegistry
     private const string SyncedMeleeYamlIdentifier = "secondary_attack_melee_yaml";
     private const string SyncedBloodMagicYamlIdentifier = "secondary_attack_blood_magic_yaml";
 
-    internal const long ReloadDelayTicks = TimeSpan.TicksPerSecond;
-
     internal static readonly string ConfigDirectoryPath = Path.Combine(Paths.ConfigPath, ConfigDirectoryName);
     internal static readonly string RangedYamlFilePath = Path.Combine(ConfigDirectoryPath, RangedYamlFileName);
     internal static readonly string MeleeYamlFilePath = Path.Combine(ConfigDirectoryPath, MeleeYamlFileName);

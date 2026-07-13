@@ -18,11 +18,11 @@ internal static class SecondaryAttackFacade
 
     private static readonly object ReloadLock = new();
     private static FileSystemWatcher? _watcher;
+    private static SecondaryAttackReloadDebouncer? _yamlReloadDebouncer;
     private static readonly Dictionary<SecondaryAttackYamlDomainId, CustomSyncedValue<string>> SyncedYamlValues = new();
     private static SecondaryAttackCompiledSnapshot _currentCompiledSnapshot = SecondaryAttackCompiledSnapshot.Empty;
     private static SecondaryAttackCompiledSnapshot? _pendingCompiledSnapshot;
     private static SecondaryAttackAppliedWorldSnapshot _currentAppliedWorldSnapshot = SecondaryAttackAppliedWorldSnapshot.Empty;
-    private static DateTime _lastYamlReloadTime;
     private static bool _hasPendingConfig;
     private static bool _hasPendingWorldReapply;
     private static int _nextSnapshotId = 1;
@@ -49,6 +49,8 @@ internal static class SecondaryAttackFacade
 
         _watcher?.Dispose();
         _watcher = null;
+        _yamlReloadDebouncer?.Dispose();
+        _yamlReloadDebouncer = null;
     }
 
     public static void ApplyToObjectDb(ObjectDB objectDb, bool emitMissingWarnings)
@@ -111,6 +113,7 @@ internal static class SecondaryAttackFacade
         }
 
         Directory.CreateDirectory(SecondaryAttackYamlDomainRegistry.ConfigDirectoryPath);
+        _yamlReloadDebouncer = new SecondaryAttackReloadDebouncer(ReloadLocalYamlFromWatcher);
         _watcher = new FileSystemWatcher(SecondaryAttackYamlDomainRegistry.ConfigDirectoryPath, "SecondaryAttacks.*.yml");
         _watcher.Changed += OnYamlFileChanged;
         _watcher.Created += OnYamlFileChanged;
@@ -127,16 +130,21 @@ internal static class SecondaryAttackFacade
             return;
         }
 
-        DateTime now = DateTime.Now;
-        if (now.Ticks - _lastYamlReloadTime.Ticks < SecondaryAttackYamlDomainRegistry.ReloadDelayTicks)
-        {
-            return;
-        }
+        _yamlReloadDebouncer?.Schedule();
+    }
 
+    private static void ReloadLocalYamlFromWatcher()
+    {
         lock (ReloadLock)
         {
-            ReloadLocalYaml();
-            _lastYamlReloadTime = now;
+            try
+            {
+                ReloadLocalYaml();
+            }
+            catch (Exception exception)
+            {
+                SecondaryAttacksPlugin.ModLogger.LogError($"Error reloading SecondaryAttacks YAML configuration: {exception.Message}");
+            }
         }
     }
 
@@ -278,6 +286,8 @@ internal static class SecondaryAttackFacade
 
         _watcher.Dispose();
         _watcher = null;
+        _yamlReloadDebouncer?.Dispose();
+        _yamlReloadDebouncer = null;
     }
 
     private static void ApplyYamlTexts(SecondaryAttackYamlTexts yamlTexts)
@@ -392,12 +402,7 @@ internal static class SecondaryAttackFacade
             return true;
         }
 
-        if (((Humanoid)localPlayer).m_currentAttack != null)
-        {
-            return false;
-        }
-
-        return !SecondaryAttackManager.HasActiveAsyncSecondaryWorkForFacade(localPlayer);
+        return ((Humanoid)localPlayer).m_currentAttack == null;
     }
 
 }

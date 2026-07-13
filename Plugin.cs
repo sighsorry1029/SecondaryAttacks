@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Timers;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -18,7 +17,7 @@ namespace SecondaryAttacks;
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.0.10";
+    internal const string ModVersion = "1.0.11";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -46,11 +45,10 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
     internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.Admin.AdminNoPresetCooldowns;
     private FileSystemWatcher? _watcher;
+    private SecondaryAttackReloadDebouncer? _configReloadDebouncer;
     private readonly object _reloadLock = new();
-    private DateTime _lastConfigReloadTime;
     private string? _lastConfigFileText;
     private bool _suppressWorldApplySettingChange;
-    private const long RELOAD_DELAY = 10000000; // One second
 
     public enum Toggle
     {
@@ -117,28 +115,28 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         SecondaryAttackFacade.Dispose();
         SaveWithRespectToConfigSet();
         _watcher?.Dispose();
+        _configReloadDebouncer?.Dispose();
     }
 
     private void SetupWatcher()
     {
+        _configReloadDebouncer = new SecondaryAttackReloadDebouncer(ReloadConfigValues);
         _watcher = new FileSystemWatcher(Paths.ConfigPath, ConfigFileName);
-        _watcher.Changed += ReadConfigValues;
-        _watcher.Created += ReadConfigValues;
-        _watcher.Renamed += ReadConfigValues;
+        _watcher.Changed += QueueConfigReload;
+        _watcher.Created += QueueConfigReload;
+        _watcher.Renamed += QueueConfigReload;
         _watcher.IncludeSubdirectories = true;
         _watcher.SynchronizingObject = ThreadingHelper.SynchronizingObject;
         _watcher.EnableRaisingEvents = true;
     }
 
-    private void ReadConfigValues(object sender, FileSystemEventArgs e)
+    private void QueueConfigReload(object sender, FileSystemEventArgs e)
     {
-        DateTime now = DateTime.Now;
-        long time = now.Ticks - _lastConfigReloadTime.Ticks;
-        if (time < RELOAD_DELAY)
-        {
-            return;
-        }
+        _configReloadDebouncer?.Schedule();
+    }
 
+    private void ReloadConfigValues()
+    {
         lock (_reloadLock)
         {
             if (!File.Exists(ConfigFileFullPath))
@@ -174,8 +172,6 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
                 ModLogger.LogError($"Error reloading configuration: {ex.Message}");
             }
         }
-
-        _lastConfigReloadTime = now;
     }
 
     private static string? ReadFileTextIfExists(string path)
