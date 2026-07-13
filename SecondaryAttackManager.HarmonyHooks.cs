@@ -26,7 +26,7 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         _nview.Register<ZDOID, float, float, float>(SneakAmbushSystem.OwnerSmokeRpcName, RPC_ApplySneakAmbushSmoke);
         _nview.Register<int, string>(SweepObserverVisualSystem.RpcName, RPC_SweepVisual);
         _nview.Register<Vector3, Vector3, string>(RiftTrailSystem.ObserverFallbackVisualRpcName, RPC_RiftTrailVisual);
-        _nview.Register<float, float>(GreatSwordSkillScalingSystem.CleavingThrustTrailScaleRpcName, RPC_CleavingThrustTrailScale);
+        _nview.Register<uint, float, double, double>(GreatSwordSkillScalingSystem.CleavingThrustVisualSessionRpcName, RPC_CleavingThrustVisualSession);
         _nview.Register(StaffRuntimeSystem.StaffTargetEffectRpcName, RPC_SpawnStaffTargetEffect);
     }
 
@@ -80,9 +80,21 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         RiftTrailSystem.HandleObserverFallbackVisualRpc(_character, _nview, origin, forward, payload);
     }
 
-    private void RPC_CleavingThrustTrailScale(long sender, float rangeScale, float duration)
+    private void RPC_CleavingThrustVisualSession(
+        long sender,
+        uint sequence,
+        float rangeScale,
+        double startedAt,
+        double expiresAt)
     {
-        GreatSwordSkillScalingSystem.HandleCleavingThrustTrailScaleRpc(_character, _nview, rangeScale, duration);
+        GreatSwordSkillScalingSystem.HandleCleavingThrustVisualSessionRpc(
+            _character,
+            _nview,
+            sender,
+            sequence,
+            rangeScale,
+            startedAt,
+            expiresAt);
     }
 
     private void RPC_SpawnStaffTargetEffect(long sender)

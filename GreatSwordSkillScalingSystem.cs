@@ -7,63 +7,90 @@ namespace SecondaryAttacks;
 
 internal static class GreatSwordSkillScalingSystem
 {
-    internal const string CleavingThrustTrailScaleRpcName = "SecondaryAttacks_CleavingThrustTrailScale";
-    private const float CleavingThrustObserverTrailScaleDuration = 1.25f;
+    internal const string CleavingThrustVisualSessionRpcName = "SecondaryAttacks_CleavingThrustVisualSessionV2";
+    private const double CleavingThrustVisualSessionDuration = 1.25d;
+    private const float MaxObserverRangeScale = 64f;
+    private const double MinVisualSessionDuration = 0.1d;
+    private const double MaxVisualSessionDuration = 3d;
+    private const double MaxVisualSessionFutureSkew = 0.5d;
+    private const double VisualSessionStaleGrace = 1d;
     private static readonly FieldInfo AttackVisEquipmentField = AccessTools.Field(typeof(Attack), "m_visEquipment")!;
     private static readonly FieldInfo VisRightItemInstanceField = AccessTools.Field(typeof(VisEquipment), "m_rightItemInstance")!;
     private static readonly FieldInfo TrailBaseField = AccessTools.Field(typeof(MeleeWeaponTrail), "_base")!;
     private static readonly FieldInfo TrailTipField = AccessTools.Field(typeof(MeleeWeaponTrail), "_tip")!;
-    private static readonly Dictionary<Transform, Vector3> OriginalTrailTipLocalPositions = new();
-    private static readonly Dictionary<Attack, List<Transform>> ScaledTrailTipsByAttack = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Transform, OriginalTrailTipState> OriginalTrailTipLocalPositions = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Attack, List<Transform>> ScaledTrailTipsByAttack = new();
     private static readonly Dictionary<MeleeWeaponTrail, CleavingThrustObserverTrailScaleController> ObserverTrailScaleControllers = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Attack, object> StartedVisualSessions = new();
+    private static uint _nextCleavingThrustVisualSequence;
 
-    internal static void ApplyTrailScaleForAttack(Attack attack)
+    internal static void BeginCleavingThrustVisualSession(Attack attack, SecondaryAttackDefinition definition)
     {
-        if (!TryGetConfiguredTrailScale(attack, out float rangeScale))
+        if (attack?.m_character == null ||
+            !SecondaryAttackManager.HasCharacterAuthority(attack.m_character) ||
+            !TryGetReadyCleavingThrustTrailScale(attack, definition, out float rangeScale))
         {
             return;
         }
 
+        if (StartedVisualSessions.TryGetValue(attack, out _))
+        {
+            return;
+        }
+
+        StartedVisualSessions.Add(attack, new object());
+
         ApplyTrailScale(attack, rangeScale);
-        SendCleavingThrustTrailScale(attack, rangeScale);
+        SendCleavingThrustVisualSession(attack, rangeScale);
     }
 
-    internal static void HandleCleavingThrustTrailScaleRpc(Character character, ZNetView? nview, float rangeScale, float duration)
+    internal static void HandleCleavingThrustVisualSessionRpc(
+        Character character,
+        ZNetView? nview,
+        long sender,
+        uint sequence,
+        float rangeScale,
+        double startedAt,
+        double expiresAt)
     {
+        if (ZNet.instance != null && ZNet.instance.IsDedicated())
+        {
+            return;
+        }
+
+        double now = SecondaryAttackManager.GetNetworkTimeSeconds();
+        ZDO? zdo = nview != null && nview.IsValid() ? nview.GetZDO() : null;
+        double sourceDuration = expiresAt - startedAt;
+        double sourceAge = now - startedAt;
         if (character == null ||
             nview == null ||
             !nview.IsValid() ||
             nview.IsOwner() ||
-            rangeScale <= 1.0001f)
+            zdo == null ||
+            zdo.GetOwner() != sender ||
+            sequence == 0U ||
+            rangeScale <= 1.0001f ||
+            float.IsNaN(rangeScale) ||
+            float.IsInfinity(rangeScale) ||
+            double.IsNaN(startedAt) ||
+            double.IsInfinity(startedAt) ||
+            double.IsNaN(expiresAt) ||
+            double.IsInfinity(expiresAt) ||
+            sourceDuration < MinVisualSessionDuration ||
+            sourceDuration > MaxVisualSessionDuration ||
+            sourceAge < -MaxVisualSessionFutureSkew ||
+            sourceAge > sourceDuration + VisualSessionStaleGrace)
         {
             return;
         }
+
+        rangeScale = Mathf.Clamp(rangeScale, 1f, MaxObserverRangeScale);
+        double localExpiresAt = now + sourceDuration;
 
         CleavingThrustObserverTrailScaleController controller =
             character.GetComponent<CleavingThrustObserverTrailScaleController>() ??
             character.gameObject.AddComponent<CleavingThrustObserverTrailScaleController>();
-        controller.Begin(character, rangeScale, Mathf.Clamp(duration, 0.1f, 3f));
-    }
-
-    internal static void ApplyTrailScaleForActiveDefinition(Attack attack, SecondaryAttackDefinition definition)
-    {
-        if (!TryGetConfiguredTrailScale(attack, definition, requireSecondaryAttack: false, out float rangeScale))
-        {
-            return;
-        }
-
-        ApplyTrailScale(attack, rangeScale);
-    }
-
-    internal static void ApplyCleavingThrustTrailScaleForTriggeredAttack(Attack attack, SecondaryAttackDefinition definition)
-    {
-        if (!TryGetCleavingThrustTrailScale(attack, definition, out float rangeScale))
-        {
-            return;
-        }
-
-        ApplyTrailScale(attack, rangeScale);
-        SendCleavingThrustTrailScale(attack, rangeScale);
+        controller.Begin(character, sequence, rangeScale, now, localExpiresAt);
     }
 
     private static void ApplyTrailScale(Attack attack, float rangeScale)
@@ -84,28 +111,30 @@ internal static class GreatSwordSkillScalingSystem
                 continue;
             }
 
-            if (!OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out Vector3 originalTipLocalPosition))
+            if (!OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out OriginalTrailTipState? originalTipState))
             {
-                originalTipLocalPosition = tipTransform.localPosition;
-                OriginalTrailTipLocalPositions[tipTransform] = originalTipLocalPosition;
+                originalTipState = new OriginalTrailTipState(tipTransform.localPosition);
+                OriginalTrailTipLocalPositions.Add(tipTransform, originalTipState);
             }
 
             Vector3 baseLocalPosition = tipTransform.parent != null
                 ? tipTransform.parent.InverseTransformPoint(baseTransform.position)
                 : baseTransform.position;
-            Vector3 originalDelta = originalTipLocalPosition - baseLocalPosition;
+            Vector3 originalDelta = originalTipState.LocalPosition - baseLocalPosition;
             tipTransform.localPosition = baseLocalPosition + originalDelta * rangeScale;
             scaledTips.Add(tipTransform);
         }
 
         if (scaledTips.Count > 0)
         {
-            ScaledTrailTipsByAttack[attack] = scaledTips;
+            ScaledTrailTipsByAttack.Remove(attack);
+            ScaledTrailTipsByAttack.Add(attack, scaledTips);
         }
     }
 
     internal static void RestoreTrailScaleForAttack(Attack attack)
     {
+        StartedVisualSessions.Remove(attack);
         if (!ScaledTrailTipsByAttack.TryGetValue(attack, out List<Transform>? scaledTips))
         {
             return;
@@ -113,54 +142,6 @@ internal static class GreatSwordSkillScalingSystem
 
         ScaledTrailTipsByAttack.Remove(attack);
         RestoreTrailTips(scaledTips);
-    }
-
-    private static bool TryGetConfiguredTrailScale(Attack attack, out float rangeScale)
-    {
-        rangeScale = 1f;
-        if (attack?.m_character == null ||
-            attack.m_weapon?.m_shared == null ||
-            !IsSecondaryAttack(attack) ||
-            !SecondaryAttackRuntimeFacade.TryGetDefinition(attack.m_weapon, out SecondaryAttackDefinition definition))
-        {
-            return false;
-        }
-
-        return TryGetConfiguredTrailScale(attack, definition, requireSecondaryAttack: false, out rangeScale);
-    }
-
-    private static bool TryGetConfiguredTrailScale(
-        Attack attack,
-        SecondaryAttackDefinition definition,
-        bool requireSecondaryAttack,
-        out float rangeScale)
-    {
-        rangeScale = 1f;
-        if (attack?.m_character == null ||
-            attack.m_weapon?.m_shared == null ||
-            (requireSecondaryAttack && !IsSecondaryAttack(attack)))
-        {
-            return false;
-        }
-
-        if (TryGetReadyCleavingThrustTrailScale(attack, definition, out float cleavingThrustScale))
-        {
-            rangeScale = Mathf.Max(rangeScale, cleavingThrustScale);
-        }
-
-        return rangeScale > 1.0001f;
-    }
-
-    private static bool TryGetCleavingThrustTrailScale(Attack attack, SecondaryAttackDefinition definition, out float rangeScale)
-    {
-        rangeScale = 1f;
-        if (definition.CleavingThrust == null)
-        {
-            return false;
-        }
-
-        rangeScale = CleavingThrustSystem.ResolveVisualRangeScale(attack, definition);
-        return rangeScale > 1.0001f;
     }
 
     private static bool TryGetReadyCleavingThrustTrailScale(Attack attack, SecondaryAttackDefinition definition, out float rangeScale)
@@ -176,16 +157,6 @@ internal static class GreatSwordSkillScalingSystem
 
         rangeScale = CleavingThrustSystem.ResolveVisualRangeScale(attack, definition);
         return rangeScale > 1.0001f;
-    }
-
-    private static bool IsSecondaryAttack(Attack attack)
-    {
-        if (attack.m_character is Humanoid humanoid && humanoid.m_currentAttack == attack)
-        {
-            return humanoid.m_currentAttackIsSecondary;
-        }
-
-        return attack.m_weapon?.m_shared?.m_secondaryAttack == attack;
     }
 
     private static GameObject? GetRightItemInstance(Attack attack)
@@ -208,7 +179,7 @@ internal static class GreatSwordSkillScalingSystem
         return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
     }
 
-    private static void SendCleavingThrustTrailScale(Attack attack, float rangeScale)
+    private static void SendCleavingThrustVisualSession(Attack attack, float rangeScale)
     {
         if (rangeScale <= 1.0001f ||
             attack?.m_character == null ||
@@ -218,11 +189,31 @@ internal static class GreatSwordSkillScalingSystem
             return;
         }
 
+        uint sequence = NextCleavingThrustVisualSequence();
+        double startedAt = SecondaryAttackManager.GetNetworkTimeSeconds();
+        double expiresAt = startedAt + CleavingThrustVisualSessionDuration;
+
         nview!.InvokeRPC(
             ZNetView.Everybody,
-            CleavingThrustTrailScaleRpcName,
+            CleavingThrustVisualSessionRpcName,
+            sequence,
             rangeScale,
-            CleavingThrustObserverTrailScaleDuration);
+            startedAt,
+            expiresAt);
+    }
+
+    private static uint NextCleavingThrustVisualSequence()
+    {
+        unchecked
+        {
+            _nextCleavingThrustVisualSequence++;
+            if (_nextCleavingThrustVisualSequence == 0U)
+            {
+                _nextCleavingThrustVisualSequence = 1U;
+            }
+
+            return _nextCleavingThrustVisualSequence;
+        }
     }
 
     internal static ObserverTrailSampleScope BeginObserverTrailSample(MeleeWeaponTrail trail)
@@ -251,11 +242,22 @@ internal static class GreatSwordSkillScalingSystem
     {
         foreach (Transform tipTransform in scaledTips)
         {
-            if (tipTransform != null && OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out Vector3 originalTipLocalPosition))
+            if (tipTransform != null &&
+                OriginalTrailTipLocalPositions.TryGetValue(tipTransform, out OriginalTrailTipState? originalTipState))
             {
-                tipTransform.localPosition = originalTipLocalPosition;
+                tipTransform.localPosition = originalTipState.LocalPosition;
             }
         }
+    }
+
+    private sealed class OriginalTrailTipState
+    {
+        internal OriginalTrailTipState(Vector3 localPosition)
+        {
+            LocalPosition = localPosition;
+        }
+
+        internal Vector3 LocalPosition { get; }
     }
 
     private sealed class CleavingThrustObserverTrailScaleController : MonoBehaviour
@@ -263,18 +265,33 @@ internal static class GreatSwordSkillScalingSystem
         private readonly List<MeleeWeaponTrail> _registeredTrails = new();
         private Character? _character;
         private GameObject? _rightItemInstance;
+        private uint _sequence;
+        private bool _hasSequence;
         private float _rangeScale;
-        private float _expiresAt;
+        private double _startedAt;
+        private double _expiresAt;
 
-        internal void Begin(Character character, float rangeScale, float duration)
+        internal void Begin(Character character, uint sequence, float rangeScale, double startedAt, double expiresAt)
         {
-            UnregisterTrails();
+            if (_hasSequence && !IsNewerSequence(sequence, _sequence))
+            {
+                return;
+            }
+
             _character = character;
+            _sequence = sequence;
+            _hasSequence = true;
             _rangeScale = Mathf.Max(1f, rangeScale);
-            _expiresAt = Time.time + Mathf.Max(0.1f, duration);
-            _rightItemInstance = null;
+            _startedAt = startedAt;
+            _expiresAt = expiresAt;
             RefreshRegistrations();
             enabled = true;
+        }
+
+        private static bool IsNewerSequence(uint candidate, uint current)
+        {
+            // Serial-number arithmetic keeps duplicate and reverse delivery safe across uint wrap.
+            return candidate != current && unchecked((int)(candidate - current)) > 0;
         }
 
         private void Update()
@@ -282,7 +299,7 @@ internal static class GreatSwordSkillScalingSystem
             if (_character == null ||
                 _character.IsDead() ||
                 SecondaryAttackManager.HasCharacterAuthority(_character) ||
-                Time.time >= _expiresAt)
+                SecondaryAttackManager.GetNetworkTimeSeconds() >= _expiresAt)
             {
                 Destroy(this);
                 return;
@@ -299,8 +316,10 @@ internal static class GreatSwordSkillScalingSystem
 
         internal ObserverTrailSampleScope BeginTrailSample(MeleeWeaponTrail trail)
         {
+            double now = SecondaryAttackManager.GetNetworkTimeSeconds();
             if (_character == null ||
-                Time.time >= _expiresAt ||
+                now < _startedAt ||
+                now >= _expiresAt ||
                 SecondaryAttackManager.HasCharacterAuthority(_character))
             {
                 return default;
@@ -349,11 +368,6 @@ internal static class GreatSwordSkillScalingSystem
 
                 ObserverTrailScaleControllers[trail] = this;
                 _registeredTrails.Add(trail);
-            }
-
-            if (_registeredTrails.Count > 0)
-            {
-                SweepTrailResetSystem.ClearWeaponTrails(_character);
             }
         }
 
@@ -415,22 +429,15 @@ internal static class GreatSwordSkillScalingSystem
 
 }
 
-[HarmonyPatch(typeof(Attack), nameof(Attack.Start))]
-internal static class AttackStartGreatSwordSkillScalingPatch
-{
-    private static void Postfix(Attack __instance, bool __result)
-    {
-        if (__result)
-        {
-            GreatSwordSkillScalingSystem.ApplyTrailScaleForAttack(__instance);
-        }
-    }
-}
-
 [HarmonyPatch(typeof(Attack), nameof(Attack.Stop))]
 internal static class AttackStopGreatSwordSkillScalingPatch
 {
     private static void Postfix(Attack __instance)
+    {
+        GreatSwordSkillScalingSystem.RestoreTrailScaleForAttack(__instance);
+    }
+
+    private static void Finalizer(Attack __instance)
     {
         GreatSwordSkillScalingSystem.RestoreTrailScaleForAttack(__instance);
     }

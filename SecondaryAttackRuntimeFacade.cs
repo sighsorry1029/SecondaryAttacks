@@ -255,7 +255,6 @@ internal static class SecondaryAttackRuntimeFacade
             HarvestSweepSystem.TryStart(attack, definition);
         }
 
-        GreatSwordSkillScalingSystem.ApplyTrailScaleForActiveDefinition(attack, definition);
         if (!needsActiveAttack)
         {
             return;
@@ -266,7 +265,7 @@ internal static class SecondaryAttackRuntimeFacade
         SecondaryAttackAdrenalineSystem.Reset(attack);
         if (definition.CleavingThrust != null)
         {
-            GreatSwordSkillScalingSystem.ApplyTrailScaleForActiveDefinition(attack, definition);
+            GreatSwordSkillScalingSystem.BeginCleavingThrustVisualSession(attack, definition);
         }
 
         if (definition.RiftTrail != null)
@@ -422,7 +421,6 @@ internal static class SecondaryAttackRuntimeFacade
         }
 
         activeAttack.Triggered = true;
-        GreatSwordSkillScalingSystem.ApplyCleavingThrustTrailScaleForTriggeredAttack(attack, activeAttack.Definition);
         CleavingThrustSystem.Trigger(attack, activeAttack.Definition);
         ApplyAttackTriggerSideEffects(attack);
         return true;
