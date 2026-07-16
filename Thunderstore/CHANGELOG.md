@@ -1,11 +1,11 @@
 # Changelog
 
-## 1.0.12
+## 1.1.0
 
-- Added a localized Secondary Attacks Compendium page with icons and descriptions for every ranged, melee, Blood Magic, and summon-quality preset.
-- Reworked the cooldown and charge HUD to grow dynamically from a stable top anchor, fixed its scale at 2, adjusted the default horizontal position to 0.615, and removed the scale configuration.
-- Expanded Summon Empower to scale ground, flying, and swimming movement, acceleration, turning, attack animations, and AI attack cadence.
-- Hardened live `.cfg` and YAML reloads with stable-file reads, bounded retries, watcher recovery, stricter YAML validation, atomic application, and stale runtime-state cleanup.
+- Added a localized in-game Compendium guide with icons and detailed descriptions for every ranged, melee, Blood Magic, and summon-quality preset, including skill-scaled cooldowns and Sneak Ambush scaling.
+- Consolidated cooldown and charge feedback into a dedicated HUD that supports dynamic rows and a stable top anchor, fixed its scale at 2, set its default horizontal position to 0.615, and removed the scale configuration.
+- Expanded Summon Empower to scale walking, running, flying, swimming, acceleration, turning, attack animations, weapon attack intervals, and the AI minimum attack interval.
+- Reworked live `.cfg` and YAML reloads with stable-file reads, bounded retries, watcher recovery, strict validation, atomic world application, and stale cooldown/effect cleanup.
 - Fixed Sticky Detonator charges following moving targets, stale Magic Summon Quality state after rules stop matching, and summon health restoration when overrides are removed.
 
 ## 1.0.11
