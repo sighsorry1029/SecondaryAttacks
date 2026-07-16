@@ -12,7 +12,7 @@ internal static class WeaponEffectManager
 {
     private const string GeneratedStatusPrefix = "SecondaryAttacks_";
 
-    private static readonly ConditionalWeakTable<Character, Dictionary<string, EffectStackState>> StackStates = new();
+    private static readonly ConditionalWeakTable<Character, CharacterEffectStackState> StackStates = new();
     private static bool _isApplyingEffectDamage;
 
     internal static bool IsApplyingGeneratedEffectDamage => _isApplyingEffectDamage;
@@ -22,9 +22,6 @@ internal static class WeaponEffectManager
         IReadOnlyDictionary<string, SecondaryAttackDefinition> definitions)
     {
         RemoveGeneratedStatuses(objectDb);
-        MeleePresetCooldownSystem.RegisterStatusEffects(objectDb);
-        SneakAmbushChargeSystem.RegisterStatusEffect(objectDb);
-        RangedSecondaryCooldownSystem.RegisterStatusEffect(objectDb);
         RegisterRuntimeStatuses(objectDb, definitions.Values);
     }
 
@@ -514,7 +511,15 @@ internal static class WeaponEffectManager
         }
 
         string stackKey = $"{weaponPrefabName}:{effect.Id}";
-        Dictionary<string, EffectStackState> stateTable = StackStates.GetOrCreateValue(recipient);
+        CharacterEffectStackState characterState = StackStates.GetValue(recipient, _ => new CharacterEffectStackState());
+        int applyRevision = SecondaryAttackFacade.CurrentAppliedWorldSnapshot.ApplyRevision;
+        if (characterState.ApplyRevision != applyRevision)
+        {
+            characterState.Stacks.Clear();
+            characterState.ApplyRevision = applyRevision;
+        }
+
+        Dictionary<string, EffectStackState> stateTable = characterState.Stacks;
         if (!stateTable.TryGetValue(stackKey, out EffectStackState state) ||
             (state.ExpirationTime > 0f && Time.time > state.ExpirationTime))
         {
@@ -633,6 +638,13 @@ internal static class WeaponEffectManager
         public int Count { get; set; }
 
         public float ExpirationTime { get; set; }
+    }
+
+    private sealed class CharacterEffectStackState
+    {
+        public int ApplyRevision { get; set; }
+
+        public Dictionary<string, EffectStackState> Stacks { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }
 

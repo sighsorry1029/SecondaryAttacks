@@ -39,6 +39,43 @@ internal static class SecondaryAttackConfigLoader
         return new SecondaryAttackYamlTexts(texts);
     }
 
+    public static bool TryReadStableLocalYamlTexts(out SecondaryAttackYamlTexts? yamlTexts)
+    {
+        yamlTexts = null;
+        Dictionary<SecondaryAttackYamlDomainId, (long Length, DateTime LastWriteTimeUtc)> stamps = new();
+        foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
+        {
+            FileInfo file = new(domain.FilePath);
+            file.Refresh();
+            if (!file.Exists)
+            {
+                return false;
+            }
+
+            stamps[domain.Id] = (file.Length, file.LastWriteTimeUtc);
+        }
+
+        Dictionary<SecondaryAttackYamlDomainId, string> texts = new();
+        foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
+        {
+            texts[domain.Id] = File.ReadAllText(domain.FilePath);
+        }
+
+        foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
+        {
+            FileInfo file = new(domain.FilePath);
+            file.Refresh();
+            (long Length, DateTime LastWriteTimeUtc) stamp = stamps[domain.Id];
+            if (!file.Exists || file.Length != stamp.Length || file.LastWriteTimeUtc != stamp.LastWriteTimeUtc)
+            {
+                return false;
+            }
+        }
+
+        yamlTexts = new SecondaryAttackYamlTexts(texts);
+        return true;
+    }
+
     public static bool TryCompileSnapshot(
         int snapshotId,
         SecondaryAttackYamlTexts yamlTexts,
@@ -195,8 +232,13 @@ internal static class SecondaryAttackConfigLoader
                 return true;
             }
 
-            hasRootMapping = parser.Current is MappingStart;
-            return true;
+            if (parser.Current is MappingStart)
+            {
+                hasRootMapping = true;
+                return true;
+            }
+
+            throw new InvalidDataException("The YAML document root must be a mapping of prefab names.");
         }
 
         return true;

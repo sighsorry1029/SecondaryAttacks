@@ -113,8 +113,20 @@ internal static class MagicSummonQualityPresetSystem
         Character? owner,
         ItemDrop.ItemData item)
     {
-        if (spawnAbility == null || item == null || !TryResolveRule(spawnAbility, item, out QualityRule rule))
+        if (spawnAbility == null || item == null)
         {
+            return null;
+        }
+
+        if (!TryResolveRule(spawnAbility, item, out QualityRule rule))
+        {
+            if (PendingSpawnAbilityStates.TryGetValue(spawnAbility, out SpawnAbilityRuntimeState? pendingState))
+            {
+                pendingState.Restore(spawnAbility);
+            }
+
+            PendingSpawnAbilityStates.Remove(spawnAbility);
+            ResetSpawnPrefabTags(spawnAbility);
             return null;
         }
 
@@ -516,6 +528,27 @@ internal static class MagicSummonQualityPresetSystem
             tag.MaxInstances = Mathf.Max(1, maxInstances);
             tag.UsesLevelByQuality = rule.Preset == MagicSummonQualityPreset.LevelByQuality;
             tag.SummonLevel = tag.UsesLevelByQuality ? Mathf.Max(1, summonLevel) : 1;
+        }
+    }
+
+    private static void ResetSpawnPrefabTags(SpawnAbility spawnAbility)
+    {
+        GameObject[] spawnPrefabs = spawnAbility.m_spawnPrefab ?? Array.Empty<GameObject>();
+        foreach (GameObject spawnPrefab in spawnPrefabs)
+        {
+            SummonQualityPresetTag? tag = spawnPrefab != null
+                ? spawnPrefab.GetComponent<SummonQualityPresetTag>()
+                : null;
+            if (tag == null)
+            {
+                continue;
+            }
+
+            tag.GroupId = "";
+            tag.MaxInstances = 1;
+            tag.UsesLevelByQuality = false;
+            tag.SummonLevel = 1;
+            tag.OwnerId = ZDOID.None;
         }
     }
 

@@ -310,10 +310,10 @@ internal static class SummonPrefabOverrideSystem
             character.m_name = displayName;
         }
 
-        if (summon.Health.HasValue && summon.Health.Value > 0f)
-        {
-            character.m_health = summon.Health.Value;
-        }
+        Character? sourceCharacter = sourcePrefab.GetComponent<Character>();
+        character.m_health = summon.Health.HasValue && summon.Health.Value > 0f
+            ? summon.Health.Value
+            : sourceCharacter?.m_health ?? character.m_health;
 
         character.m_group = "";
         character.m_defeatSetGlobalKey = "";

@@ -7,11 +7,11 @@ namespace SecondaryAttacks;
 
 internal static class SecondaryCooldownHudSystem
 {
-    private const int MaxSlots = 10;
+    private const int PreviewSlotCount = 10;
     private const int Columns = 5;
-    private const int Rows = 2;
     private const float SlotSize = 34f;
     private const float SlotSpacing = 4f;
+    private const float HudScale = 2f;
     private static readonly Color FilledBackgroundColor = new(0f, 0f, 0f, 0.48f);
     private static readonly Color EmptyBackgroundColor = new(0f, 0f, 0f, 0.2f);
     private static readonly List<Entry> Entries = [];
@@ -22,13 +22,6 @@ internal static class SecondaryCooldownHudSystem
 
     internal static bool IsEnabled =>
         SecondaryAttacksPlugin.SecondaryCooldownHudEnabled.Value == SecondaryAttacksPlugin.Toggle.On;
-
-    internal static bool ShouldSuppressStatusEffects => IsEnabled;
-
-    internal static bool ShouldSuppressCooldownStatusEffects(Character? character)
-    {
-        return IsEnabled && character != null && character == Player.m_localPlayer;
-    }
 
     internal static void Update(Player? player)
     {
@@ -62,13 +55,16 @@ internal static class SecondaryCooldownHudSystem
             return;
         }
 
+        int visibleSlotCount = Mathf.Max(Entries.Count, previewMode ? PreviewSlotCount : 0);
+        EnsureSlotCapacity(visibleSlotCount);
+        UpdateRootSize(visibleSlotCount);
         ApplyConfiguredTransform();
         if (previewMode)
         {
             RootObject.transform.SetAsLastSibling();
         }
 
-        UpdateSlots(previewMode);
+        UpdateSlots(previewMode, visibleSlotCount);
     }
 
     internal static void Hide()
@@ -101,10 +97,7 @@ internal static class SecondaryCooldownHudSystem
         RootRect = root.AddComponent<RectTransform>();
         RootRect.anchorMin = Vector2.zero;
         RootRect.anchorMax = Vector2.zero;
-        RootRect.pivot = new Vector2(0.5f, 0.5f);
-        float width = Columns * SlotSize + (Columns - 1) * SlotSpacing;
-        float height = Rows * SlotSize + (Rows - 1) * SlotSpacing;
-        RootRect.sizeDelta = new Vector2(width, height);
+        RootRect.pivot = new Vector2(0.5f, 1f);
 
         GridLayoutGroup grid = root.AddComponent<GridLayoutGroup>();
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
@@ -113,10 +106,8 @@ internal static class SecondaryCooldownHudSystem
         grid.spacing = new Vector2(SlotSpacing, SlotSpacing);
         grid.childAlignment = TextAnchor.UpperLeft;
 
-        for (int index = 0; index < MaxSlots; index++)
-        {
-            Slots.Add(CreateSlot(root.transform, index));
-        }
+        EnsureSlotCapacity(PreviewSlotCount);
+        UpdateRootSize(PreviewSlotCount);
 
         root.SetActive(false);
     }
@@ -268,22 +259,49 @@ internal static class SecondaryCooldownHudSystem
         float x = Mathf.Clamp01(SecondaryAttacksPlugin.SecondaryCooldownHudPositionX.Value);
         float y = Mathf.Clamp01(SecondaryAttacksPlugin.SecondaryCooldownHudPositionY.Value);
         RootRect.anchoredPosition = new Vector2(parentSize.x * x, parentSize.y * y);
-        RootRect.localScale = Vector3.one * Mathf.Clamp(SecondaryAttacksPlugin.SecondaryCooldownHudScale.Value, 1f, 2f);
+        RootRect.localScale = Vector3.one * HudScale;
     }
 
-    private static void UpdateSlots(bool previewMode)
+    private static void EnsureSlotCapacity(int requiredCount)
+    {
+        if (RootObject == null)
+        {
+            return;
+        }
+
+        while (Slots.Count < requiredCount)
+        {
+            Slots.Add(CreateSlot(RootObject.transform, Slots.Count));
+        }
+    }
+
+    private static void UpdateRootSize(int visibleSlotCount)
+    {
+        if (RootRect == null)
+        {
+            return;
+        }
+
+        int rows = Mathf.Max(1, Mathf.CeilToInt(visibleSlotCount / (float)Columns));
+        float width = Columns * SlotSize + (Columns - 1) * SlotSpacing;
+        float height = rows * SlotSize + (rows - 1) * SlotSpacing;
+        RootRect.sizeDelta = new Vector2(width, height);
+    }
+
+    private static void UpdateSlots(bool previewMode, int visibleSlotCount)
     {
         if (!AreSlotsValid())
         {
             ResetHudReferences();
             EnsureHud();
-            if (RootObject == null || RootRect == null || Slots.Count != MaxSlots)
+            EnsureSlotCapacity(visibleSlotCount);
+            UpdateRootSize(visibleSlotCount);
+            if (RootObject == null || RootRect == null || Slots.Count < visibleSlotCount || !AreSlotsValid())
             {
                 return;
             }
         }
 
-        int count = Mathf.Min(Entries.Count, MaxSlots);
         for (int index = 0; index < Slots.Count; index++)
         {
             CooldownSlot slot = Slots[index];
@@ -292,7 +310,13 @@ internal static class SecondaryCooldownHudSystem
                 continue;
             }
 
-            bool hasEntry = index < count;
+            if (index >= visibleSlotCount)
+            {
+                slot.SetRootActive(false);
+                continue;
+            }
+
+            bool hasEntry = index < Entries.Count;
             if (!hasEntry && !previewMode)
             {
                 slot.SetRootActive(false);
@@ -313,11 +337,6 @@ internal static class SecondaryCooldownHudSystem
 
     private static bool AreSlotsValid()
     {
-        if (Slots.Count != MaxSlots)
-        {
-            return false;
-        }
-
         foreach (CooldownSlot slot in Slots)
         {
             if (!slot.IsValid)

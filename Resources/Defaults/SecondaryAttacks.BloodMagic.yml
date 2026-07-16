@@ -16,8 +16,8 @@ Global:
     durabilityFactor: 1.0
     radius: 10
     duration: 15
-    moveSpeedFactor: 1.5 # Multiplies movement speed; pathing, turning, and attack range can still limit real uptime.
-    attackSpeedFactor: 2 # Speeds AI attack waiting, not the whole loop. Example: 2s animation/turn/approach + 2s wait at 4.0 becomes about 2s + 0.5s, not 4x attacks.
+    moveSpeedFactor: 1.5 # Multiplies non-crouching movement, matching acceleration, and turn speeds.
+    attackSpeedFactor: 2 # Multiplies attack animation speed and divides both the weapon attack interval and AI minimum attack interval.
 
   shieldConvert: # Auto-applies to StaffShield.
     enabled: true

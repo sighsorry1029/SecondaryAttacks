@@ -350,12 +350,15 @@ internal static class StickyDetonatorSystem
             projectileCollider.enabled = false;
         }
 
+        Character? hitCharacter = collider != null ? ProjectileRuntimeSystem.GetHitCharacter(collider) : null;
         GameObject? hitObject = collider != null ? Projectile.FindHitObject(collider) : null;
-        if (hitObject != null &&
-            hitObject != projectile.gameObject &&
-            !hitObject.isStatic)
+        Transform? attachment = hitCharacter != null ? hitCharacter.transform : hitObject?.transform;
+        if (attachment != null &&
+            attachment.gameObject != projectile.gameObject &&
+            !attachment.gameObject.isStatic)
         {
-            projectile.transform.SetParent(hitObject.transform, worldPositionStays: true);
+            projectile.transform.SetParent(attachment, worldPositionStays: true);
+            state.AttachTo(attachment);
         }
 
         StickyChargeController controller = projectile.GetComponent<StickyChargeController>() ??
@@ -423,6 +426,7 @@ internal static class StickyDetonatorSystem
     private static void Detonate(StickyChargeController controller)
     {
         StickyChargeState state = controller.State;
+        state.RefreshAttachedPose();
         if (!TrySpawnAoeExplosion(state))
         {
             SpawnProjectileExplosion(state);
@@ -596,6 +600,36 @@ internal static class StickyDetonatorSystem
         public Vector3 ImpactForward { get; set; } = Vector3.forward;
 
         public float ExpiresAt { get; set; }
+
+        private Transform? Attachment { get; set; }
+
+        private Vector3 LocalHitPoint { get; set; }
+
+        private Vector3 LocalHitNormal { get; set; } = Vector3.up;
+
+        private Vector3 LocalImpactForward { get; set; } = Vector3.forward;
+
+        public void AttachTo(Transform attachment)
+        {
+            Attachment = attachment;
+            LocalHitPoint = attachment.InverseTransformPoint(HitPoint);
+            LocalHitNormal = attachment.InverseTransformDirection(HitNormal).normalized;
+            LocalImpactForward = attachment.InverseTransformDirection(ImpactForward).normalized;
+        }
+
+        public void RefreshAttachedPose()
+        {
+            if (Attachment == null)
+            {
+                return;
+            }
+
+            HitPoint = Attachment.TransformPoint(LocalHitPoint);
+            Vector3 hitNormal = Attachment.TransformDirection(LocalHitNormal);
+            Vector3 impactForward = Attachment.TransformDirection(LocalImpactForward);
+            HitNormal = hitNormal.sqrMagnitude > 0.001f ? hitNormal.normalized : Vector3.up;
+            ImpactForward = impactForward.sqrMagnitude > 0.001f ? impactForward.normalized : Vector3.forward;
+        }
     }
 
     private sealed class StickyChargeController : MonoBehaviour

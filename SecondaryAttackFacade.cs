@@ -10,15 +10,28 @@ namespace SecondaryAttacks;
 
 internal static class SecondaryAttackFacade
 {
+    private sealed class ApplyFailureState
+    {
+        internal int ConsecutiveFailures;
+        internal DateTime NextAttemptUtc = DateTime.MinValue;
+        internal DateTime NextLogUtc = DateTime.MinValue;
+        internal string Signature = string.Empty;
+        internal int SuppressedLogCount;
+    }
+
     private enum YamlAuthorityMode
     {
         LocalFiles,
         SyncedOnly
     }
 
+    private static readonly TimeSpan ApplyFailureLogInterval = TimeSpan.FromSeconds(10d);
     private static readonly object ReloadLock = new();
+    private static readonly ApplyFailureState PendingConfigApplyFailure = new();
+    private static readonly ApplyFailureState PendingWorldApplyFailure = new();
     private static FileSystemWatcher? _watcher;
     private static SecondaryAttackReloadDebouncer? _yamlReloadDebouncer;
+    private static SecondaryAttackReloadDebouncer? _applyRetryDebouncer;
     private static readonly Dictionary<SecondaryAttackYamlDomainId, CustomSyncedValue<string>> SyncedYamlValues = new();
     private static SecondaryAttackCompiledSnapshot _currentCompiledSnapshot = SecondaryAttackCompiledSnapshot.Empty;
     private static SecondaryAttackCompiledSnapshot? _pendingCompiledSnapshot;
@@ -37,6 +50,9 @@ internal static class SecondaryAttackFacade
 
     public static void Initialize()
     {
+        _applyRetryDebouncer = new SecondaryAttackReloadDebouncer(
+            RetryFailedPendingApply,
+            "SecondaryAttacks pending world apply");
         SecondaryAttackConfigLoader.EnsureLocalFilesExist();
         InitializeSyncedYamlValues();
 
@@ -51,19 +67,24 @@ internal static class SecondaryAttackFacade
         _watcher = null;
         _yamlReloadDebouncer?.Dispose();
         _yamlReloadDebouncer = null;
+        _applyRetryDebouncer?.Dispose();
+        _applyRetryDebouncer = null;
     }
 
     public static void ApplyToObjectDb(ObjectDB objectDb, bool emitMissingWarnings)
     {
         RefreshYamlAuthorityMode();
         ApplyCompiledSnapshotToObjectDb(objectDb, _currentCompiledSnapshot, emitMissingWarnings);
+        _hasPendingWorldReapply = false;
+        ResetApplyFailure(PendingWorldApplyFailure);
     }
 
     internal static void TryApplyPendingConfig()
     {
         RefreshYamlAuthorityMode();
-        if (CommitPendingConfig(force: false, applyToObjectDbImmediately: true))
+        if (_hasPendingConfig)
         {
+            CommitPendingConfig(force: false);
             return;
         }
 
@@ -81,28 +102,94 @@ internal static class SecondaryAttackFacade
     internal static void ApplyPendingConfigToObjectDb(ObjectDB objectDb, bool emitMissingWarnings)
     {
         RefreshYamlAuthorityMode();
-        bool appliedPendingConfig = CommitPendingConfig(force: true, applyToObjectDbImmediately: false);
-        ApplyCompiledSnapshotToObjectDb(objectDb, _currentCompiledSnapshot, emitMissingWarnings);
-        if (appliedPendingConfig)
+        bool applyingPendingConfig = _hasPendingConfig && _pendingCompiledSnapshot != null;
+        SecondaryAttackCompiledSnapshot snapshot = applyingPendingConfig
+            ? _pendingCompiledSnapshot!
+            : _currentCompiledSnapshot;
+        string fingerprint = applyingPendingConfig
+            ? _pendingYamlFingerprint ?? _currentYamlFingerprint
+            : _currentYamlFingerprint;
+        ApplyFailureState failureState = applyingPendingConfig
+            ? PendingConfigApplyFailure
+            : PendingWorldApplyFailure;
+
+        try
         {
-            SecondaryAttacksPlugin.ModLogger.LogInfo("Applied staged YAML config changes.");
+            ApplyCompiledSnapshotToObjectDb(objectDb, snapshot, emitMissingWarnings);
         }
+        catch (Exception exception)
+        {
+            if (!applyingPendingConfig)
+            {
+                _hasPendingWorldReapply = true;
+            }
+
+            RecordApplyFailure(
+                applyingPendingConfig ? "staged YAML configuration" : "world configuration",
+                exception,
+                failureState);
+            return;
+        }
+
+        if (applyingPendingConfig)
+        {
+            CompletePendingConfigCommit(snapshot, fingerprint);
+        }
+
+        _hasPendingWorldReapply = false;
+        ResetApplyFailure(PendingConfigApplyFailure);
+        ResetApplyFailure(PendingWorldApplyFailure);
     }
 
     internal static void ApplyPendingConfigToZNetScene(ZNetScene scene, bool emitMissingWarnings)
     {
         RefreshYamlAuthorityMode();
-        bool appliedPendingConfig = CommitPendingConfig(force: true, applyToObjectDbImmediately: false);
-        ApplyCompiledSnapshotToZNetScene(scene, _currentCompiledSnapshot, emitMissingWarnings);
-        if (ObjectDB.instance != null)
+        bool applyingPendingConfig = _hasPendingConfig && _pendingCompiledSnapshot != null;
+        SecondaryAttackCompiledSnapshot snapshot = applyingPendingConfig
+            ? _pendingCompiledSnapshot!
+            : _currentCompiledSnapshot;
+        string fingerprint = applyingPendingConfig
+            ? _pendingYamlFingerprint ?? _currentYamlFingerprint
+            : _currentYamlFingerprint;
+        ApplyFailureState failureState = applyingPendingConfig
+            ? PendingConfigApplyFailure
+            : PendingWorldApplyFailure;
+        ObjectDB? objectDb = ObjectDB.instance;
+
+        try
         {
-            ApplyCompiledSnapshotToObjectDb(ObjectDB.instance, _currentCompiledSnapshot, emitMissingWarnings, applyZNetScene: false);
+            ApplyCompiledSnapshotToZNetScene(scene, snapshot, emitMissingWarnings);
+            if (objectDb != null)
+            {
+                ApplyCompiledSnapshotToObjectDb(objectDb, snapshot, emitMissingWarnings, applyZNetScene: false);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (!applyingPendingConfig)
+            {
+                _hasPendingWorldReapply = true;
+            }
+
+            RecordApplyFailure(
+                applyingPendingConfig ? "staged YAML configuration" : "world configuration",
+                exception,
+                failureState);
+            return;
         }
 
-        if (appliedPendingConfig)
+        if (applyingPendingConfig)
         {
-            SecondaryAttacksPlugin.ModLogger.LogInfo("Applied staged YAML config changes.");
+            CompletePendingConfigCommit(snapshot, fingerprint);
         }
+
+        if (objectDb != null)
+        {
+            _hasPendingWorldReapply = false;
+        }
+
+        ResetApplyFailure(PendingConfigApplyFailure);
+        ResetApplyFailure(PendingWorldApplyFailure);
     }
 
     private static void SetupWatcher()
@@ -113,11 +200,15 @@ internal static class SecondaryAttackFacade
         }
 
         Directory.CreateDirectory(SecondaryAttackYamlDomainRegistry.ConfigDirectoryPath);
-        _yamlReloadDebouncer = new SecondaryAttackReloadDebouncer(ReloadLocalYamlFromWatcher);
+        _yamlReloadDebouncer = new SecondaryAttackReloadDebouncer(
+            ReloadLocalYamlFromWatcher,
+            "SecondaryAttacks YAML reload");
         _watcher = new FileSystemWatcher(SecondaryAttackYamlDomainRegistry.ConfigDirectoryPath, "SecondaryAttacks.*.yml");
         _watcher.Changed += OnYamlFileChanged;
         _watcher.Created += OnYamlFileChanged;
+        _watcher.Deleted += OnYamlFileChanged;
         _watcher.Renamed += OnYamlFileChanged;
+        _watcher.Error += OnYamlWatcherError;
         _watcher.IncludeSubdirectories = false;
         _watcher.SynchronizingObject = ThreadingHelper.SynchronizingObject;
         _watcher.EnableRaisingEvents = true;
@@ -133,17 +224,36 @@ internal static class SecondaryAttackFacade
         _yamlReloadDebouncer?.Schedule();
     }
 
-    private static void ReloadLocalYamlFromWatcher()
+    private static void OnYamlWatcherError(object sender, ErrorEventArgs e)
+    {
+        if (_yamlAuthorityMode != YamlAuthorityMode.LocalFiles)
+        {
+            return;
+        }
+
+        SecondaryAttacksPlugin.ModLogger.LogError(
+            $"SecondaryAttacks YAML file watcher error; scheduling a full reload. {e.GetException()}");
+        _yamlReloadDebouncer?.Schedule();
+    }
+
+    private static bool ReloadLocalYamlFromWatcher()
     {
         lock (ReloadLock)
         {
             try
             {
-                ReloadLocalYaml();
+                if (!SecondaryAttackConfigLoader.TryReadStableLocalYamlTexts(out SecondaryAttackYamlTexts? yamlTexts))
+                {
+                    return false;
+                }
+
+                PublishAndApplyLocalYaml(yamlTexts!);
+                return true;
             }
             catch (Exception exception)
             {
                 SecondaryAttacksPlugin.ModLogger.LogError($"Error reloading SecondaryAttacks YAML configuration: {exception.Message}");
+                return false;
             }
         }
     }
@@ -157,7 +267,11 @@ internal static class SecondaryAttackFacade
 
         SecondaryAttackConfigLoader.EnsureLocalFilesExist();
         SecondaryAttackYamlTexts yamlTexts = SecondaryAttackConfigLoader.ReadLocalYamlTexts();
+        PublishAndApplyLocalYaml(yamlTexts);
+    }
 
+    private static void PublishAndApplyLocalYaml(SecondaryAttackYamlTexts yamlTexts)
+    {
         if (SyncedYamlValues.Count == SecondaryAttackYamlDomainRegistry.Domains.Count)
         {
             _suppressSyncedYamlChanged = true;
@@ -293,9 +407,14 @@ internal static class SecondaryAttackFacade
     private static void ApplyYamlTexts(SecondaryAttackYamlTexts yamlTexts)
     {
         string fingerprint = yamlTexts.GetContentFingerprint();
-        if (string.Equals(_currentYamlFingerprint, fingerprint, StringComparison.Ordinal) ||
-            (_hasPendingConfig && string.Equals(_pendingYamlFingerprint, fingerprint, StringComparison.Ordinal)))
+        if (string.Equals(_currentYamlFingerprint, fingerprint, StringComparison.Ordinal))
         {
+            return;
+        }
+
+        if (_hasPendingConfig && string.Equals(_pendingYamlFingerprint, fingerprint, StringComparison.Ordinal))
+        {
+            CommitPendingConfig(force: false);
             return;
         }
 
@@ -312,16 +431,24 @@ internal static class SecondaryAttackFacade
         _pendingCompiledSnapshot = snapshot;
         _pendingYamlFingerprint = fingerprint;
         _hasPendingConfig = true;
-        CommitPendingConfig(force: false, applyToObjectDbImmediately: true);
+        ResetApplyFailure(PendingConfigApplyFailure);
+        CommitPendingConfig(force: false);
     }
 
     private static void StageWorldReapply()
     {
         _hasPendingWorldReapply = true;
+        ResetApplyFailure(PendingWorldApplyFailure);
+        if (_hasPendingConfig)
+        {
+            CommitPendingConfig(force: false);
+            return;
+        }
+
         CommitPendingWorldReapply(force: false);
     }
 
-    private static bool CommitPendingConfig(bool force, bool applyToObjectDbImmediately)
+    private static bool CommitPendingConfig(bool force)
     {
         if (!_hasPendingConfig || _pendingCompiledSnapshot == null)
         {
@@ -333,18 +460,33 @@ internal static class SecondaryAttackFacade
             return false;
         }
 
-        _currentCompiledSnapshot = _pendingCompiledSnapshot;
-        _currentYamlFingerprint = _pendingYamlFingerprint ?? _currentYamlFingerprint;
-        _pendingCompiledSnapshot = null;
-        _pendingYamlFingerprint = null;
-        _hasPendingConfig = false;
-
-        if (applyToObjectDbImmediately && ObjectDB.instance != null)
+        if (!force && !CanAttemptApply(PendingConfigApplyFailure))
         {
-            ApplyCompiledSnapshotToObjectDb(ObjectDB.instance, _currentCompiledSnapshot, emitMissingWarnings: true);
+            return false;
         }
 
-        SecondaryAttacksPlugin.ModLogger.LogInfo("Applied staged YAML config changes.");
+        ObjectDB? objectDb = ObjectDB.instance;
+        if (objectDb == null)
+        {
+            return false;
+        }
+
+        SecondaryAttackCompiledSnapshot snapshot = _pendingCompiledSnapshot;
+        string fingerprint = _pendingYamlFingerprint ?? _currentYamlFingerprint;
+        try
+        {
+            ApplyCompiledSnapshotToObjectDb(objectDb, snapshot, emitMissingWarnings: true);
+        }
+        catch (Exception exception)
+        {
+            RecordApplyFailure("staged YAML configuration", exception, PendingConfigApplyFailure);
+            return false;
+        }
+
+        CompletePendingConfigCommit(snapshot, fingerprint);
+        _hasPendingWorldReapply = false;
+        ResetApplyFailure(PendingConfigApplyFailure);
+        ResetApplyFailure(PendingWorldApplyFailure);
         return true;
     }
 
@@ -360,12 +502,28 @@ internal static class SecondaryAttackFacade
             return false;
         }
 
+        if (!force && !CanAttemptApply(PendingWorldApplyFailure))
+        {
+            return false;
+        }
+
         if (ObjectDB.instance == null)
         {
             return false;
         }
 
-        ApplyCompiledSnapshotToObjectDb(ObjectDB.instance, _currentCompiledSnapshot, emitMissingWarnings: true);
+        try
+        {
+            ApplyCompiledSnapshotToObjectDb(ObjectDB.instance, _currentCompiledSnapshot, emitMissingWarnings: true);
+        }
+        catch (Exception exception)
+        {
+            RecordApplyFailure("world configuration", exception, PendingWorldApplyFailure);
+            return false;
+        }
+
+        _hasPendingWorldReapply = false;
+        ResetApplyFailure(PendingWorldApplyFailure);
         SecondaryAttacksPlugin.ModLogger.LogInfo("Applied staged world-apply config changes.");
         return true;
     }
@@ -376,7 +534,6 @@ internal static class SecondaryAttackFacade
         bool emitMissingWarnings,
         bool applyZNetScene = true)
     {
-        _hasPendingWorldReapply = false;
         if (applyZNetScene && ZNetScene.instance != null)
         {
             ApplyCompiledSnapshotToZNetScene(ZNetScene.instance, compiledSnapshot, emitMissingWarnings);
@@ -402,7 +559,96 @@ internal static class SecondaryAttackFacade
             return true;
         }
 
-        return ((Humanoid)localPlayer).m_currentAttack == null;
+        Attack? currentAttack = ((Humanoid)localPlayer).m_currentAttack;
+        return currentAttack == null || currentAttack.IsDone();
+    }
+
+    private static void CompletePendingConfigCommit(
+        SecondaryAttackCompiledSnapshot snapshot,
+        string fingerprint)
+    {
+        if (!_hasPendingConfig || !ReferenceEquals(_pendingCompiledSnapshot, snapshot))
+        {
+            return;
+        }
+
+        _currentCompiledSnapshot = snapshot;
+        _currentYamlFingerprint = fingerprint;
+        _pendingCompiledSnapshot = null;
+        _pendingYamlFingerprint = null;
+        _hasPendingConfig = false;
+        SecondaryAttacksPlugin.ModLogger.LogInfo("Applied staged YAML config changes.");
+    }
+
+    private static bool CanAttemptApply(ApplyFailureState state)
+    {
+        return DateTime.UtcNow >= state.NextAttemptUtc;
+    }
+
+    private static void RecordApplyFailure(
+        string operation,
+        Exception exception,
+        ApplyFailureState state)
+    {
+        DateTime now = DateTime.UtcNow;
+        state.ConsecutiveFailures++;
+        int retryStep = Math.Min(state.ConsecutiveFailures - 1, 4);
+        double retryDelaySeconds = Math.Min(0.25d * (1 << retryStep), 4d);
+        state.NextAttemptUtc = now.AddSeconds(retryDelaySeconds);
+        if (state.ConsecutiveFailures == 1)
+        {
+            _applyRetryDebouncer?.Schedule();
+        }
+
+        string signature = $"{exception.GetType().FullName}: {exception.Message}";
+        if (!string.Equals(signature, state.Signature, StringComparison.Ordinal) || now >= state.NextLogUtc)
+        {
+            string suppressedSuffix = state.SuppressedLogCount > 0
+                ? $" ({state.SuppressedLogCount} repeated failures suppressed.)"
+                : string.Empty;
+            SecondaryAttacksPlugin.ModLogger.LogError(
+                $"Failed to apply {operation}; the pending change will be retried.{suppressedSuffix}\n{exception}");
+            state.Signature = signature;
+            state.NextLogUtc = now + ApplyFailureLogInterval;
+            state.SuppressedLogCount = 0;
+            return;
+        }
+
+        state.SuppressedLogCount++;
+    }
+
+    private static bool RetryFailedPendingApply()
+    {
+        lock (ReloadLock)
+        {
+            if (!CanApplyPendingConfigNow() || ObjectDB.instance == null)
+            {
+                return true;
+            }
+
+            if (_hasPendingConfig)
+            {
+                bool applied = CommitPendingConfig(force: false);
+                return applied || PendingConfigApplyFailure.ConsecutiveFailures == 0;
+            }
+
+            if (_hasPendingWorldReapply)
+            {
+                bool applied = CommitPendingWorldReapply(force: false);
+                return applied || PendingWorldApplyFailure.ConsecutiveFailures == 0;
+            }
+
+            return true;
+        }
+    }
+
+    private static void ResetApplyFailure(ApplyFailureState state)
+    {
+        state.ConsecutiveFailures = 0;
+        state.NextAttemptUtc = DateTime.MinValue;
+        state.NextLogUtc = DateTime.MinValue;
+        state.Signature = string.Empty;
+        state.SuppressedLogCount = 0;
     }
 
 }

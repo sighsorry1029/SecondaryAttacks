@@ -184,7 +184,7 @@ Shield Convert reads the active shield amount on you and nearby allies, then con
 
 ![](https://i.ibb.co/wFJXgXtn/empowertroll.gif)
 
-Summon Empower buffs nearby summons with configurable duration, movement speed factor, and attack speed factor. The remaining empowered time is shown in the HUD.
+Summon Empower buffs nearby summons with configurable duration, a factor for non-crouching movement, matching acceleration and turn speeds, and an attack speed factor. The remaining empowered time is shown in the HUD.
 
 ![](https://i.ibb.co/1SKgq5S/empowersample2.gif)
 

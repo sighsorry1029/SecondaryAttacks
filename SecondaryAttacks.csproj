@@ -497,10 +497,12 @@
         <Compile Include="RiftTrailSystem.cs" />
         <Compile Include="Properties\AssemblyInfo.cs"/>
         <Compile Include="SecondaryAttackCompiledSnapshot.cs" />
+        <Compile Include="SecondaryAttackCompendiumManager.cs" />
         <Compile Include="SecondaryAttackConfigFiles.cs" />
         <Compile Include="SecondaryAttackConfigLoader.cs" />
         <Compile Include="SecondaryAttackReloadDebouncer.cs" />
         <Compile Include="SecondaryAttackLocalization.cs" />
+        <Compile Include="SecondaryAttackPresetCatalog.cs" />
         <Compile Include="SecondaryAttackAdrenalineSystem.cs" />
         <Compile Include="SecondaryAttackAdminAccessSystem.cs" />
         <Compile Include="SecondaryAttackNamedEffectSystem.cs" />
@@ -545,6 +547,7 @@
         <Compile Include="SecondaryAttackWorldApplySystem.cs" />
         <Compile Include="SecondaryAttackWarningLog.cs" />
         <Compile Include="SummonPrefabOverrideSystem.cs" />
+        <Compile Include="SummonEmpowerMovementSystem.cs" />
         <Compile Include="ShieldAccess.cs" />
         <Compile Include="StickyDetonatorSystem.cs" />
         <Compile Include="WarfareTweaksBridge.cs" />

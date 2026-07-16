@@ -340,9 +340,13 @@ internal static class StaffRuntimeSystem
         float expiry = zdo!.GetFloat(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, 0f);
         if (expiry <= now)
         {
-            zdo.Set(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, 0f);
-            zdo.Set(SecondaryAttackManager.SummonEmpowerMoveSpeedBonusZdoKeyForStaffRuntime, 0f);
-            zdo.Set(SecondaryAttackManager.SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime, 0f);
+            if (expiry > 0f && SecondaryAttackManager.HasCharacterAuthority(character))
+            {
+                zdo.Set(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, 0f);
+                zdo.Set(SecondaryAttackManager.SummonEmpowerMoveSpeedBonusZdoKeyForStaffRuntime, 0f);
+                zdo.Set(SecondaryAttackManager.SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime, 0f);
+            }
+
             return false;
         }
 
@@ -350,6 +354,20 @@ internal static class StaffRuntimeSystem
         attackSpeedFactor = Mathf.Max(0.05f, zdo.GetFloat(SecondaryAttackManager.SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime, 1f));
         remainingTime = expiry - now;
         return remainingTime > 0f;
+    }
+
+    internal static bool TryGetSummonEmpowerAttackSpeedFactor(Character? character, out float attackSpeedFactor)
+    {
+        attackSpeedFactor = 1f;
+        if (character == null ||
+            character.IsPlayer() ||
+            !TryGetSummonEmpower(character, out _, out float configuredFactor, out _))
+        {
+            return false;
+        }
+
+        attackSpeedFactor = Mathf.Max(1f, configuredFactor);
+        return !Mathf.Approximately(attackSpeedFactor, 1f);
     }
 
     internal static bool TryGetDisplayedShieldRemaining(Character character, out float remaining)

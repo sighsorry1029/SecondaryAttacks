@@ -17,7 +17,7 @@ namespace SecondaryAttacks;
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.0.11";
+    internal const string ModVersion = "1.0.12";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -40,7 +40,6 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<RangedPresetSelection> CrossbowPreset => Settings.Ranged.CrossbowPreset;
     internal static ConfigEntry<BombPresetSelection> BombPreset => Settings.Ranged.BombPreset;
     internal static ConfigEntry<Toggle> SecondaryCooldownHudEnabled => Settings.Ui.SecondaryCooldownHudEnabled;
-    internal static ConfigEntry<float> SecondaryCooldownHudScale => Settings.Ui.SecondaryCooldownHudScale;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionX => Settings.Ui.SecondaryCooldownHudPositionX;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
     internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.Admin.AdminNoPresetCooldowns;
@@ -92,6 +91,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         Config.SaveOnConfigSet = false;
 
         Settings.Bind(this);
+        RemoveLegacyHudScaleConfig();
         RegisterWorldApplySettingHandlers();
         _serverConfigLocked = Settings.General.LockConfiguration;
         _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
@@ -120,12 +120,14 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
     private void SetupWatcher()
     {
-        _configReloadDebouncer = new SecondaryAttackReloadDebouncer(ReloadConfigValues);
+        _configReloadDebouncer = new SecondaryAttackReloadDebouncer(ReloadConfigValues, "SecondaryAttacks config reload");
         _watcher = new FileSystemWatcher(Paths.ConfigPath, ConfigFileName);
         _watcher.Changed += QueueConfigReload;
         _watcher.Created += QueueConfigReload;
         _watcher.Renamed += QueueConfigReload;
-        _watcher.IncludeSubdirectories = true;
+        _watcher.Deleted += QueueConfigReload;
+        _watcher.Error += QueueConfigWatcherRecovery;
+        _watcher.IncludeSubdirectories = false;
         _watcher.SynchronizingObject = ThreadingHelper.SynchronizingObject;
         _watcher.EnableRaisingEvents = true;
     }
@@ -135,23 +137,35 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         _configReloadDebouncer?.Schedule();
     }
 
-    private void ReloadConfigValues()
+    private void QueueConfigWatcherRecovery(object sender, ErrorEventArgs e)
+    {
+        ModLogger.LogWarning($"Config file watcher reported an error; scheduling a full config rescan. {e.GetException().Message}");
+        _configReloadDebouncer?.Schedule();
+    }
+
+    private bool ReloadConfigValues()
     {
         lock (_reloadLock)
         {
-            if (!File.Exists(ConfigFileFullPath))
+            if (!TryReadStableFileText(ConfigFileFullPath, out string? configFileText))
             {
-                ModLogger.LogWarning("Config file does not exist. Skipping reload.");
-                return;
+                return false;
             }
 
             try
             {
-                string configFileText = File.ReadAllText(ConfigFileFullPath);
                 if (string.Equals(_lastConfigFileText, configFileText, StringComparison.Ordinal))
                 {
-                    return;
+                    return true;
                 }
+
+                RangedPresetSelection previousFireballStaffPreset = FireballStaffPreset.Value;
+                RangedPresetSelection previousRapidStaffPreset = RapidStaffPreset.Value;
+                RangedPresetSelection previousLightningStaffPreset = LightningStaffPreset.Value;
+                RangedPresetSelection previousBowPreset = BowPreset.Value;
+                RangedPresetSelection previousCrossbowPreset = CrossbowPreset.Value;
+                BombPresetSelection previousBombPreset = BombPreset.Value;
+                MagicSummonQualityPresetSelection previousMagicSummonQualityPreset = MagicSummonQualityPreset.Value;
 
                 _suppressWorldApplySettingChange = true;
                 try
@@ -163,13 +177,27 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
                     _suppressWorldApplySettingChange = false;
                 }
 
-                SecondaryAttackFacade.RequestCurrentWorldReapply();
-                _lastConfigFileText = ReadFileTextIfExists(ConfigFileFullPath);
+                bool needsWorldReapply =
+                    previousFireballStaffPreset != FireballStaffPreset.Value ||
+                    previousRapidStaffPreset != RapidStaffPreset.Value ||
+                    previousLightningStaffPreset != LightningStaffPreset.Value ||
+                    previousBowPreset != BowPreset.Value ||
+                    previousCrossbowPreset != CrossbowPreset.Value ||
+                    previousBombPreset != BombPreset.Value ||
+                    previousMagicSummonQualityPreset != MagicSummonQualityPreset.Value;
+                if (needsWorldReapply)
+                {
+                    SecondaryAttackFacade.RequestCurrentWorldReapply();
+                }
+
+                _lastConfigFileText = configFileText;
                 ModLogger.LogInfo("Configuration reload complete.");
+                return true;
             }
             catch (Exception ex)
             {
-                ModLogger.LogError($"Error reloading configuration: {ex.Message}");
+                ModLogger.LogWarning($"Configuration reload attempt failed and will be retried: {ex.Message}");
+                return false;
             }
         }
     }
@@ -179,17 +207,64 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
+    private static bool TryReadStableFileText(string path, out string? fileText)
+    {
+        fileText = null;
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        FileInfo before = new(path);
+        before.Refresh();
+        if (!before.Exists)
+        {
+            return false;
+        }
+
+        long length = before.Length;
+        DateTime lastWriteTimeUtc = before.LastWriteTimeUtc;
+        string candidate = File.ReadAllText(path);
+
+        FileInfo after = new(path);
+        after.Refresh();
+        if (!after.Exists || after.Length != length || after.LastWriteTimeUtc != lastWriteTimeUtc)
+        {
+            return false;
+        }
+
+        fileText = candidate;
+        return true;
+    }
+
     private void SaveWithRespectToConfigSet(bool reload = false)
     {
         bool originalSaveOnSet = Config.SaveOnConfigSet;
-        Config.SaveOnConfigSet = false;
-        if (reload)
-            Config.Reload();
-        Config.Save();
-        if (originalSaveOnSet)
+        try
+        {
+            Config.SaveOnConfigSet = false;
+            if (reload)
+            {
+                Config.Reload();
+            }
+            else
+            {
+                Config.Save();
+            }
+        }
+        finally
         {
             Config.SaveOnConfigSet = originalSaveOnSet;
         }
+    }
+
+    private void RemoveLegacyHudScaleConfig()
+    {
+        const string group = "3 - UI";
+        const string name = "Secondary Cooldown HUD Scale";
+        ConfigDefinition definition = new(group, name);
+        _ = Config.Bind(definition, 2f, new ConfigDescription("Legacy fixed HUD scale."));
+        Config.Remove(definition);
     }
 
     private void RegisterWorldApplySettingHandlers()
@@ -291,16 +366,14 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal sealed class UiSettings
     {
         internal ConfigEntry<Toggle> SecondaryCooldownHudEnabled = null!;
-        internal ConfigEntry<float> SecondaryCooldownHudScale = null!;
         internal ConfigEntry<float> SecondaryCooldownHudPositionX = null!;
         internal ConfigEntry<float> SecondaryCooldownHudPositionY = null!;
 
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
             const string group = "3 - UI";
-            SecondaryCooldownHudEnabled = plugin.config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns are shown in a dedicated HUD block instead of status effect icons. While this HUD is on, secondary cooldown center messages are suppressed.", synchronizedSetting: false);
-            SecondaryCooldownHudScale = plugin.config(group, "Secondary Cooldown HUD Scale", 2.0f, new ConfigDescription("Client-side scale for the secondary cooldown HUD block.", new AcceptableValueRange<float>(1.0f, 2.0f)), synchronizedSetting: false);
-            SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.6f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
+            SecondaryCooldownHudEnabled = plugin.config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns and charge progress are shown in a dedicated HUD block. Off hides this display without changing cooldown behavior.", synchronizedSetting: false);
+            SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.615f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
             SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
         }
     }

@@ -473,39 +473,36 @@ internal static class SkillsRaiseSkillBloodMagicPatch
     }
 }
 
-[HarmonyPatch(typeof(SEMan), nameof(SEMan.ApplyStatusEffectSpeedMods))]
-internal static class SEManApplyStatusEffectSpeedModsPatch
-{
-    private static void Postfix(SEMan __instance, ref float speed)
-    {
-        Character? character = SecondaryAttackManager.GetSeManCharacter(__instance);
-        if (character == null)
-        {
-            return;
-        }
-
-        if (!StaffRuntimeSystem.TryGetSummonEmpower(character, out float moveSpeedFactor, out _, out _) ||
-            Mathf.Approximately(moveSpeedFactor, 1f))
-        {
-            return;
-        }
-
-        speed *= moveSpeedFactor;
-    }
-}
-
 [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.GetTimeSinceLastAttack))]
 internal static class HumanoidGetTimeSinceLastAttackPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
     {
-        if (!StaffRuntimeSystem.TryGetSummonEmpower(__instance, out _, out float attackSpeedFactor, out _) ||
-            Mathf.Approximately(attackSpeedFactor, 1f))
+        if (!StaffRuntimeSystem.TryGetSummonEmpowerAttackSpeedFactor(__instance, out float attackSpeedFactor))
         {
             return;
         }
 
-        __result *= Mathf.Max(0.05f, attackSpeedFactor);
+        __result *= attackSpeedFactor;
+    }
+}
+
+[HarmonyPatch(typeof(CharacterAnimEvent), nameof(CharacterAnimEvent.CustomFixedUpdate))]
+internal static class CharacterAnimEventCustomFixedUpdateSummonEmpowerAttackSpeedPatch
+{
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(CharacterAnimEvent __instance)
+    {
+        if (__instance?.m_character == null ||
+            __instance.m_animator == null ||
+            !__instance.m_character.InAttack() ||
+            __instance.m_animator.speed <= 0.001f ||
+            !StaffRuntimeSystem.TryGetSummonEmpowerAttackSpeedFactor(__instance.m_character, out float attackSpeedFactor))
+        {
+            return;
+        }
+
+        __instance.m_animator.speed = Mathf.Max(__instance.m_animator.speed, attackSpeedFactor);
     }
 }
 
@@ -539,13 +536,12 @@ internal static class AttackStartCooldownAdjustmentPatch
             return;
         }
 
-        if (!StaffRuntimeSystem.TryGetSummonEmpower(__instance.m_character, out _, out float attackSpeedFactor, out _) ||
-            Mathf.Approximately(attackSpeedFactor, 1f))
+        if (!StaffRuntimeSystem.TryGetSummonEmpowerAttackSpeedFactor(__instance.m_character, out float attackSpeedFactor))
         {
             return;
         }
 
-        float intervalReduction = 1f - 1f / Mathf.Max(0.05f, attackSpeedFactor);
+        float intervalReduction = 1f - 1f / attackSpeedFactor;
         __instance.m_weapon.m_lastAttackTime -= __instance.m_weapon.m_shared.m_aiAttackInterval * intervalReduction;
     }
 

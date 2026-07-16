@@ -1,22 +1,66 @@
-sa_status_secondary_cooldown: 보조 공격 재사용 대기
-sa_status_sneak_ambush_cooldown: 기습 재사용 대기
-sa_status_cleaving_thrust_cooldown: 가르기 찌르기 재사용 대기
-sa_status_impact_burst_cooldown: 충격 폭발 재사용 대기
-sa_status_boomerang_cooldown: 부메랑 재사용 대기
-sa_status_spinning_sweep_cooldown: 회전 휩쓸기 재사용 대기
-sa_status_launch_slam_cooldown: 도약 강타 재사용 대기
-sa_status_knockback_chain_cooldown: 밀쳐내기 연쇄 재사용 대기
-sa_status_aftershock_cooldown: 여진 재사용 대기
-sa_status_rift_trail_cooldown: 균열 궤적 재사용 대기
-sa_status_fracture_line_cooldown: 균열선 재사용 대기
-sa_status_harvest_sweep_cooldown: 수확 휩쓸기 재사용 대기
-sa_status_spear_rain_cooldown: 창비 재사용 대기
-sa_status_summon_empower_cooldown: 소환 강화 재사용 대기
-sa_status_shield_convert_cooldown: 보호막 전환 재사용 대기
-sa_status_sneak_ambush_charge: 기습 충전
-sa_tooltip_secondary_recharging: 보조 공격이 재사용 대기 중입니다.
-sa_tooltip_sneak_ambush_charge: 은신한 뒤 공격하면 기습을 충전합니다.
-sa_tooltip_sneak_ambush_charge_progress: "준비됨: {0} / {1}초\n은신 스킬이 높을수록 더 빠르게 충전됩니다."
 sa_hint_detonate: 폭파
 sa_hud_empower: 강화
 sa_summon_name_format: "{0} (소환)"
+
+sa_compendium_title: 보조 공격
+sa_compendium_intro: 공격 프리셋의 재사용 대기시간은 장착한 무기의 스킬 레벨에 따라 감소합니다.
+sa_compendium_group_ranged: 원거리 프리셋
+sa_compendium_group_melee: 근접 프리셋
+sa_compendium_group_blood_magic: 혈마법 프리셋
+sa_compendium_group_summon_quality: 마법 소환 품질
+
+sa_compendium_preset_barrage_name: 탄막
+sa_compendium_preset_barrage_description: 여러 발의 투사체를 부채꼴 또는 좌우로 간격을 둔 대형으로 발사합니다.
+sa_compendium_preset_volley_name: 일제 사격
+sa_compendium_preset_volley_description: 여러 투사체를 포물선으로 발사해 조준 지점 주변에 떨어뜨립니다.
+sa_compendium_preset_piercing_name: 관통 사격
+sa_compendium_preset_piercing_description: 무기의 기본 투사체 구성을 그대로 발사해 여러 대상을 관통하며, 적중할 때마다 피해가 감소합니다.
+sa_compendium_preset_scatter_name: 분산 도탄
+sa_compendium_preset_scatter_description: 하나의 투사체를 발사하며, 캐릭터가 아닌 표면에 처음 충돌하면 도탄하는 여러 투사체로 분열합니다.
+sa_compendium_preset_spiral_name: 나선 사격
+sa_compendium_preset_spiral_description: 조준 방향을 중심으로 회전하는 나선 형태로 투사체를 발사합니다.
+sa_compendium_preset_sentinel_name: 파수꾼
+sa_compendium_preset_sentinel_description: 사용자 주변을 공전하며 가까운 적을 탐색한 뒤 목표를 향해 발사되는 투사체를 생성합니다.
+sa_compendium_preset_meteor_name: 유성우
+sa_compendium_preset_meteor_description: 조준 지점 주변 범위에 투사체를 상공에서 떨어뜨립니다.
+sa_compendium_preset_burst_name: 점사
+sa_compendium_preset_burst_description: 무기의 기본 투사체 구성을 연속된 발사 동작으로 반복 발사합니다.
+sa_compendium_preset_sticky_detonator_name: 점착 기폭
+sa_compendium_preset_sticky_detonator_description: 충돌 지점에 붙는 폭탄을 던집니다. 방어 입력으로 활성 폭탄을 모두 기폭합니다.
+sa_compendium_preset_overcharged_bomb_name: 과충전 폭탄
+sa_compendium_preset_overcharged_bomb_description: 추가 폭탄을 소모해 피해와 폭발 범위가 강화된 폭탄을 던질 수 있습니다.
+
+sa_compendium_preset_sneak_ambush_name: 기습
+sa_compendium_preset_sneak_ambush_description: 은신 중 준비 시간을 축적하며, 은신 스킬이 높을수록 더 빠르게 충전됩니다. 다음 유효한 보조 공격 적중 시 연막으로 주변 적의 경계를 해제하고, 충전량이 많을수록 효과 범위와 적이 사용자를 감지하지 못하는 시간 및 백스탭 대기시간 감소량이 증가합니다.
+sa_compendium_preset_rift_trail_name: 균열 궤적
+sa_compendium_preset_rift_trail_description: 검을 휘두른 궤적을 남겨 그 범위 안의 적에게 반복해서 피해를 줍니다.
+sa_compendium_preset_cleaving_thrust_name: 가르기 찌르기
+sa_compendium_preset_cleaving_thrust_description: 대검 찌르기의 사거리와 궤적을 확장해 진행 경로의 모든 유효한 대상을 타격합니다.
+sa_compendium_preset_launch_slam_name: 도약 강타
+sa_compendium_preset_launch_slam_description: 보조 공격에 맞은 대상을 공중으로 띄우고, 착지할 때 주변에 범위 피해를 줍니다.
+sa_compendium_preset_aftershock_name: 여진
+sa_compendium_preset_aftershock_description: 첫 범위 강타 뒤에 앞으로 전진하며 점차 약해지는 충격파를 연속으로 일으킵니다.
+sa_compendium_preset_knockback_chain_name: 밀쳐내기 연쇄
+sa_compendium_preset_knockback_chain_description: 발차기의 밀쳐내기를 크게 강화합니다. 튕겨 나간 적이 다른 적과 충돌할 때마다 감소된 피해와 밀쳐내기가 연쇄됩니다.
+sa_compendium_preset_boomerang_name: 부메랑
+sa_compendium_preset_boomerang_description: 무기를 곡선 왕복 궤도로 던져 여러 대상을 타격한 뒤 사용자에게 돌아오게 합니다.
+sa_compendium_preset_impact_burst_name: 충격 폭발
+sa_compendium_preset_impact_burst_description: 무기를 던지고 충돌 지점 주변에 피해와 강한 밀쳐내기를 주는 폭발을 일으킵니다.
+sa_compendium_preset_spear_rain_name: 창의 비
+sa_compendium_preset_spear_rain_description: 던진 창이 대상에게 적중하면 상공에서 추가 창을 불러 적중한 대상을 추적하게 합니다.
+sa_compendium_preset_spinning_sweep_name: 회전 휩쓸기
+sa_compendium_preset_spinning_sweep_description: 취소하거나 무기를 바꾸거나 다음 공격 비용을 낼 수 없을 때까지 폴암 회전 공격을 반복합니다.
+sa_compendium_preset_fracture_line_name: 균열선
+sa_compendium_preset_fracture_line_description: 지면을 따라 균열을 열어 그 위의 적과 파괴 가능한 물체에 반복 피해를 줍니다.
+sa_compendium_preset_harvest_sweep_name: 수확 휩쓸기
+sa_compendium_preset_harvest_sweep_description: 주변의 작물과 채집물을 수확하는 낫 휩쓸기를 반복합니다.
+
+sa_compendium_preset_summon_empower_name: 소환 강화
+sa_compendium_preset_summon_empower_description: 조건이 일치하는 주변 소환수의 웅크리기를 제외한 이동 속도·가속도·회전 속도를 높이고 공격 애니메이션과 AI 공격 주기를 일시적으로 가속합니다.
+sa_compendium_preset_shield_convert_name: 보호막 전환
+sa_compendium_preset_shield_convert_description: 사용자와 주변의 비적대적인 대상에게 적용된 보호막을 제거하고, 남은 보호막 수치에 비례해 체력을 회복합니다.
+
+sa_compendium_preset_count_by_quality_name: 품질별 소환 수
+sa_compendium_preset_count_by_quality_description: 무기 품질이 높을수록 동시에 유지할 수 있는 소환수 수가 늘어나며 소환수 레벨은 고정됩니다.
+sa_compendium_preset_level_by_quality_name: 품질별 레벨
+sa_compendium_preset_level_by_quality_description: 무기 품질이 높을수록 소환수 레벨이 올라가며 동시에 유지할 수 있는 수는 고정됩니다.

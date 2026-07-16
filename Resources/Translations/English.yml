@@ -1,22 +1,66 @@
-sa_status_secondary_cooldown: Secondary Cooldown
-sa_status_sneak_ambush_cooldown: Sneak Ambush Cooldown
-sa_status_cleaving_thrust_cooldown: Cleaving Thrust Cooldown
-sa_status_impact_burst_cooldown: Impact Burst Cooldown
-sa_status_boomerang_cooldown: Boomerang Cooldown
-sa_status_spinning_sweep_cooldown: Spinning Sweep Cooldown
-sa_status_launch_slam_cooldown: Launch Slam Cooldown
-sa_status_knockback_chain_cooldown: Knockback Chain Cooldown
-sa_status_aftershock_cooldown: Aftershock Cooldown
-sa_status_rift_trail_cooldown: Rift Trail Cooldown
-sa_status_fracture_line_cooldown: Fracture Line Cooldown
-sa_status_harvest_sweep_cooldown: Harvest Sweep Cooldown
-sa_status_spear_rain_cooldown: Spear Rain Cooldown
-sa_status_summon_empower_cooldown: Summon Empower Cooldown
-sa_status_shield_convert_cooldown: Shield Convert Cooldown
-sa_status_sneak_ambush_charge: Sneak Ambush Charge
-sa_tooltip_secondary_recharging: Secondary attack is recharging.
-sa_tooltip_sneak_ambush_charge: Sneak before striking to charge Sneak Ambush.
-sa_tooltip_sneak_ambush_charge_progress: "Prepared: {0} / {1}s\nHigher Sneak skill charges faster."
 sa_hint_detonate: Detonate
 sa_hud_empower: Empower
 sa_summon_name_format: "{0} (Summon)"
+
+sa_compendium_title: Secondary Attacks
+sa_compendium_intro: Attack preset cooldowns are reduced according to the equipped weapon's skill level.
+sa_compendium_group_ranged: Ranged Presets
+sa_compendium_group_melee: Melee Presets
+sa_compendium_group_blood_magic: Blood Magic Presets
+sa_compendium_group_summon_quality: Magic Summon Quality
+
+sa_compendium_preset_barrage_name: Barrage
+sa_compendium_preset_barrage_description: Fires multiple projectiles across a spread or a laterally spaced formation.
+sa_compendium_preset_volley_name: Volley
+sa_compendium_preset_volley_description: Launches multiple projectiles in arcs so they land around the aimed point.
+sa_compendium_preset_piercing_name: Piercing
+sa_compendium_preset_piercing_description: Fires the weapon's full projectile pattern through multiple characters, with damage falling after each hit.
+sa_compendium_preset_scatter_name: Scatter
+sa_compendium_preset_scatter_description: Fires a projectile that splits into a cone of ricocheting projectiles when it first hits a non-character surface.
+sa_compendium_preset_spiral_name: Spiral
+sa_compendium_preset_spiral_description: Fires projectiles in a rotating spiral around the aim direction.
+sa_compendium_preset_sentinel_name: Sentinel
+sa_compendium_preset_sentinel_description: Creates orbiting projectiles that seek nearby enemies and launch themselves at a target.
+sa_compendium_preset_meteor_name: Meteor
+sa_compendium_preset_meteor_description: Calls down projectiles from above across an area around the aimed point.
+sa_compendium_preset_burst_name: Burst
+sa_compendium_preset_burst_description: Repeats the weapon's full primary projectile pattern through successive firing animations.
+sa_compendium_preset_sticky_detonator_name: Sticky Detonator
+sa_compendium_preset_sticky_detonator_description: Throws charges that stick where they hit. Use Block to detonate all active charges.
+sa_compendium_preset_overcharged_bomb_name: Overcharged Bomb
+sa_compendium_preset_overcharged_bomb_description: Can consume additional bombs to launch a stronger bomb with increased damage and blast radius.
+
+sa_compendium_preset_sneak_ambush_name: Sneak Ambush
+sa_compendium_preset_sneak_ambush_description: Builds preparation while sneaking, charging faster with higher Sneak skill. The next valid secondary hit releases smoke that clears nearby enemies' awareness; more preparation increases its radius, how long affected enemies cannot sense you, and the reduction to their backstab cooldown.
+sa_compendium_preset_rift_trail_name: Rift Trail
+sa_compendium_preset_rift_trail_description: Leaves the sword's swing trail active, repeatedly damaging enemies within the swept path.
+sa_compendium_preset_cleaving_thrust_name: Cleaving Thrust
+sa_compendium_preset_cleaving_thrust_description: Extends a greatsword thrust into a long cleave that strikes every valid target along its path.
+sa_compendium_preset_launch_slam_name: Launch Slam
+sa_compendium_preset_launch_slam_description: Launches the secondary-hit target upward, then deals area damage when it lands.
+sa_compendium_preset_aftershock_name: Aftershock
+sa_compendium_preset_aftershock_description: Follows the initial area slam with weakening shockwaves that advance forward.
+sa_compendium_preset_knockback_chain_name: Knockback Chain
+sa_compendium_preset_knockback_chain_description: Greatly increases kick knockback. Collisions pass diminishing damage and force through nearby enemies.
+sa_compendium_preset_boomerang_name: Boomerang
+sa_compendium_preset_boomerang_description: Throws the weapon along a curved return path, hitting multiple targets before returning to the wielder.
+sa_compendium_preset_impact_burst_name: Impact Burst
+sa_compendium_preset_impact_burst_description: Throws the weapon and releases a damaging, forceful burst around its impact point.
+sa_compendium_preset_spear_rain_name: Spear Rain
+sa_compendium_preset_spear_rain_description: Calls down additional spears after the thrown spear hits a character, guiding them toward the struck target.
+sa_compendium_preset_spinning_sweep_name: Spinning Sweep
+sa_compendium_preset_spinning_sweep_description: Sustains a repeating polearm spin until cancelled, the weapon changes, or the next attack cost cannot be paid.
+sa_compendium_preset_fracture_line_name: Fracture Line
+sa_compendium_preset_fracture_line_description: Opens a crack along the ground that repeatedly damages enemies and destructibles standing over it.
+sa_compendium_preset_harvest_sweep_name: Harvest Sweep
+sa_compendium_preset_harvest_sweep_description: Sustains a repeating scythe sweep that harvests nearby crops and pickables.
+
+sa_compendium_preset_summon_empower_name: Summon Empower
+sa_compendium_preset_summon_empower_description: Temporarily increases matching nearby summons' non-crouching movement, acceleration, and turning speeds and accelerates their attack animations and AI attack cadence.
+sa_compendium_preset_shield_convert_name: Shield Convert
+sa_compendium_preset_shield_convert_description: Removes active shields from the wielder and nearby non-hostile targets, restoring health from their remaining shield strength.
+
+sa_compendium_preset_count_by_quality_name: Count by Quality
+sa_compendium_preset_count_by_quality_description: Weapon quality increases the maximum number of simultaneous summons while summon level stays fixed.
+sa_compendium_preset_level_by_quality_name: Level by Quality
+sa_compendium_preset_level_by_quality_description: Weapon quality increases summon level while the maximum number of simultaneous summons stays fixed.
