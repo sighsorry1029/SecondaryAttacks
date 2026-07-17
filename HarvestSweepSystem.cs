@@ -125,9 +125,11 @@ internal static class HarvestSweepSystem
 
 internal sealed class HarvestSweepController : MonoBehaviour
 {
+    private const int MaxHarvestHitBufferSize = 2048;
     private static readonly int AttackTagHash = ZSyncAnimation.GetHash("attack");
-    private static readonly Collider[] Hits = new Collider[200];
+    private static Collider[] Hits = new Collider[256];
     private static int _harvestMask;
+    private static bool _reportedHarvestSearchSaturation;
 
     private readonly HashSet<Pickable> _seenThisTick = new();
     private readonly HashSet<Destructible> _destroyedPlants = new();
@@ -546,12 +548,7 @@ internal sealed class HarvestSweepController : MonoBehaviour
         _seenThisTick.Clear();
         try
         {
-            hitCount = Physics.OverlapSphereNonAlloc(
-                center,
-                radius,
-                Hits,
-                GetHarvestMask(),
-                QueryTriggerInteraction.UseGlobal);
+            hitCount = QueryHarvestHits(center, radius);
             for (int i = 0; i < hitCount; i++)
             {
                 Collider hit = Hits[i];
@@ -607,7 +604,7 @@ internal sealed class HarvestSweepController : MonoBehaviour
 
     private static bool CanHarvest(Pickable pickable)
     {
-        return (pickable.m_harvestable || GroundworkCompat.IsForagingTarget(pickable)) &&
+        return GroundworkCompat.CanScytheHarvest(pickable) &&
                pickable.CanBePicked();
     }
 
@@ -726,9 +723,41 @@ internal sealed class HarvestSweepController : MonoBehaviour
     {
         if (_harvestMask == 0)
         {
-            _harvestMask = LayerMask.GetMask("piece", "piece_nonsolid", "item");
+            _harvestMask = LayerMask.GetMask("piece", "piece_nonsolid", "item", "Default", "Default_small");
         }
 
         return _harvestMask;
+    }
+
+    private static int QueryHarvestHits(Vector3 center, float radius)
+    {
+        while (true)
+        {
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                center,
+                radius,
+                Hits,
+                GetHarvestMask(),
+                QueryTriggerInteraction.UseGlobal);
+            if (hitCount < Hits.Length)
+            {
+                return hitCount;
+            }
+
+            if (Hits.Length >= MaxHarvestHitBufferSize)
+            {
+                if (!_reportedHarvestSearchSaturation)
+                {
+                    _reportedHarvestSearchSaturation = true;
+                    SecondaryAttacksPlugin.ModLogger.LogWarning(
+                        $"Harvest sweep search reached the {Hits.Length}-collider maximum buffer capacity. " +
+                        "Results may be truncated in this unusually dense area.");
+                }
+
+                return hitCount;
+            }
+
+            Array.Resize(ref Hits, Math.Min(Hits.Length * 2, MaxHarvestHitBufferSize));
+        }
     }
 }

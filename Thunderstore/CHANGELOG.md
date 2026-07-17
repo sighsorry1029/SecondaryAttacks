@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- Fixed Harvest Sweep missing valid crops and foraging targets on the `Default` and `Default_small` layers, and expanded its collider search capacity for unusually dense planting areas.
+- Updated Groundwork compatibility to use Groundwork's native scythe-harvest eligibility and farming hooks, so cultivated pickables and range-pickup suppression behave consistently.
+
 ## 1.1.0
 
 - Added a localized in-game Compendium guide with icons and detailed descriptions for every ranged, melee, Blood Magic, and summon-quality preset, including skill-scaled cooldowns and Sneak Ambush scaling.

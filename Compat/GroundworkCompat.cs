@@ -8,11 +8,13 @@ namespace SecondaryAttacks;
 internal static class GroundworkCompat
 {
     private const string GroundworkAssemblyName = "Groundwork";
-    private const string FarmingSkillOverrideTypeName = "SecondaryAttacks.FarmingSkillOverrideSystem";
+    private const string FarmingSkillSystemTypeName = "Groundwork.FarmingSkillSystem";
+    private const string ScytheHarvestSystemTypeName = "Groundwork.ScytheHarvestSystem";
     private static readonly IDisposable NoopScope = new NoopDisposable();
     private static bool _resolved;
     private static MethodInfo? _suppressRangePickupMethod;
     private static MethodInfo? _isForagingTargetMethod;
+    private static MethodInfo? _canScytheHarvestMethod;
 
     internal static IDisposable SuppressForagingRangePickup()
     {
@@ -58,6 +60,32 @@ internal static class GroundworkCompat
         return IsForagingTargetFallback(pickable);
     }
 
+    internal static bool CanScytheHarvest(Pickable? pickable)
+    {
+        if (pickable == null)
+        {
+            return false;
+        }
+
+        Resolve();
+        if (_canScytheHarvestMethod != null)
+        {
+            try
+            {
+                if (_canScytheHarvestMethod.Invoke(null, new object[] { pickable }) is bool result)
+                {
+                    return result;
+                }
+            }
+            catch
+            {
+                // Fall through to the standalone harvest check.
+            }
+        }
+
+        return pickable.m_harvestable || IsForagingTarget(pickable);
+    }
+
     private static void Resolve()
     {
         if (_resolved)
@@ -68,9 +96,11 @@ internal static class GroundworkCompat
         _resolved = true;
         Assembly? groundworkAssembly = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, GroundworkAssemblyName, StringComparison.OrdinalIgnoreCase));
-        Type? farmingType = groundworkAssembly?.GetType(FarmingSkillOverrideTypeName);
+        Type? farmingType = groundworkAssembly?.GetType(FarmingSkillSystemTypeName);
+        Type? scytheHarvestType = groundworkAssembly?.GetType(ScytheHarvestSystemTypeName);
         _suppressRangePickupMethod = farmingType?.GetMethod("SuppressRangePickup", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         _isForagingTargetMethod = farmingType?.GetMethod("IsForagingTarget", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        _canScytheHarvestMethod = scytheHarvestType?.GetMethod("CanScytheHarvest", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
     }
 
     private static bool IsForagingTargetFallback(Pickable pickable)
