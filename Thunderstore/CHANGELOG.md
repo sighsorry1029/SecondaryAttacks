@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2
+
+- Reworked MagicPlugin character cleanup to remove destroyed entries from Valheim's global Character registry immediately before `MagicPlugin.Update`, preventing repeated null-reference errors in MagicPlugin and other character-list consumers.
+- Removed the obsolete reflection-based MagicPlugin field scan and SecondaryAttacks' `Character.OnDestroy` hook, keeping the registry guard allocation-free and avoiding overlap with creature lifecycle repair owned by other mods.
+
 ## 1.1.1
 
 - Fixed Harvest Sweep missing valid crops and foraging targets on the `Default` and `Default_small` layers, and expanded its collider search capacity for unusually dense planting areas.
