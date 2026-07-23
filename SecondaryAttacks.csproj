@@ -472,7 +472,6 @@
         <Compile Include="LaunchSlamSystem.cs" />
         <Compile Include="LocalizationManager.cs" />
         <Compile Include="Compat\GroundworkCompat.cs" />
-        <Compile Include="Compat\MagicPluginCompat.cs" />
         <Compile Include="Compat\SecondaryAttackCompat.cs" />
         <Compile Include="MagicPluginSummonQualitySystem.cs" />
         <Compile Include="MeleePresetCooldownSystem.cs" />

@@ -2,8 +2,8 @@
 
 ## 1.1.2
 
-- Reworked MagicPlugin character cleanup to remove destroyed entries from Valheim's global Character registry immediately before `MagicPlugin.Update`, preventing repeated null-reference errors in MagicPlugin and other character-list consumers.
-- Removed the obsolete reflection-based MagicPlugin field scan and SecondaryAttacks' `Character.OnDestroy` hook, keeping the registry guard allocation-free and avoiding overlap with creature lifecycle repair owned by other mods.
+- Moved the embedded MagicPlugin projectile-burst, teleport, and Character-registry compatibility fixes into the standalone InteropFixes mod, removing duplicate patch ownership from SecondaryAttacks.
+- Kept MagicPlugin as a soft integration and Harmony ordering target, so SecondaryAttacks' summon features still cooperate with it without making MagicPlugin or InteropFixes a hard dependency.
 
 ## 1.1.1
 

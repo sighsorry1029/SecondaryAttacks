@@ -97,7 +97,6 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
         Assembly assembly = Assembly.GetExecutingAssembly();
         _harmony.PatchAll(assembly);
-        SecondaryAttackCompat.TryInstallStartupHooks(_harmony);
         SecondaryAttackFacade.Initialize();
         SetupWatcher();
 
