@@ -799,9 +799,14 @@ internal static class MeleeProjectileHitCascadeSystem
         return marker;
     }
 
-    private static Vector3 CalculateBallisticVelocity(Vector3 spawnPoint, Vector3 targetPoint, float gravity, float flightTime)
+    internal static Vector3 CalculateBallisticVelocity(
+        Vector3 spawnPoint,
+        Vector3 targetPoint,
+        float gravity,
+        float flightTime,
+        float minimumFlightTime = 0.1f)
     {
-        flightTime = Mathf.Max(0.1f, flightTime);
+        flightTime = Mathf.Max(minimumFlightTime, flightTime);
         Vector3 gravityVector = Vector3.down * gravity;
         return (targetPoint - spawnPoint - gravityVector * (0.5f * flightTime * flightTime)) / flightTime;
     }
@@ -1016,7 +1021,12 @@ internal sealed class SpearRainGuidedProjectileController : MonoBehaviour
             ? _targetMarker.CurrentPoint
             : _fallbackTargetPoint;
         float remaining = Mathf.Max(MinRemainingFlightTime, _flightTime - _elapsed);
-        Vector3 desiredVelocity = CalculateBallisticVelocity(transform.position, targetPoint, _gravity, remaining);
+        Vector3 desiredVelocity = MeleeProjectileHitCascadeSystem.CalculateBallisticVelocity(
+            transform.position,
+            targetPoint,
+            _gravity,
+            remaining,
+            MinRemainingFlightTime);
         if (desiredVelocity.sqrMagnitude < 0.001f)
         {
             return;
@@ -1031,10 +1041,4 @@ internal sealed class SpearRainGuidedProjectileController : MonoBehaviour
         ProjectileAccess.SetVelocity(_projectile, desiredVelocity);
     }
 
-    private static Vector3 CalculateBallisticVelocity(Vector3 spawnPoint, Vector3 targetPoint, float gravity, float flightTime)
-    {
-        flightTime = Mathf.Max(MinRemainingFlightTime, flightTime);
-        Vector3 gravityVector = Vector3.down * gravity;
-        return (targetPoint - spawnPoint - gravityVector * (0.5f * flightTime * flightTime)) / flightTime;
-    }
 }

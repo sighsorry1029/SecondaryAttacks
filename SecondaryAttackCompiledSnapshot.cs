@@ -25,8 +25,6 @@ internal sealed class SecondaryAttackCompiledSnapshot
 
     public NormalizedWeaponConfig? GlobalMeleeFallback => Config.GlobalMeleeFallback;
 
-    public IReadOnlyDictionary<string, EffectBehaviorConfig> Effects => Config.Effects;
-
     public IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> MagicSummons => Config.MagicSummons;
 }
 
@@ -53,5 +51,4 @@ internal sealed class SecondaryAttackAppliedWorldSnapshot
 
     public IReadOnlyDictionary<string, SecondaryAttackDefinition> DefinitionsByPrefabName { get; }
 
-    public IReadOnlyDictionary<string, EffectBehaviorConfig> Effects => CompiledSnapshot.Effects;
 }

@@ -11,16 +11,6 @@ internal static partial class SecondaryAttackManager
 {
     private static readonly Dictionary<Humanoid, ItemDrop.ItemData> ReloadConsumptionWeapons = new();
 
-    internal static bool TryMarkCompatibilityWarningReported(string warningKey)
-    {
-        return SecondaryAttackWarningLog.TryMarkWarning(warningKey);
-    }
-
-    internal static bool TryMarkCompatibilityIssueReported(string issueKey)
-    {
-        return SecondaryAttackWarningLog.TryMarkIssue(issueKey);
-    }
-
     internal static int GetRuntimeWeaponAppliedWorldRevision(ItemDrop.ItemData weapon)
     {
         RuntimeWeaponDefinitionState state = RuntimeWeaponDefinitionStates.GetValue(weapon, _ => new RuntimeWeaponDefinitionState());
@@ -194,16 +184,6 @@ internal static partial class SecondaryAttackManager
 
         attack.m_useCharacterFacing = false;
         attack.m_useCharacterFacingYAim = false;
-    }
-
-    internal static bool TryCreateDefinition(
-        SecondaryAttackDefinitionBuildContext buildContext,
-        string prefabName,
-        ItemDrop itemDrop,
-        NormalizedWeaponConfig weaponConfig,
-        out SecondaryAttackDefinition? definition)
-    {
-        return SecondaryAttackDefinitionCompiler.TryCreateDefinition(buildContext, prefabName, itemDrop, weaponConfig, out definition);
     }
 
     internal static bool HasCharacterAuthority(Character? character)
@@ -387,21 +367,14 @@ internal static partial class SecondaryAttackManager
         internal bool Applies => Weapon != null;
     }
 
-    internal static Character? GetSeManCharacter(SEMan seMan)
+    internal static void EnsureRuntimeWeaponDefinitionApplied(ItemDrop.ItemData? weapon)
     {
-        return ShieldAccess.GetSeManCharacter(seMan);
+        SecondaryAttackRuntimeWeaponRebind.Apply(weapon, SecondaryAttackFacade.CurrentAppliedWorldSnapshot);
     }
 
-    internal static float ClosestSegmentProgress(Vector3 start, Vector3 end, Vector3 point)
+    internal static void RefreshLocalPlayerRuntimeWeaponDefinitions()
     {
-        Vector3 segment = end - start;
-        float lengthSq = segment.sqrMagnitude;
-        if (lengthSq <= Mathf.Epsilon)
-        {
-            return 0f;
-        }
-
-        return Mathf.Clamp01(Vector3.Dot(point - start, segment) / lengthSq);
+        SecondaryAttackRuntimeWeaponRebind.RefreshLocalPlayerInventory(SecondaryAttackFacade.CurrentAppliedWorldSnapshot);
     }
 
     internal static Vector3 ResolveSafeClosestPoint(Collider collider, Vector3 origin)
@@ -416,46 +389,33 @@ internal static partial class SecondaryAttackManager
         return collider.ClosestPoint(origin);
     }
 
-    internal static void RegisterAsyncSecondaryWork(Character? owner)
+    private sealed class BowSecondaryState
     {
-        if (owner == null)
+        public string PrefabName { get; set; } = "";
+
+        public bool PendingSecondary { get; set; }
+    }
+
+    private sealed class RuntimeWeaponDefinitionState
+    {
+        public int AppliedWorldRevision { get; set; } = -1;
+    }
+
+    internal sealed class ReloadSecondaryResourceCostContext
+    {
+        public static readonly ReloadSecondaryResourceCostContext Empty = new(0f, 0f);
+
+        public ReloadSecondaryResourceCostContext(float staminaDelta, float eitrDelta)
         {
-            return;
+            StaminaDelta = staminaDelta;
+            EitrDelta = eitrDelta;
         }
 
-        AsyncSecondaryActivityState state = AsyncSecondaryActivityStates.GetValue(owner, _ => new AsyncSecondaryActivityState());
-        state.ActiveCount++;
+        public float StaminaDelta { get; }
+
+        public float EitrDelta { get; }
+
+        public bool HasDelta => Math.Abs(StaminaDelta) > 0.001f || Math.Abs(EitrDelta) > 0.001f;
     }
 
-    internal static void UnregisterAsyncSecondaryWork(Character? owner)
-    {
-        if (owner == null)
-        {
-            return;
-        }
-
-        if (!AsyncSecondaryActivityStates.TryGetValue(owner, out AsyncSecondaryActivityState? state))
-        {
-            return;
-        }
-
-        state.ActiveCount = Mathf.Max(0, state.ActiveCount - 1);
-    }
-
-    private static bool HasActiveAsyncSecondaryWork(Character? owner)
-    {
-        return owner != null &&
-               AsyncSecondaryActivityStates.TryGetValue(owner, out AsyncSecondaryActivityState? state) &&
-               state.ActiveCount > 0;
-    }
-
-    internal static bool HasActiveAsyncSecondaryWorkForFacade(Character? owner)
-    {
-        return HasActiveAsyncSecondaryWork(owner);
-    }
-
-    private sealed class AsyncSecondaryActivityState
-    {
-        public int ActiveCount { get; set; }
-    }
 }

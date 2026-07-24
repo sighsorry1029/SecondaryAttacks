@@ -9,6 +9,13 @@ internal static class StaffRuntimeSystem
 {
     internal const string StaffTargetEffectRpcName = "SecondaryAttacks_SpawnStaffTargetEffect";
 
+    private const string SummonEmpowerExpiryZdoKey = "SecondaryAttacks_SummonEmpowerExpiry";
+    private const string SummonEmpowerMoveSpeedBonusZdoKey = "SecondaryAttacks_SummonEmpowerMoveSpeedBonus";
+    private const string SummonEmpowerAttackCooldownReductionZdoKey = "SecondaryAttacks_SummonEmpowerAttackCooldownReduction";
+    private const string ShieldRemainingDisplayZdoKey = "SecondaryAttacks_ShieldRemainingDisplay";
+    private const string ShieldDisplayExpiryZdoKey = "SecondaryAttacks_ShieldDisplayExpiry";
+    private const string ApplySummonEmpowerRpcName = "SecondaryAttacks_ApplySummonEmpower";
+    private const string ConvertShieldToHealRpcName = "SecondaryAttacks_ConvertShieldToHeal";
     private const string SummonEmpowerPresetName = "summonEmpower";
     private const string ShieldConvertPresetName = "shieldConvert";
     private const string StaffTargetEffectPrefabName = "fx_bloodweapon_hit";
@@ -216,7 +223,7 @@ internal static class StaffRuntimeSystem
             return;
         }
 
-        nview!.InvokeRPC(SecondaryAttackManager.ApplySummonEmpowerRpcNameForStaffRuntime, expiry, moveSpeedFactor, attackSpeedFactor);
+        nview!.InvokeRPC(ApplySummonEmpowerRpcName, expiry, moveSpeedFactor, attackSpeedFactor);
     }
 
     private static void ConvertShieldToHeal(Character target, float healFactor, int shieldStatusEffectHash)
@@ -237,7 +244,7 @@ internal static class StaffRuntimeSystem
             return;
         }
 
-        nview!.InvokeRPC(SecondaryAttackManager.ConvertShieldToHealRpcNameForStaffRuntime, healFactor, shieldStatusEffectHash);
+        nview!.InvokeRPC(ConvertShieldToHealRpcName, healFactor, shieldStatusEffectHash);
     }
 
     internal static void ApplySummonEmpowerState(Character character, float expiry, float moveSpeedFactor, float attackSpeedFactor)
@@ -247,9 +254,9 @@ internal static class StaffRuntimeSystem
             return;
         }
 
-        zdo!.Set(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, Mathf.Max(0f, expiry));
-        zdo.Set(SecondaryAttackManager.SummonEmpowerMoveSpeedBonusZdoKeyForStaffRuntime, Mathf.Max(0.05f, moveSpeedFactor));
-        zdo.Set(SecondaryAttackManager.SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime, Mathf.Max(0.05f, attackSpeedFactor));
+        zdo!.Set(SummonEmpowerExpiryZdoKey, Mathf.Max(0f, expiry));
+        zdo.Set(SummonEmpowerMoveSpeedBonusZdoKey, Mathf.Max(0.05f, moveSpeedFactor));
+        zdo.Set(SummonEmpowerAttackCooldownReductionZdoKey, Mathf.Max(0.05f, attackSpeedFactor));
         OverheadStatusUiManager.RefreshTrackedCharacter(character);
         BroadcastStaffTargetEffect(character);
     }
@@ -315,14 +322,14 @@ internal static class StaffRuntimeSystem
         float now = (float)SecondaryAttackManager.GetNetworkTimeSeconds();
         if (SecondaryAttackManager.TryGetShieldRemaining(character, preferredStatusEffectHash: 0, out _, out float remaining, out float remainingTime))
         {
-            zdo!.Set(SecondaryAttackManager.ShieldRemainingDisplayZdoKeyForStaffRuntime, Mathf.Max(0f, remaining));
-            zdo.Set(SecondaryAttackManager.ShieldDisplayExpiryZdoKeyForStaffRuntime, now + Mathf.Max(0f, remainingTime));
+            zdo!.Set(ShieldRemainingDisplayZdoKey, Mathf.Max(0f, remaining));
+            zdo.Set(ShieldDisplayExpiryZdoKey, now + Mathf.Max(0f, remainingTime));
             OverheadStatusUiManager.RefreshTrackedCharacter(character);
             return;
         }
 
-        zdo!.Set(SecondaryAttackManager.ShieldRemainingDisplayZdoKeyForStaffRuntime, 0f);
-        zdo.Set(SecondaryAttackManager.ShieldDisplayExpiryZdoKeyForStaffRuntime, 0f);
+        zdo!.Set(ShieldRemainingDisplayZdoKey, 0f);
+        zdo.Set(ShieldDisplayExpiryZdoKey, 0f);
         OverheadStatusUiManager.RefreshTrackedCharacter(character);
     }
 
@@ -337,21 +344,21 @@ internal static class StaffRuntimeSystem
         }
 
         float now = (float)SecondaryAttackManager.GetNetworkTimeSeconds();
-        float expiry = zdo!.GetFloat(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, 0f);
+        float expiry = zdo!.GetFloat(SummonEmpowerExpiryZdoKey, 0f);
         if (expiry <= now)
         {
             if (expiry > 0f && SecondaryAttackManager.HasCharacterAuthority(character))
             {
-                zdo.Set(SecondaryAttackManager.SummonEmpowerExpiryZdoKeyForStaffRuntime, 0f);
-                zdo.Set(SecondaryAttackManager.SummonEmpowerMoveSpeedBonusZdoKeyForStaffRuntime, 0f);
-                zdo.Set(SecondaryAttackManager.SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime, 0f);
+                zdo.Set(SummonEmpowerExpiryZdoKey, 0f);
+                zdo.Set(SummonEmpowerMoveSpeedBonusZdoKey, 0f);
+                zdo.Set(SummonEmpowerAttackCooldownReductionZdoKey, 0f);
             }
 
             return false;
         }
 
-        moveSpeedFactor = Mathf.Max(0.05f, zdo.GetFloat(SecondaryAttackManager.SummonEmpowerMoveSpeedBonusZdoKeyForStaffRuntime, 1f));
-        attackSpeedFactor = Mathf.Max(0.05f, zdo.GetFloat(SecondaryAttackManager.SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime, 1f));
+        moveSpeedFactor = Mathf.Max(0.05f, zdo.GetFloat(SummonEmpowerMoveSpeedBonusZdoKey, 1f));
+        attackSpeedFactor = Mathf.Max(0.05f, zdo.GetFloat(SummonEmpowerAttackCooldownReductionZdoKey, 1f));
         remainingTime = expiry - now;
         return remainingTime > 0f;
     }
@@ -379,13 +386,13 @@ internal static class StaffRuntimeSystem
         }
 
         float now = (float)SecondaryAttackManager.GetNetworkTimeSeconds();
-        float expiry = zdo!.GetFloat(SecondaryAttackManager.ShieldDisplayExpiryZdoKeyForStaffRuntime, 0f);
+        float expiry = zdo!.GetFloat(ShieldDisplayExpiryZdoKey, 0f);
         if (expiry <= now)
         {
             return false;
         }
 
-        remaining = Mathf.Max(0f, zdo.GetFloat(SecondaryAttackManager.ShieldRemainingDisplayZdoKeyForStaffRuntime, 0f));
+        remaining = Mathf.Max(0f, zdo.GetFloat(ShieldRemainingDisplayZdoKey, 0f));
         return remaining > 0f;
     }
 }

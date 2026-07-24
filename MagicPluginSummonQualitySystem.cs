@@ -407,6 +407,8 @@ internal static class MagicSummonQualityPresetSystem
                 shared.m_maxQuality = maxQuality;
             }
         }
+
+        state.OriginalMaxQualities.Clear();
     }
 
     private static bool TryResolveRule(SpawnAbility spawnAbility, ItemDrop.ItemData item, out QualityRule rule)

@@ -30,7 +30,7 @@ internal static class SecondaryAttackRuntimeWeaponRebind
             Attack sourceAttack = SecondaryAttackManager.ResolveSourceAttack(ObjectDB.instance, prefabItemDrop, definition);
             Attack configuredSecondaryAttack = SecondaryAttackManager.BuildSecondaryAttack(sourceAttack, definition);
             SecondaryAttackManager.NormalizeCopiedProjectileAim(configuredSecondaryAttack, definition);
-            weapon.m_shared.m_secondaryAttack = ProjectilePresetCooldownFallback.UsesDynamicOriginalSecondary(definition)
+            weapon.m_shared.m_secondaryAttack = ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(definition)
                 ? SecondaryAttackManager.CloneAttack(definition.CooldownFallbackSecondaryAttack ?? prefabItemDrop.m_itemData?.m_shared?.m_secondaryAttack)
                 : configuredSecondaryAttack;
         }

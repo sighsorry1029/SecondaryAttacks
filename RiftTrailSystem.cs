@@ -1200,7 +1200,6 @@ internal static class RiftTrailSystem
         private float _endTime;
         private float _visualEndTime;
         private float _nextTickTime;
-        private bool _registered;
         private bool _activated;
         private bool _durabilityDrained;
         private bool _finished;
@@ -1241,10 +1240,8 @@ internal static class RiftTrailSystem
             Range = Mathf.Max(0.1f, attack.m_attackRange);
             Angle = Mathf.Clamp(attack.m_attackAngle, 1f, 360f);
             Width = Mathf.Max(0.01f, attack.m_attackRayWidth + Mathf.Max(0f, attack.m_attackRayWidthCharExtra));
-            _registered = true;
             TryResolveTrailSamplers();
             SampleTrails();
-            SecondaryAttackManager.RegisterAsyncSecondaryWork(attack.m_character);
             enabled = true;
         }
 
@@ -1686,8 +1683,8 @@ internal static class RiftTrailSystem
                 float normalizedAge = trailSampler.LifeTime > 0.001f
                     ? Mathf.Clamp01(age / trailSampler.LifeTime)
                     : 1f - i / (float)(sampleCount - 1);
-                Color color = ApplyVisualTint(EvaluateColor(trailSampler.Colors, normalizedAge), visualTint, visualAlphaFactor);
-                float size = Mathf.Max(0.01f, EvaluateSize(trailSampler.Sizes, normalizedAge)) * visualScale;
+                Color color = ApplyVisualTint(EvaluateTrailColor(trailSampler.Colors, normalizedAge), visualTint, visualAlphaFactor);
+                float size = Mathf.Max(0.01f, EvaluateTrailSize(trailSampler.Sizes, normalizedAge)) * visualScale;
                 Vector3 width = sample.Tip - sample.Base;
                 vertices[i * 2] = sample.Base + visualOffset - width * (size * 0.5f);
                 vertices[i * 2 + 1] = sample.Tip + visualOffset + width * (size * 0.5f);
@@ -1768,44 +1765,6 @@ internal static class RiftTrailSystem
                            (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
         }
 
-        private static Color EvaluateColor(Color[]? colors, float normalizedAge)
-        {
-            if (colors == null || colors.Length == 0)
-            {
-                return Color.Lerp(Color.white, Color.clear, normalizedAge);
-            }
-
-            if (colors.Length == 1)
-            {
-                return colors[0];
-            }
-
-            float scaledIndex = normalizedAge * (colors.Length - 1);
-            int left = Mathf.Clamp(Mathf.FloorToInt(scaledIndex), 0, colors.Length - 1);
-            int right = Mathf.Clamp(Mathf.CeilToInt(scaledIndex), 0, colors.Length - 1);
-            float t = Mathf.InverseLerp(left, right, scaledIndex);
-            return Color.Lerp(colors[left], colors[right], t);
-        }
-
-        private static float EvaluateSize(float[]? sizes, float normalizedAge)
-        {
-            if (sizes == null || sizes.Length == 0)
-            {
-                return 1f;
-            }
-
-            if (sizes.Length == 1)
-            {
-                return sizes[0];
-            }
-
-            float scaledIndex = normalizedAge * (sizes.Length - 1);
-            int left = Mathf.Clamp(Mathf.FloorToInt(scaledIndex), 0, sizes.Length - 1);
-            int right = Mathf.Clamp(Mathf.CeilToInt(scaledIndex), 0, sizes.Length - 1);
-            float t = Mathf.InverseLerp(left, right, scaledIndex);
-            return Mathf.Lerp(sizes[left], sizes[right], t);
-        }
-
         private void UpdateVisualFade()
         {
             if (_visualRibbons.Count == 0)
@@ -1868,11 +1827,6 @@ internal static class RiftTrailSystem
             DestroyVisualRibbons();
             UnregisterController(Attack, this);
 
-            if (_registered)
-            {
-                SecondaryAttackManager.UnregisterAsyncSecondaryWork(Attack?.m_character);
-                _registered = false;
-            }
         }
 
         private void DestroyVisualRibbons()

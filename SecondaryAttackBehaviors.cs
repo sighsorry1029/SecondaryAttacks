@@ -33,40 +33,6 @@ internal enum MeleeSpecialPreset
     FractureLine
 }
 
-internal enum WeaponEffectType
-{
-    Dot,
-    ResistanceShred,
-    Adrenaline,
-    Haste,
-    Vampirism,
-    Execute,
-    StaggerChance,
-    BurstDamage,
-    Bleeding,
-    Bash,
-    Piercing,
-    Executioner,
-    Decapitator,
-    Smasher,
-    Juggernaut
-}
-
-internal enum WeaponEffectTrigger
-{
-    AnyHit,
-    MainHit,
-    SecondaryHit
-}
-
-internal enum ScalarValueMode
-{
-    Fixed,
-    TargetMaxHealthPercent,
-    SelfMaxHealthPercent,
-    SelfMaxStaminaPercent
-}
-
 internal enum SecondaryAttackBehaviorType
 {
     EffectOnly,

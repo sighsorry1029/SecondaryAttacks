@@ -14,76 +14,13 @@ namespace SecondaryAttacks;
 
 internal static partial class SecondaryAttackManager
 {
-    private const string SummonEmpowerExpiryZdoKey = "SecondaryAttacks_SummonEmpowerExpiry";
-    private const string SummonEmpowerMoveSpeedBonusZdoKey = "SecondaryAttacks_SummonEmpowerMoveSpeedBonus";
-    private const string SummonEmpowerAttackCooldownReductionZdoKey = "SecondaryAttacks_SummonEmpowerAttackCooldownReduction";
-    private const string ShieldRemainingDisplayZdoKey = "SecondaryAttacks_ShieldRemainingDisplay";
-    private const string ShieldDisplayExpiryZdoKey = "SecondaryAttacks_ShieldDisplayExpiry";
-    private const string ApplySummonEmpowerRpcName = "SecondaryAttacks_ApplySummonEmpower";
-    private const string ConvertShieldToHealRpcName = "SecondaryAttacks_ConvertShieldToHeal";
     private const string StaffRapidFireAnimation = "staff_rapidfire";
 
     private static readonly ConditionalWeakTable<Player, BowSecondaryState> BowSecondaryStates = new();
-    private static readonly ConditionalWeakTable<Character, AsyncSecondaryActivityState> AsyncSecondaryActivityStates = new();
     private static readonly ConditionalWeakTable<ItemDrop.ItemData, RuntimeWeaponDefinitionState> RuntimeWeaponDefinitionStates = new();
     private static readonly SortedSet<string> PlayerAnimatorTriggers = new(StringComparer.Ordinal);
     private static bool _animatorDumpWritten;
     private static bool _customAnimationDumpWritten;
-
-    internal static string ApplySummonEmpowerRpcNameForStaffRuntime => ApplySummonEmpowerRpcName;
-
-    internal static string ConvertShieldToHealRpcNameForStaffRuntime => ConvertShieldToHealRpcName;
-
-    internal static string SummonEmpowerExpiryZdoKeyForStaffRuntime => SummonEmpowerExpiryZdoKey;
-
-    internal static string SummonEmpowerMoveSpeedBonusZdoKeyForStaffRuntime => SummonEmpowerMoveSpeedBonusZdoKey;
-
-    internal static string SummonEmpowerAttackCooldownReductionZdoKeyForStaffRuntime => SummonEmpowerAttackCooldownReductionZdoKey;
-
-    internal static string ShieldRemainingDisplayZdoKeyForStaffRuntime => ShieldRemainingDisplayZdoKey;
-
-    internal static string ShieldDisplayExpiryZdoKeyForStaffRuntime => ShieldDisplayExpiryZdoKey;
-
-    // Public compatibility bridge for external integrations. Internal runtime code should call SecondaryAttackRuntimeFacade directly.
-    public static bool TryGetDefinition(ItemDrop.ItemData weapon, out SecondaryAttackDefinition definition)
-    {
-        return SecondaryAttackRuntimeFacade.TryGetDefinition(weapon, out definition);
-    }
-
-    public static bool TryGetDefinition(string weaponPrefabName, out SecondaryAttackDefinition definition)
-    {
-        return SecondaryAttackRuntimeFacade.TryGetDefinition(weaponPrefabName, out definition);
-    }
-
-    public static bool TryGetCurrentWeaponDefinition(out SecondaryAttackDefinition definition, out bool secondaryAttack)
-    {
-        return SecondaryAttackRuntimeFacade.TryGetCurrentWeaponDefinition(out definition, out secondaryAttack);
-    }
-
-    public static bool ShouldHandleBowDraw(ItemDrop.ItemData weapon)
-    {
-        return SecondaryAttackRuntimeFacade.ShouldHandleBowDraw(weapon);
-    }
-
-    public static bool CanStartConfiguredSecondary(Humanoid humanoid, ItemDrop.ItemData weapon)
-    {
-        return SecondaryAttackRuntimeFacade.CanStartConfiguredSecondary(humanoid, weapon);
-    }
-
-    public static void RegisterActiveAttack(Attack attack, ItemDrop.ItemData weapon)
-    {
-        SecondaryAttackRuntimeFacade.RegisterActiveAttack(attack, weapon);
-    }
-
-    public static bool TryHandleCustomAttackTrigger(Attack attack)
-    {
-        return SecondaryAttackRuntimeFacade.TryHandleCustomAttackTrigger(attack);
-    }
-
-    public static bool TryHandleCustomProjectileBurst(Attack attack)
-    {
-        return SecondaryAttackRuntimeFacade.TryHandleCustomProjectileBurst(attack);
-    }
 
     internal static Attack BuildSecondaryAttack(Attack sourceAttack, SecondaryAttackDefinition definition)
     {
@@ -166,7 +103,7 @@ internal static partial class SecondaryAttackManager
             state.PendingSecondary = false;
         }
 
-        if (!TryGetDefinition(weapon, out SecondaryAttackDefinition definition))
+        if (!SecondaryAttackRuntimeFacade.TryGetDefinition(weapon, out SecondaryAttackDefinition definition))
         {
             state.PendingSecondary = false;
             return;
@@ -310,7 +247,7 @@ internal static partial class SecondaryAttackManager
         out ReloadSecondaryResourceCostContext context)
     {
         context = ReloadSecondaryResourceCostContext.Empty;
-        if (weapon == null || !TryGetDefinition(weapon, out SecondaryAttackDefinition definition))
+        if (weapon == null || !SecondaryAttackRuntimeFacade.TryGetDefinition(weapon, out SecondaryAttackDefinition definition))
         {
             return true;
         }
@@ -610,15 +547,6 @@ internal static partial class SecondaryAttackManager
         }
 
         return null;
-    }
-
-    internal static bool TryResolveWeaponEffectDefinition(
-        string effectId,
-        EffectBehaviorConfig effectConfig,
-        out ConfiguredWeaponEffectDefinition? definition,
-        out string reason)
-    {
-        return WeaponEffectDefinitionCompiler.TryResolve(effectId, effectConfig, out definition, out reason);
     }
 
     private static float GetSkillAdjustedDrawCost(Player player, ItemDrop.ItemData weapon, float rawDrawCost)

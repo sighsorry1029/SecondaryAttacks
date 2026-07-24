@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.3
+
+- Made Ranged, Melee, and Blood Magic YAML synchronization atomic through one strictly framed payload, rejecting malformed data and stale staged updates without replacing the last applied configuration.
+- Added compensating world rollback and narrowed original-state snapshots to actual mutations, preventing failed reloads from leaving mixed secondary-attack, summon-quality, or summon-prefab state.
+- Hardened `StartAttack` exception cleanup and direct-hit Harmony ordering so temporary cooldown/adrenaline state is restored and nested damage does not re-trigger direct-hit effects.
+- Removed the legacy generic `effects` pipeline, the unsupported `cooldownFallback` YAML field, ignored preset fields, and redundant compiler/runtime layers while preserving the active preset feature sets.
+
 ## 1.1.2
 
 - Moved the embedded MagicPlugin projectile-burst, teleport, and Character-registry compatibility fixes into the standalone InteropFixes mod, removing duplicate patch ownership from SecondaryAttacks.

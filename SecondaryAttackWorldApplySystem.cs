@@ -19,17 +19,15 @@ internal static class SecondaryAttackWorldApplySystem
             return SecondaryAttackAppliedWorldSnapshot.Empty;
         }
 
-        SecondaryAttackObjectDbStateStore.Capture(objectDb);
         SecondaryAttackObjectDbStateStore.Restore(objectDb);
         MagicSummonQualityPresetSystem.RestoreObjectDb(objectDb);
-        SecondaryAttackDefinitionBuildContext buildContext = new(objectDb, compiledSnapshot.Effects, emitMissingWarnings);
+        SecondaryAttackDefinitionBuildContext buildContext = new(objectDb, emitMissingWarnings);
 
         Dictionary<string, SecondaryAttackDefinition> appliedDefinitions = new(StringComparer.OrdinalIgnoreCase);
         int appliedCount = 0;
         int appliedGlobalRangedFallbackCount = 0;
         int appliedGlobalBloodMagicFallbackCount = 0;
         int appliedGlobalMeleeFallbackCount = 0;
-        int appliedEffectOnlyCount = 0;
         HashSet<string> seenConfiguredPrefabs = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (GameObject itemPrefab in objectDb.m_items)
@@ -48,7 +46,6 @@ internal static class SecondaryAttackWorldApplySystem
             bool usesGlobalMeleeFallback = false;
             bool usesGlobalRangedFallback = false;
             bool usesGlobalBloodMagicFallback = false;
-            bool usesEffectOnlyFallback = false;
             compiledSnapshot.Weapons.TryGetValue(itemPrefab.name, out NormalizedWeaponConfig? weaponConfig);
             if (weaponConfig != null)
             {
@@ -80,11 +77,6 @@ internal static class SecondaryAttackWorldApplySystem
                     weaponConfig = defaultMeleeFallback!;
                     usesGlobalMeleeFallback = true;
                 }
-                else if (SecondaryAttackDefinitionCompiler.HasConfiguredWeaponEffects(itemPrefab.name, compiledSnapshot.Effects))
-                {
-                    weaponConfig = new NormalizedWeaponConfig();
-                    usesEffectOnlyFallback = true;
-                }
                 else
                 {
                     continue;
@@ -105,8 +97,12 @@ internal static class SecondaryAttackWorldApplySystem
                 Attack configuredSecondaryAttack = SecondaryAttackManager.BuildSecondaryAttack(sourceAttack, resolvedDefinition);
                 SecondaryAttackManager.NormalizeCopiedProjectileAim(configuredSecondaryAttack, resolvedDefinition);
                 resolvedDefinition.ConfiguredSecondaryAttack = SecondaryAttackManager.CloneAttack(configuredSecondaryAttack);
-                if (!ProjectilePresetCooldownFallback.UsesDynamicOriginalSecondary(resolvedDefinition))
+                if (!ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(resolvedDefinition))
                 {
+                    SecondaryAttackObjectDbStateStore.CaptureSecondaryAttack(
+                        objectDb,
+                        itemPrefab.name,
+                        itemDrop.m_itemData.m_shared.m_secondaryAttack);
                     itemDrop.m_itemData.m_shared.m_secondaryAttack = configuredSecondaryAttack;
                 }
             }
@@ -127,10 +123,6 @@ internal static class SecondaryAttackWorldApplySystem
                 appliedGlobalMeleeFallbackCount++;
             }
 
-            if (usesEffectOnlyFallback)
-            {
-                appliedEffectOnlyCount++;
-            }
         }
 
         SecondaryAttackAppliedWorldSnapshot appliedWorldSnapshot = new(compiledSnapshot, appliedDefinitions, _nextApplyRevision++);
@@ -143,19 +135,16 @@ internal static class SecondaryAttackWorldApplySystem
             }
 
             string warningKey = $"missing_objectdb_prefab:{configuredPrefabName}";
-            if (SecondaryAttackManager.TryMarkCompatibilityWarningReported(warningKey))
+            if (SecondaryAttackWarningLog.TryMarkWarning(warningKey))
             {
                 SecondaryAttacksPlugin.ModLogger.LogWarning($"Configured prefab '{configuredPrefabName}' was not found in ObjectDB.");
             }
         }
 
-        WeaponEffectManager.ApplyToObjectDb(
-            objectDb,
-            appliedWorldSnapshot.DefinitionsByPrefabName);
         MagicSummonQualityPresetSystem.ApplyToObjectDb(
             objectDb,
             appliedWorldSnapshot.CompiledSnapshot.MagicSummons);
-        SecondaryAttacksPlugin.ModLogger.LogInfo($"Applied {appliedCount} secondary attack definition(s), including {appliedGlobalRangedFallbackCount} global ranged fallback definition(s), {appliedGlobalBloodMagicFallbackCount} global blood magic fallback definition(s), {appliedGlobalMeleeFallbackCount} global melee fallback definition(s), and {appliedEffectOnlyCount} effect-only definition(s).");
+        SecondaryAttacksPlugin.ModLogger.LogInfo($"Applied {appliedCount} secondary attack definition(s), including {appliedGlobalRangedFallbackCount} global ranged fallback definition(s), {appliedGlobalBloodMagicFallbackCount} global blood magic fallback definition(s), and {appliedGlobalMeleeFallbackCount} global melee fallback definition(s).");
         return appliedWorldSnapshot;
     }
 
@@ -164,7 +153,6 @@ internal static class SecondaryAttackWorldApplySystem
         SecondaryAttackCompiledSnapshot compiledSnapshot,
         bool emitMissingWarnings)
     {
-        SummonPrefabOverrideSystem.RestoreScene(scene);
         SummonPrefabOverrideSystem.Apply(
             scene,
             compiledSnapshot.MagicSummons,

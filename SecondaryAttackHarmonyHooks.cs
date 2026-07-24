@@ -364,7 +364,7 @@ internal static class SEManInternalAddStatusEffectShieldDisplayPatch
             return;
         }
 
-        Character? character = SecondaryAttackManager.GetSeManCharacter(__instance);
+        Character? character = ShieldAccess.GetSeManCharacter(__instance);
         if (character != null)
         {
             StaffRuntimeSystem.SyncShieldDisplayState(character);
@@ -387,7 +387,7 @@ internal static class SEManRemoveStatusEffectShieldDisplayPatch
             return;
         }
 
-        Character? character = SecondaryAttackManager.GetSeManCharacter(__instance);
+        Character? character = ShieldAccess.GetSeManCharacter(__instance);
         if (character != null)
         {
             StaffRuntimeSystem.SyncShieldDisplayState(character);
@@ -606,7 +606,7 @@ internal static class ObjectDbCopyOtherDbPatch
 }
 
 [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Awake))]
-[HarmonyAfter(SecondaryAttackCompat.MagicPluginGuid)]
+[HarmonyAfter(SecondaryAttacksPlugin.MagicPluginGuid)]
 internal static class ZNetSceneAwakeSummonPrefabOverridePatch
 {
     private static void Postfix(ZNetScene __instance)
@@ -717,6 +717,28 @@ internal static class HumanoidStartAttackPatch
         bool __result,
         SecondaryAttackStartAttackDispatch.StartAttackState __state) =>
         SecondaryAttackStartAttackDispatch.Postfix(__instance, secondaryAttack, __result, __state);
+
+    private static Exception? Finalizer(
+        Exception? __exception,
+        Humanoid __instance,
+        bool secondaryAttack,
+        SecondaryAttackStartAttackDispatch.StartAttackState __state)
+    {
+        if (__exception != null)
+        {
+            try
+            {
+                SecondaryAttackStartAttackDispatch.Cleanup(__instance, secondaryAttack, __state);
+            }
+            catch (Exception cleanupException)
+            {
+                SecondaryAttacksPlugin.ModLogger.LogError(
+                    $"Failed to clean up an interrupted StartAttack: {cleanupException.Message}");
+            }
+        }
+
+        return __exception;
+    }
 }
 
 [HarmonyPatch(typeof(Attack), nameof(Attack.OnAttackTrigger))]

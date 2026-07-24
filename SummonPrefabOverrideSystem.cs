@@ -15,17 +15,6 @@ internal static class SummonPrefabOverrideSystem
     private static readonly ConditionalWeakTable<ZNetScene, SceneState> SceneStates = new();
     private static GameObject? _cloneContainer;
 
-    internal static void RestoreScene(ZNetScene scene)
-    {
-        if (scene == null)
-        {
-            return;
-        }
-
-        SceneState state = SceneStates.GetValue(scene, _ => new SceneState());
-        RestoreOriginalSpawnPrefabs(state);
-    }
-
     internal static void Apply(
         ZNetScene scene,
         IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> overrides,
@@ -149,6 +138,8 @@ internal static class SummonPrefabOverrideSystem
 
             spawnAbility.m_spawnPrefab = (GameObject[])originalSpawnPrefabs.Clone();
         }
+
+        state.OriginalSpawnPrefabs.Clear();
     }
 
     private static void CaptureOriginalSpawnPrefabs(SceneState state, SpawnAbility spawnAbility)

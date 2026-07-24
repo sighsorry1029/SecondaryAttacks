@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using BepInEx;
 using ServerSync;
 using UnityEngine;
@@ -32,7 +30,7 @@ internal static class SecondaryAttackFacade
     private static FileSystemWatcher? _watcher;
     private static SecondaryAttackReloadDebouncer? _yamlReloadDebouncer;
     private static SecondaryAttackReloadDebouncer? _applyRetryDebouncer;
-    private static readonly Dictionary<SecondaryAttackYamlDomainId, CustomSyncedValue<string>> SyncedYamlValues = new();
+    private static CustomSyncedValue<string>? _syncedYamlEnvelope;
     private static SecondaryAttackCompiledSnapshot _currentCompiledSnapshot = SecondaryAttackCompiledSnapshot.Empty;
     private static SecondaryAttackCompiledSnapshot? _pendingCompiledSnapshot;
     private static SecondaryAttackAppliedWorldSnapshot _currentAppliedWorldSnapshot = SecondaryAttackAppliedWorldSnapshot.Empty;
@@ -44,8 +42,6 @@ internal static class SecondaryAttackFacade
     private static string _currentYamlFingerprint = string.Empty;
     private static string? _pendingYamlFingerprint;
 
-    internal static SecondaryAttackCompiledSnapshot CurrentCompiledSnapshot => _currentCompiledSnapshot;
-
     internal static SecondaryAttackAppliedWorldSnapshot CurrentAppliedWorldSnapshot => _currentAppliedWorldSnapshot;
 
     public static void Initialize()
@@ -54,14 +50,14 @@ internal static class SecondaryAttackFacade
             RetryFailedPendingApply,
             "SecondaryAttacks pending world apply");
         SecondaryAttackConfigLoader.EnsureLocalFilesExist();
-        InitializeSyncedYamlValues();
+        InitializeSyncedYamlEnvelope();
 
         RefreshYamlAuthorityMode(force: true);
     }
 
     public static void Dispose()
     {
-        DisposeSyncedYamlValues();
+        DisposeSyncedYamlEnvelope();
 
         _watcher?.Dispose();
         _watcher = null;
@@ -158,11 +154,7 @@ internal static class SecondaryAttackFacade
 
         try
         {
-            ApplyCompiledSnapshotToZNetScene(scene, snapshot, emitMissingWarnings);
-            if (objectDb != null)
-            {
-                ApplyCompiledSnapshotToObjectDb(objectDb, snapshot, emitMissingWarnings, applyZNetScene: false);
-            }
+            ApplyCompiledSnapshotToWorld(scene, objectDb, snapshot, emitMissingWarnings);
         }
         catch (Exception exception)
         {
@@ -272,15 +264,12 @@ internal static class SecondaryAttackFacade
 
     private static void PublishAndApplyLocalYaml(SecondaryAttackYamlTexts yamlTexts)
     {
-        if (SyncedYamlValues.Count == SecondaryAttackYamlDomainRegistry.Domains.Count)
+        if (_syncedYamlEnvelope != null)
         {
             _suppressSyncedYamlChanged = true;
             try
             {
-                foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
-                {
-                    SyncedYamlValues[domain.Id].AssignLocalValue(yamlTexts.Get(domain.Id));
-                }
+                _syncedYamlEnvelope.AssignLocalValue(yamlTexts.ToEnvelope());
             }
             finally
             {
@@ -298,7 +287,10 @@ internal static class SecondaryAttackFacade
             return;
         }
 
-        ApplyYamlTexts(ReadSyncedYamlTexts());
+        if (TryReadSyncedYamlTexts(out SecondaryAttackYamlTexts? yamlTexts, out _))
+        {
+            ApplyYamlTexts(yamlTexts!);
+        }
     }
 
     private static void RefreshYamlAuthorityMode(bool force = false)
@@ -310,6 +302,7 @@ internal static class SecondaryAttackFacade
         }
 
         _yamlAuthorityMode = nextMode;
+        DiscardPendingConfig();
         switch (nextMode)
         {
             case YamlAuthorityMode.LocalFiles:
@@ -319,25 +312,18 @@ internal static class SecondaryAttackFacade
                 break;
             case YamlAuthorityMode.SyncedOnly:
                 DisposeWatcher();
-                if (AnySyncedYamlHasValue())
+                if (TryReadSyncedYamlTexts(
+                        out SecondaryAttackYamlTexts? yamlTexts,
+                        out bool hasSyncedYamlEnvelope))
                 {
-                    ApplyYamlTexts(ReadSyncedYamlTexts());
+                    ApplyYamlTexts(yamlTexts!);
                 }
-                else
+                else if (!hasSyncedYamlEnvelope)
                 {
-                    _pendingCompiledSnapshot = null;
-                    _pendingYamlFingerprint = null;
-                    _hasPendingConfig = false;
-                    _hasPendingWorldReapply = false;
                     _currentCompiledSnapshot = SecondaryAttackCompiledSnapshot.Empty;
                     _currentYamlFingerprint = string.Empty;
-                    _currentAppliedWorldSnapshot = SecondaryAttackAppliedWorldSnapshot.Empty;
-                    if (ZNetScene.instance != null)
-                    {
-                        ApplyCompiledSnapshotToZNetScene(ZNetScene.instance, _currentCompiledSnapshot, emitMissingWarnings: true);
-                    }
-
-                    SecondaryAttackManager.RefreshLocalPlayerRuntimeWeaponDefinitions();
+                    _hasPendingWorldReapply = true;
+                    ResetApplyFailure(PendingWorldApplyFailure);
                 }
 
                 SecondaryAttacksPlugin.ModLogger.LogInfo("SecondaryAttacks YAML authority mode: SyncedOnly.");
@@ -352,43 +338,47 @@ internal static class SecondaryAttackFacade
             : YamlAuthorityMode.LocalFiles;
     }
 
-    private static void InitializeSyncedYamlValues()
+    private static void InitializeSyncedYamlEnvelope()
     {
-        DisposeSyncedYamlValues();
-        foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
-        {
-            CustomSyncedValue<string> syncedValue = new(SecondaryAttacksPlugin.ConfigSync, domain.SyncedIdentifier, "");
-            syncedValue.ValueChanged += OnSyncedYamlChanged;
-            SyncedYamlValues[domain.Id] = syncedValue;
-        }
+        DisposeSyncedYamlEnvelope();
+        _syncedYamlEnvelope = new CustomSyncedValue<string>(
+            SecondaryAttacksPlugin.ConfigSync,
+            SecondaryAttackYamlDomainRegistry.SyncedYamlEnvelopeIdentifier,
+            "");
+        _syncedYamlEnvelope.ValueChanged += OnSyncedYamlChanged;
     }
 
-    private static void DisposeSyncedYamlValues()
+    private static void DisposeSyncedYamlEnvelope()
     {
-        foreach (CustomSyncedValue<string> syncedValue in SyncedYamlValues.Values)
+        if (_syncedYamlEnvelope == null)
         {
-            syncedValue.ValueChanged -= OnSyncedYamlChanged;
+            return;
         }
 
-        SyncedYamlValues.Clear();
+        _syncedYamlEnvelope.ValueChanged -= OnSyncedYamlChanged;
+        _syncedYamlEnvelope = null;
     }
 
-    private static SecondaryAttackYamlTexts ReadSyncedYamlTexts()
+    private static bool TryReadSyncedYamlTexts(
+        out SecondaryAttackYamlTexts? yamlTexts,
+        out bool hasValue)
     {
-        Dictionary<SecondaryAttackYamlDomainId, string> texts = new();
-        foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
+        yamlTexts = null;
+        string envelope = _syncedYamlEnvelope?.Value ?? string.Empty;
+        hasValue = !string.IsNullOrEmpty(envelope);
+        if (!hasValue)
         {
-            texts[domain.Id] = SyncedYamlValues.TryGetValue(domain.Id, out CustomSyncedValue<string>? syncedValue)
-                ? syncedValue.Value
-                : string.Empty;
+            return false;
         }
 
-        return new SecondaryAttackYamlTexts(texts);
-    }
+        if (SecondaryAttackYamlTexts.TryFromEnvelope(envelope, out yamlTexts))
+        {
+            return true;
+        }
 
-    private static bool AnySyncedYamlHasValue()
-    {
-        return SyncedYamlValues.Values.Any(syncedValue => !string.IsNullOrEmpty(syncedValue.Value));
+        SecondaryAttacksPlugin.ModLogger.LogError(
+            "Ignoring malformed synchronized SecondaryAttacks YAML envelope.");
+        return false;
     }
 
     private static void DisposeWatcher()
@@ -409,6 +399,7 @@ internal static class SecondaryAttackFacade
         string fingerprint = yamlTexts.GetContentFingerprint();
         if (string.Equals(_currentYamlFingerprint, fingerprint, StringComparison.Ordinal))
         {
+            DiscardPendingConfig();
             return;
         }
 
@@ -418,12 +409,21 @@ internal static class SecondaryAttackFacade
             return;
         }
 
+        DiscardPendingConfig();
         if (!SecondaryAttackConfigLoader.TryCompileSnapshot(_nextSnapshotId++, yamlTexts, out SecondaryAttackCompiledSnapshot? snapshot))
         {
             return;
         }
 
         StageConfig(snapshot!, fingerprint);
+    }
+
+    private static void DiscardPendingConfig()
+    {
+        _pendingCompiledSnapshot = null;
+        _pendingYamlFingerprint = null;
+        _hasPendingConfig = false;
+        ResetApplyFailure(PendingConfigApplyFailure);
     }
 
     private static void StageConfig(SecondaryAttackCompiledSnapshot snapshot, string fingerprint)
@@ -531,16 +531,80 @@ internal static class SecondaryAttackFacade
     private static void ApplyCompiledSnapshotToObjectDb(
         ObjectDB objectDb,
         SecondaryAttackCompiledSnapshot compiledSnapshot,
-        bool emitMissingWarnings,
-        bool applyZNetScene = true)
+        bool emitMissingWarnings)
     {
-        if (applyZNetScene && ZNetScene.instance != null)
-        {
-            ApplyCompiledSnapshotToZNetScene(ZNetScene.instance, compiledSnapshot, emitMissingWarnings);
-        }
+        ApplyCompiledSnapshotToWorld(
+            ZNetScene.instance,
+            objectDb,
+            compiledSnapshot,
+            emitMissingWarnings);
+    }
 
-        _currentAppliedWorldSnapshot = SecondaryAttackWorldApplySystem.Apply(objectDb, compiledSnapshot, emitMissingWarnings);
-        SecondaryAttackManager.RefreshLocalPlayerRuntimeWeaponDefinitions();
+    private static void ApplyCompiledSnapshotToWorld(
+        ZNetScene? scene,
+        ObjectDB? objectDb,
+        SecondaryAttackCompiledSnapshot compiledSnapshot,
+        bool emitMissingWarnings)
+    {
+        SecondaryAttackCompiledSnapshot rollbackSnapshot =
+            _currentAppliedWorldSnapshot.CompiledSnapshot;
+        try
+        {
+            if (scene != null)
+            {
+                ApplyCompiledSnapshotToZNetScene(scene, compiledSnapshot, emitMissingWarnings);
+            }
+
+            if (objectDb != null)
+            {
+                _currentAppliedWorldSnapshot =
+                    SecondaryAttackWorldApplySystem.Apply(objectDb, compiledSnapshot, emitMissingWarnings);
+                SecondaryAttackManager.RefreshLocalPlayerRuntimeWeaponDefinitions();
+            }
+        }
+        catch (Exception applyException)
+        {
+            TryCompensateFailedWorldApply(
+                scene,
+                objectDb,
+                rollbackSnapshot,
+                applyException);
+            throw;
+        }
+    }
+
+    private static void TryCompensateFailedWorldApply(
+        ZNetScene? scene,
+        ObjectDB? objectDb,
+        SecondaryAttackCompiledSnapshot rollbackSnapshot,
+        Exception applyException)
+    {
+        try
+        {
+            if (scene != null)
+            {
+                ApplyCompiledSnapshotToZNetScene(
+                    scene,
+                    rollbackSnapshot,
+                    emitMissingWarnings: false);
+            }
+
+            if (objectDb != null)
+            {
+                _currentAppliedWorldSnapshot =
+                    SecondaryAttackWorldApplySystem.Apply(
+                        objectDb,
+                        rollbackSnapshot,
+                        emitMissingWarnings: false);
+                SecondaryAttackManager.RefreshLocalPlayerRuntimeWeaponDefinitions();
+            }
+        }
+        catch (Exception compensationException)
+        {
+            SecondaryAttacksPlugin.ModLogger.LogError(
+                "Failed to restore the previously applied SecondaryAttacks world after an apply error. " +
+                $"Apply error: {applyException}\nCompensation error: {compensationException}");
+        }
     }
 
     private static void ApplyCompiledSnapshotToZNetScene(

@@ -807,7 +807,6 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                 Preset = "impactBurst",
                 Cooldown = impactBurst.Cooldown,
                 CooldownReductionFactor = impactBurst.CooldownReductionFactor,
-                CooldownFallback = ProjectilePresetCooldownFallback.OriginalSecondary,
                 ResourceMultiplier = impactBurst.ResourceMultiplier,
                 DurabilityFactor = impactBurst.DurabilityFactor,
                 ProjectileSpinAxis = impactBurst.ProjectileSpinAxis,
@@ -982,7 +981,6 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                     Preset = preset,
                     Cooldown = raw.Cooldown ?? baseConfig.Cooldown,
                     CooldownReductionFactor = raw.CooldownReductionFactor ?? baseConfig.CooldownReductionFactor,
-                    CooldownFallback = ProjectilePresetCooldownFallback.OriginalSecondary,
                     ResourceMultiplier = raw.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
                     DurabilityFactor = raw.DurabilityFactor ?? baseConfig.DurabilityFactor,
                     ProjectileSpinAxis = isSpearRainPreset
@@ -1027,7 +1025,6 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                     : baseConfig.Animation,
                 Cooldown = raw.Cooldown ?? baseConfig.Cooldown,
                 CooldownReductionFactor = raw.CooldownReductionFactor ?? baseConfig.CooldownReductionFactor,
-                CooldownFallback = ProjectilePresetCooldownFallback.OriginalSecondary,
                 ResourceMultiplier = raw.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
                 DurabilityFactor = raw.DurabilityFactor ?? baseConfig.DurabilityFactor,
                 ProjectileSpinAxis = NormalizeProjectileSpinAxis(
@@ -1060,7 +1057,6 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                     : baseConfig.Animation,
                 Cooldown = raw.Cooldown ?? baseConfig.Cooldown,
                 CooldownReductionFactor = raw.CooldownReductionFactor ?? baseConfig.CooldownReductionFactor,
-                CooldownFallback = ProjectilePresetCooldownFallback.OriginalSecondary,
                 ResourceMultiplier = raw.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
                 DurabilityFactor = raw.DurabilityFactor ?? baseConfig.DurabilityFactor,
                 ProjectileSpinAxis = NormalizeProjectileSpinAxis(
@@ -1215,10 +1211,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                 ResourceMultiplier = raw.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
                 DurabilityFactor = raw.DurabilityFactor ?? baseConfig.DurabilityFactor,
                 LaunchHeight = raw.LaunchHeight ?? baseConfig.LaunchHeight,
-                DamageFactor = raw.DamageFactor ?? baseConfig.DamageFactor,
-                Vfx = baseConfig.Vfx,
-                VfxRotationOffset = baseConfig.VfxRotationOffset,
-                Sfx = baseConfig.Sfx
+                DamageFactor = raw.DamageFactor ?? baseConfig.DamageFactor
             });
     }
 

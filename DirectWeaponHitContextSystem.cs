@@ -1,4 +1,5 @@
 using HarmonyLib;
+using Object = UnityEngine.Object;
 
 namespace SecondaryAttacks;
 
@@ -7,15 +8,35 @@ internal static class DirectWeaponHitContextSystem
     private static int _directHitDepth;
     private static int _characterDamageDepth;
 
-    internal static bool IsDirectWeaponHitActive => _directHitDepth > 0;
-
-    internal static bool ShouldCountWeaponEffectHit =>
+    private static bool ShouldHandleDirectWeaponHit =>
         _directHitDepth > 0 &&
         _characterDamageDepth == 1 &&
-        !WeaponEffectManager.IsApplyingGeneratedEffectDamage &&
         !LaunchSlamSystem.IsApplyingLandingDamage &&
         !KnockbackChainSystem.IsApplyingChainDamage &&
         !MeleeProjectileHitCascadeSystem.IsApplyingImpactBurstDamage;
+
+    internal static void ApplyDirectWeaponHitEffects(Character target, ref HitData hit)
+    {
+        if (!ShouldHandleDirectWeaponHit ||
+            (Object)(object)hit.GetAttacker() != (Object)(object)Player.m_localPlayer ||
+            !TryGetEffectiveAttackContext(
+                out Player localPlayer,
+                out bool secondaryAttack,
+                out SecondaryAttackDefinition? definition))
+        {
+            return;
+        }
+
+        if (definition?.SneakAmbush != null)
+        {
+            SneakAmbushSystem.TryTriggerForSecondaryHit(localPlayer, target, secondaryAttack, definition);
+        }
+
+        if (!KnockbackChainSystem.TryApplyForSecondaryHit(localPlayer, target, secondaryAttack, definition, ref hit))
+        {
+            LaunchSlamSystem.TryApplyForSecondaryHit(localPlayer, target, secondaryAttack, definition, ref hit);
+        }
+    }
 
     internal static Scope BeginAttackHit(Attack attack)
     {
@@ -72,6 +93,44 @@ internal static class DirectWeaponHitContextSystem
                    projectile,
                    out ProjectileAttackAttribution? attribution) &&
                attribution is { SecondaryAttack: true } or { DisableCurrentAttackFallback: true };
+    }
+
+    private static bool TryGetEffectiveAttackContext(
+        out Player localPlayer,
+        out bool secondaryAttack,
+        out SecondaryAttackDefinition? definition)
+    {
+        localPlayer = Player.m_localPlayer;
+        secondaryAttack = false;
+        definition = null;
+        if (localPlayer == null)
+        {
+            return false;
+        }
+
+        if (SecondaryAttackRuntimeFacade.TryGetProjectileHitAttackContext(
+                out _,
+                out secondaryAttack,
+                out definition,
+                out bool disableCurrentAttackFallback))
+        {
+            return true;
+        }
+
+        if (disableCurrentAttackFallback)
+        {
+            return false;
+        }
+
+        Attack? currentAttack = ((Humanoid)localPlayer).m_currentAttack;
+        if (currentAttack?.m_weapon?.m_dropPrefab == null)
+        {
+            return false;
+        }
+
+        secondaryAttack = ((Humanoid)localPlayer).m_currentAttackIsSecondary;
+        SecondaryAttackRuntimeFacade.TryGetDefinition(currentAttack.m_weapon, out definition!);
+        return true;
     }
 
     internal readonly struct Scope
@@ -152,5 +211,15 @@ internal static class CharacterDamageDirectWeaponHitDepthPatch
     private static void Finalizer(ref DirectWeaponHitContextSystem.Scope __state)
     {
         DirectWeaponHitContextSystem.End(ref __state);
+    }
+}
+
+[HarmonyPatch(typeof(Character), nameof(Character.Damage))]
+internal static class CharacterDamageDirectWeaponHitEffectsPatch
+{
+    [HarmonyPriority(Priority.Normal)]
+    private static void Prefix(Character __instance, ref HitData hit)
+    {
+        DirectWeaponHitContextSystem.ApplyDirectWeaponHitEffects(__instance, ref hit);
     }
 }

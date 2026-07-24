@@ -7,7 +7,6 @@ namespace SecondaryAttacks;
 internal static class BackstabSkillGainSystem
 {
     internal const string GrantSneakSkillRpcName = "SecondaryAttacks_GrantBackstabSneakSkill";
-    internal const float BackstabCooldownSeconds = 300f;
     private const float BackstabTimeDetectionWindow = 1f;
     private static readonly AccessTools.FieldRef<Character, float>? BackstabTimeField = TryCreateBackstabTimeFieldRef();
 

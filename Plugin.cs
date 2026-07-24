@@ -13,11 +13,12 @@ using UnityEngine;
 namespace SecondaryAttacks;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
-[BepInDependency(SecondaryAttackCompat.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
+    internal const string MagicPluginGuid = "blacks7ar.MagicPlugin";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.1.2";
+    internal const string ModVersion = "1.1.3";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -421,14 +422,6 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         [UsedImplicitly] public bool? Browsable = null!;
         [UsedImplicitly] public string? Category = null!;
         [UsedImplicitly] public Action<ConfigEntryBase>? CustomDrawer = null!;
-    }
-
-    class AcceptableShortcuts() : AcceptableValueBase(typeof(KeyboardShortcut))
-    {
-        public override object Clamp(object value) => value;
-        public override bool IsValid(object value) => true;
-
-        public override string ToDescriptionString() => $"# Acceptable values: {string.Join(", ", UnityInput.Current.SupportedKeyCodes)}";
     }
 
     #endregion

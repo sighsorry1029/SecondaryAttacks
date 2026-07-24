@@ -122,8 +122,7 @@ internal static class SecondaryAttackConfigLoader
         {
             Ranged = ranged!,
             Melee = melee!,
-            BloodMagic = bloodMagic!,
-            Effects = new Dictionary<string, EffectBehaviorConfig>(StringComparer.OrdinalIgnoreCase)
+            BloodMagic = bloodMagic!
         };
         return true;
     }

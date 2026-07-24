@@ -437,7 +437,6 @@ internal static class FractureLineSystem
         private float _endTime;
         private float _visualEndTime;
         private float _nextTickTime;
-        private bool _registered;
         private bool _durabilityDrained;
         private bool _finished;
 
@@ -481,9 +480,7 @@ internal static class FractureLineSystem
             _endTime = Time.time + fractureLine.Duration;
             _visualEndTime = _endTime + VisualFadeSeconds;
             _nextTickTime = Time.time + fractureLine.TickInterval;
-            _registered = true;
             CreateVisual();
-            SecondaryAttackManager.RegisterAsyncSecondaryWork(attack.m_character);
             enabled = true;
         }
 
@@ -681,11 +678,6 @@ internal static class FractureLineSystem
         private void OnDestroy()
         {
             DestroyVisuals();
-            if (_registered)
-            {
-                SecondaryAttackManager.UnregisterAsyncSecondaryWork(Attack?.m_character);
-                _registered = false;
-            }
         }
     }
 

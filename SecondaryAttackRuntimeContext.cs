@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace SecondaryAttacks;
 
@@ -18,11 +19,6 @@ internal static class SecondaryAttackRuntimeContext
     internal static bool TryGetActiveAttack(Attack attack, out ActiveSecondaryAttack? activeAttack)
     {
         return ActiveAttacks.TryGetValue(attack, out activeAttack);
-    }
-
-    internal static void RemoveActiveAttack(Attack attack)
-    {
-        ActiveAttacks.Remove(attack);
     }
 
     internal static void SetProjectileAttackAttribution(Projectile projectile, ProjectileAttackAttribution attribution)
@@ -62,4 +58,74 @@ internal static class SecondaryAttackRuntimeContext
         context = ActiveProjectileHitContexts[ActiveProjectileHitContexts.Count - 1];
         return true;
     }
+}
+
+internal sealed class ActiveSecondaryAttack
+{
+    public ActiveSecondaryAttack(SecondaryAttackDefinition definition)
+    {
+        Definition = definition;
+    }
+
+    public SecondaryAttackDefinition Definition { get; }
+
+    public bool Triggered { get; set; }
+
+    public bool ProjectileTriggered { get; set; }
+
+    public float NextHoldRepeatTime { get; set; }
+}
+
+internal sealed class ProjectileAttackAttribution
+{
+    public ProjectileAttackAttribution(
+        string weaponPrefabName,
+        bool secondaryAttack,
+        SecondaryAttackDefinition? definition,
+        bool disableCurrentAttackFallback)
+    {
+        WeaponPrefabName = weaponPrefabName;
+        SecondaryAttack = secondaryAttack;
+        Definition = definition;
+        DisableCurrentAttackFallback = disableCurrentAttackFallback;
+    }
+
+    public string WeaponPrefabName { get; }
+
+    public bool SecondaryAttack { get; }
+
+    public SecondaryAttackDefinition? Definition { get; }
+
+    public bool DisableCurrentAttackFallback { get; }
+}
+
+internal sealed class ProjectileHitContext
+{
+    public ProjectileHitContext(
+        Projectile projectile,
+        Collider collider,
+        Vector3 hitPoint,
+        bool water,
+        Vector3 normal,
+        ProjectileAttackAttribution? attribution)
+    {
+        Projectile = projectile;
+        Collider = collider;
+        HitPoint = hitPoint;
+        Water = water;
+        Normal = normal;
+        Attribution = attribution;
+    }
+
+    public Projectile Projectile { get; }
+
+    public Collider Collider { get; }
+
+    public Vector3 HitPoint { get; }
+
+    public bool Water { get; }
+
+    public Vector3 Normal { get; }
+
+    public ProjectileAttackAttribution? Attribution { get; }
 }

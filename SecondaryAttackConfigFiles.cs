@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -20,13 +21,11 @@ internal sealed class SecondaryAttackYamlDomain
         SecondaryAttackYamlDomainId id,
         string fileName,
         string filePath,
-        string syncedIdentifier,
         Func<string> getDefaultContents)
     {
         Id = id;
         FileName = fileName;
         FilePath = filePath;
-        SyncedIdentifier = syncedIdentifier;
         GetDefaultContents = getDefaultContents;
     }
 
@@ -35,8 +34,6 @@ internal sealed class SecondaryAttackYamlDomain
     public string FileName { get; }
 
     public string FilePath { get; }
-
-    public string SyncedIdentifier { get; }
 
     public Func<string> GetDefaultContents { get; }
 }
@@ -48,9 +45,7 @@ internal static class SecondaryAttackYamlDomainRegistry
     internal const string MeleeYamlFileName = "SecondaryAttacks.Melee.yml";
     internal const string BloodMagicYamlFileName = "SecondaryAttacks.BloodMagic.yml";
     internal const string AnimationReferenceFileName = "SecondaryAttacks_AnimationReferences.txt";
-    private const string SyncedRangedYamlIdentifier = "secondary_attack_ranged_yaml";
-    private const string SyncedMeleeYamlIdentifier = "secondary_attack_melee_yaml";
-    private const string SyncedBloodMagicYamlIdentifier = "secondary_attack_blood_magic_yaml";
+    internal const string SyncedYamlEnvelopeIdentifier = "secondary_attack_yaml_envelope";
 
     internal static readonly string ConfigDirectoryPath = Path.Combine(Paths.ConfigPath, ConfigDirectoryName);
     internal static readonly string RangedYamlFilePath = Path.Combine(ConfigDirectoryPath, RangedYamlFileName);
@@ -64,19 +59,16 @@ internal static class SecondaryAttackYamlDomainRegistry
             SecondaryAttackYamlDomainId.Ranged,
             RangedYamlFileName,
             RangedYamlFilePath,
-            SyncedRangedYamlIdentifier,
             () => SecondaryAttackDefaultYamlResources.Load(RangedYamlFileName)),
         new(
             SecondaryAttackYamlDomainId.Melee,
             MeleeYamlFileName,
             MeleeYamlFilePath,
-            SyncedMeleeYamlIdentifier,
             () => SecondaryAttackDefaultYamlResources.Load(MeleeYamlFileName)),
         new(
             SecondaryAttackYamlDomainId.BloodMagic,
             BloodMagicYamlFileName,
             BloodMagicYamlFilePath,
-            SyncedBloodMagicYamlIdentifier,
             () => SecondaryAttackDefaultYamlResources.Load(BloodMagicYamlFileName)),
     };
 
@@ -97,10 +89,18 @@ internal sealed class SecondaryAttackYamlTexts
 
     public SecondaryAttackYamlTexts(IReadOnlyDictionary<SecondaryAttackYamlDomainId, string> texts)
     {
-        _texts = new Dictionary<SecondaryAttackYamlDomainId, string>(texts);
+        _texts = new Dictionary<SecondaryAttackYamlDomainId, string>();
+        foreach (KeyValuePair<SecondaryAttackYamlDomainId, string> pair in texts)
+        {
+            _texts[pair.Key] = pair.Value;
+        }
+
         foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
         {
-            _texts.TryAdd(domain.Id, string.Empty);
+            if (!_texts.ContainsKey(domain.Id))
+            {
+                _texts[domain.Id] = string.Empty;
+            }
         }
     }
 
@@ -112,6 +112,11 @@ internal sealed class SecondaryAttackYamlTexts
     }
 
     public string GetContentFingerprint()
+    {
+        return ToEnvelope();
+    }
+
+    internal string ToEnvelope()
     {
         StringBuilder builder = new();
         foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
@@ -127,6 +132,66 @@ internal sealed class SecondaryAttackYamlTexts
 
         return builder.ToString();
     }
+
+    internal static bool TryFromEnvelope(string envelope, out SecondaryAttackYamlTexts? yamlTexts)
+    {
+        yamlTexts = null;
+        if (string.IsNullOrEmpty(envelope))
+        {
+            return false;
+        }
+
+        Dictionary<SecondaryAttackYamlDomainId, string> texts = new();
+        int offset = 0;
+        foreach (SecondaryAttackYamlDomain domain in SecondaryAttackYamlDomainRegistry.Domains)
+        {
+            string domainPrefix = $"{(int)domain.Id}:";
+            if (offset + domainPrefix.Length > envelope.Length ||
+                !string.Equals(
+                    envelope.Substring(offset, domainPrefix.Length),
+                    domainPrefix,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            offset += domainPrefix.Length;
+            int lengthSeparator = envelope.IndexOf(':', offset);
+            if (lengthSeparator < 0 ||
+                !int.TryParse(
+                    envelope.Substring(offset, lengthSeparator - offset),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out int textLength) ||
+                textLength < 0)
+            {
+                return false;
+            }
+
+            offset = lengthSeparator + 1;
+            if (textLength > envelope.Length - offset)
+            {
+                return false;
+            }
+
+            texts[domain.Id] = envelope.Substring(offset, textLength);
+            offset += textLength;
+            if (offset >= envelope.Length || envelope[offset] != '\n')
+            {
+                return false;
+            }
+
+            offset++;
+        }
+
+        if (offset != envelope.Length)
+        {
+            return false;
+        }
+
+        yamlTexts = new SecondaryAttackYamlTexts(texts);
+        return true;
+    }
 }
 
 internal sealed class SecondaryAttackParsedYaml
@@ -140,6 +205,4 @@ internal sealed class SecondaryAttackParsedYaml
     public IReadOnlyDictionary<string, BloodMagicWeaponConfig> BloodMagic { get; set; } =
         new Dictionary<string, BloodMagicWeaponConfig>(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyDictionary<string, EffectBehaviorConfig> Effects { get; set; } =
-        new Dictionary<string, EffectBehaviorConfig>(StringComparer.OrdinalIgnoreCase);
 }

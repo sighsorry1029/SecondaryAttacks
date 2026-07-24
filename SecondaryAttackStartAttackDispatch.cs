@@ -3,7 +3,6 @@ namespace SecondaryAttacks;
 
 internal static class SecondaryAttackStartAttackDispatch
 {
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Attack, ProjectilePresetCooldownFallbackState> ProjectilePresetCooldownFallbackAttacks = new();
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Attack, ProjectilePresetCooldownConsumedState> ProjectilePresetCooldownConsumedAttacks = new();
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Attack, ProjectilePresetOriginalCooldownFallbackState> ProjectilePresetOriginalCooldownFallbackAttacks = new();
 
@@ -70,11 +69,7 @@ internal static class SecondaryAttackStartAttackDispatch
         bool result,
         StartAttackState state)
     {
-        SecondaryAttackAdrenalineSystem.EndConfiguredSecondaryStart(humanoid);
-        if (secondaryAttack)
-        {
-            state.RestoreCooldownFallbackSecondary();
-        }
+        Cleanup(humanoid, secondaryAttack, state);
 
         if (!secondaryAttack)
         {
@@ -102,6 +97,24 @@ internal static class SecondaryAttackStartAttackDispatch
 
         SecondaryAttackManager.ApplyReloadSecondaryResourceCost(humanoid, state.ReloadCostContext);
         RegisterActiveAttackIfNeeded(humanoid);
+    }
+
+    internal static void Cleanup(
+        Humanoid humanoid,
+        bool secondaryAttack,
+        StartAttackState state)
+    {
+        try
+        {
+            SecondaryAttackAdrenalineSystem.EndConfiguredSecondaryStart(humanoid);
+        }
+        finally
+        {
+            if (secondaryAttack)
+            {
+                state.RestoreCooldownFallbackSecondary();
+            }
+        }
     }
 
     private static bool TryPrepareConfiguredSecondaryStart(
@@ -173,7 +186,6 @@ internal static class SecondaryAttackStartAttackDispatch
             return true;
         }
 
-        ClearProjectilePresetCooldownFallback(attack);
         if (ProjectilePresetCooldownConsumedAttacks.TryGetValue(attack, out _))
         {
             return true;
@@ -213,19 +225,8 @@ internal static class SecondaryAttackStartAttackDispatch
             return true;
         }
 
-        if (ProjectilePresetCooldownFallback.IsCopiedSecondary(ResolveProjectilePresetCooldownFallback(definition!)))
-        {
-            MarkProjectilePresetCooldownFallback(attack);
-            return true;
-        }
-
         attack.Stop();
         return false;
-    }
-
-    internal static bool ShouldSkipProjectilePresetEffectsForCooldown(Attack? attack)
-    {
-        return attack != null && ProjectilePresetCooldownFallbackAttacks.TryGetValue(attack, out _);
     }
 
     internal static bool IsProjectilePresetOriginalCooldownFallback(Attack? attack)
@@ -252,14 +253,13 @@ internal static class SecondaryAttackStartAttackDispatch
             return false;
         }
 
-        string cooldownFallback = ResolveProjectilePresetCooldownFallback(definition!);
         bool cooldownReady = MeleePresetCooldownSystem.IsReady(humanoid, currentWeapon, presetName, cooldown!);
         bool spearRainPending = IsSpearRainPreset(presetName) &&
                                 MeleeProjectileHitCascadeSystem.HasPendingSpearRain(humanoid);
         bool ready = cooldownReady && !spearRainPending;
         if (ready)
         {
-            if (ProjectilePresetCooldownFallback.UsesDynamicOriginalSecondary(definition!))
+            if (ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(definition!))
             {
                 return TryPrepareDynamicProjectilePresetSecondary(
                     currentWeapon,
@@ -272,12 +272,7 @@ internal static class SecondaryAttackStartAttackDispatch
             return false;
         }
 
-        if (ProjectilePresetCooldownFallback.IsCopiedSecondary(cooldownFallback))
-        {
-            return false;
-        }
-
-        if (ProjectilePresetCooldownFallback.UsesDynamicOriginalSecondary(definition!) &&
+        if (ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(definition!) &&
             TryPrepareDynamicOriginalSecondaryFallback(
                 currentWeapon,
                 definition!,
@@ -397,19 +392,8 @@ internal static class SecondaryAttackStartAttackDispatch
         return true;
     }
 
-    private static string ResolveProjectilePresetCooldownFallback(SecondaryAttackDefinition definition)
-    {
-        return ProjectilePresetCooldownFallback.OriginalSecondary;
-    }
-
     private static bool IsSpearRainPreset(string presetName) =>
         presetName.Equals("spearRain", System.StringComparison.OrdinalIgnoreCase);
-
-    private static void MarkProjectilePresetCooldownFallback(Attack attack)
-    {
-        ProjectilePresetCooldownFallbackAttacks.Remove(attack);
-        ProjectilePresetCooldownFallbackAttacks.Add(attack, new ProjectilePresetCooldownFallbackState());
-    }
 
     private static void MarkProjectilePresetCooldownConsumed(Attack attack)
     {
@@ -421,11 +405,6 @@ internal static class SecondaryAttackStartAttackDispatch
     {
         ProjectilePresetOriginalCooldownFallbackAttacks.Remove(attack);
         ProjectilePresetOriginalCooldownFallbackAttacks.Add(attack, new ProjectilePresetOriginalCooldownFallbackState());
-    }
-
-    private static void ClearProjectilePresetCooldownFallback(Attack attack)
-    {
-        ProjectilePresetCooldownFallbackAttacks.Remove(attack);
     }
 
     private static bool TryResolveOriginalSecondaryAttack(
@@ -535,10 +514,6 @@ internal static class SecondaryAttackStartAttackDispatch
         }
 
         SecondaryAttackRuntimeFacade.RegisterActiveAttack(humanoid.m_currentAttack, currentWeapon);
-    }
-
-    private sealed class ProjectilePresetCooldownFallbackState
-    {
     }
 
     private sealed class ProjectilePresetCooldownConsumedState

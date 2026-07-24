@@ -9,8 +9,6 @@ namespace SecondaryAttacks;
 internal static partial class ProjectileRuntimeSystem
 {
     private static int AimRayMask;
-    private static int ShieldChargeCollisionMask;
-    private static int ShieldChargeImpactMask;
     private const float MeteorFallbackRange = 32f;
     private const float PiercingShotHitCooldown = 0.25f;
     private const float SentinelTargetScanInterval = 0.15f;
@@ -50,7 +48,7 @@ internal static partial class ProjectileRuntimeSystem
         string weaponPrefabName = attack.m_weapon?.m_dropPrefab != null ? attack.m_weapon.m_dropPrefab.name : definition.PrefabName;
         string presetName = definition.Behavior is ProjectileSecondaryBehavior projectileBehavior ? GetPresetName(projectileBehavior.Preset) : "unknown";
         string key = weaponPrefabName + "|" + presetName + "|" + reason;
-        if (SecondaryAttackManager.TryMarkCompatibilityIssueReported(key))
+        if (SecondaryAttackWarningLog.TryMarkIssue(key))
         {
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping custom secondary for {weaponPrefabName}: {reason}");
         }
@@ -1450,26 +1448,6 @@ internal static partial class ProjectileRuntimeSystem
         return AimRayMask;
     }
 
-    internal static int GetShieldChargeCollisionMask()
-    {
-        if (ShieldChargeCollisionMask == 0)
-        {
-            ShieldChargeCollisionMask = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "terrain", "blocker", "vehicle");
-        }
-
-        return ShieldChargeCollisionMask;
-    }
-
-    internal static int GetShieldChargeImpactMask()
-    {
-        if (ShieldChargeImpactMask == 0)
-        {
-            ShieldChargeImpactMask = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "terrain", "blocker", "vehicle", "character", "character_net", "character_ghost", "hitbox", "character_noenv");
-        }
-
-        return ShieldChargeImpactMask;
-    }
-
     private static Vector3 CalculateGravityAdjustedBallisticVelocity(
         Vector3 spawnPoint,
         Vector3 targetPoint,
@@ -1894,7 +1872,6 @@ internal static partial class ProjectileRuntimeSystem
         private float _nextShotAt;
         private int _remainingShots;
         private bool _reloadConsumed;
-        private bool _registeredAsyncWork;
 
         public void Initialize(Attack attack, SecondaryAttackDefinition definition, int remainingShots)
         {
@@ -1907,8 +1884,6 @@ internal static partial class ProjectileRuntimeSystem
                 : 0.2f;
             _nextShotAt = Time.time + _interval;
             ActiveBurstFireControllers.Add(_attack);
-            SecondaryAttackManager.RegisterAsyncSecondaryWork(_owner);
-            _registeredAsyncWork = true;
         }
 
         private void OnDestroy()
@@ -1919,11 +1894,6 @@ internal static partial class ProjectileRuntimeSystem
                 ActiveBurstFireControllers.Remove(_attack);
             }
 
-            if (_registeredAsyncWork)
-            {
-                SecondaryAttackManager.UnregisterAsyncSecondaryWork(_owner);
-                _registeredAsyncWork = false;
-            }
         }
 
         private void Update()
@@ -2022,7 +1992,6 @@ internal static partial class ProjectileRuntimeSystem
         private float _volleyAngleOffset;
         private float _nextFireAt;
         private int _emittedCount;
-        private bool _registeredAsyncWork;
 
         public void Initialize(
             Attack attack,
@@ -2048,17 +2017,6 @@ internal static partial class ProjectileRuntimeSystem
             _horizontalRight = horizontalRight;
             _volleyAngleOffset = UnityEngine.Random.value * 360f;
             _nextFireAt = Time.time;
-            SecondaryAttackManager.RegisterAsyncSecondaryWork(_owner);
-            _registeredAsyncWork = true;
-        }
-
-        private void OnDestroy()
-        {
-            if (_registeredAsyncWork)
-            {
-                SecondaryAttackManager.UnregisterAsyncSecondaryWork(_owner);
-                _registeredAsyncWork = false;
-            }
         }
 
         private void Update()
@@ -2155,7 +2113,6 @@ internal static partial class ProjectileRuntimeSystem
         private int _index;
         private int _count;
         private bool _released;
-        private bool _registeredAsyncWork;
 
         public void Initialize(
             Attack attack,
@@ -2203,17 +2160,6 @@ internal static partial class ProjectileRuntimeSystem
             _projectile.enabled = false;
             transform.position = GetSentinelHoverPosition(_owner, _definition, _index, _count, Time.time);
             transform.rotation = Quaternion.LookRotation(GetSentinelForward(_owner), Vector3.up);
-            SecondaryAttackManager.RegisterAsyncSecondaryWork(_owner);
-            _registeredAsyncWork = true;
-        }
-
-        private void OnDestroy()
-        {
-            if (_registeredAsyncWork)
-            {
-                SecondaryAttackManager.UnregisterAsyncSecondaryWork(_owner);
-                _registeredAsyncWork = false;
-            }
         }
 
         private void FixedUpdate()

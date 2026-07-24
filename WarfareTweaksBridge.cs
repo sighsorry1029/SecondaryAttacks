@@ -3,7 +3,6 @@ namespace SecondaryAttacks;
 public static class WarfareTweaksBridge
 {
     public static bool IsGeneratedDamageActive =>
-        WeaponEffectManager.IsApplyingGeneratedEffectDamage ||
         LaunchSlamSystem.IsApplyingLandingDamage ||
         KnockbackChainSystem.IsApplyingChainDamage ||
         MeleeProjectileHitCascadeSystem.IsApplyingImpactBurstDamage;

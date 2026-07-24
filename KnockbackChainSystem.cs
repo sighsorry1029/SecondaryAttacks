@@ -8,6 +8,10 @@ internal static class KnockbackChainSystem
 {
     private const int MaxOverlapHits = 64;
     private const float MinChainPower = 0.05f;
+    private const float CollisionRadius = 2f;
+    private const string InitialHitVfx = "vfx_archerytarget_bullseye";
+    private const string CollisionVfx = "vfx_HitSparks";
+    private const string CollisionSfx = "sfx_club_hit";
 
     private static readonly Collider[] OverlapHits = new Collider[MaxOverlapHits];
     private static int _characterMask;
@@ -50,13 +54,7 @@ internal static class KnockbackChainSystem
         }
 
         hit.m_pushForce = boostedPushForce;
-        if (knockbackChain.MaxChainTargets <= 0)
-        {
-            SpawnVfx(knockbackChain.InitialHitVfx, ResolveVfxPoint(hit, target), target.transform.rotation, "knockback_chain_initial_hit_vfx_missing");
-            return true;
-        }
-
-        SpawnVfx(knockbackChain.InitialHitVfx, ResolveVfxPoint(hit, target), target.transform.rotation, "knockback_chain_initial_hit_vfx_missing");
+        SpawnVfx(InitialHitVfx, ResolveVfxPoint(hit, target), target.transform.rotation, "knockback_chain_initial_hit_vfx_missing");
         Vector3 direction = ResolveDirection(hit.m_dir, attacker, target);
         KnockbackChainState state = new(attacker, hit, knockbackChain);
         AttachTracker(target, state, boostedPushForce, 1f, direction);
@@ -95,7 +93,7 @@ internal static class KnockbackChainSystem
         Vector3 travelDirection)
     {
         KnockbackChainDefinition config = state.Config;
-        if (state.CollateralHits >= config.MaxChainTargets)
+        if (state.HasReachedTargetLimit)
         {
             return;
         }
@@ -106,7 +104,7 @@ internal static class KnockbackChainSystem
         {
             hitCount = Physics.OverlapSphereNonAlloc(
                 sourceCenter,
-                config.CollisionRadius,
+                CollisionRadius,
                 OverlapHits,
                 GetCharacterMask(),
                 QueryTriggerInteraction.Ignore);
@@ -120,7 +118,7 @@ internal static class KnockbackChainSystem
 
                 Character? target = ProjectileRuntimeSystem.GetHitCharacter(collider);
                 if (!IsValidCollisionTarget(state.Attacker, source, target) ||
-                    !state.CanHit(target!, config.HitCooldown))
+                    !state.CanHit(target!))
                 {
                     continue;
                 }
@@ -137,12 +135,12 @@ internal static class KnockbackChainSystem
                 }
 
                 float nextPower = chainPower * config.ChainDecay;
-                if (state.CollateralHits < config.MaxChainTargets && nextPower >= MinChainPower)
+                if (!state.HasReachedTargetLimit && nextPower >= MinChainPower)
                 {
                     AttachTracker(target, state, pushForce, nextPower, hitDirection);
                 }
 
-                if (state.CollateralHits >= config.MaxChainTargets)
+                if (state.HasReachedTargetLimit)
                 {
                     return;
                 }
@@ -163,7 +161,6 @@ internal static class KnockbackChainSystem
         float chainPower,
         Vector3 direction)
     {
-        KnockbackChainDefinition config = state.Config;
         HitData.DamageTypes damage = state.SourceHit.m_damage.Clone();
         damage.Modify(chainPower);
         if (damage.GetTotalDamage() <= 0f)
@@ -192,9 +189,7 @@ internal static class KnockbackChainSystem
         chainHit.m_hitCollider = collider;
         chainHit.SetAttacker(state.Attacker);
 
-        int collisionIndex = state.CollateralHits;
         state.MarkHit(target);
-        bool spawnDistanceEffects = ShouldSpawnCollisionDistanceEffects(config, state.Attacker, chainHit.m_point);
 
         bool wasApplyingChainDamage = IsApplyingChainDamage;
         IsApplyingChainDamage = true;
@@ -207,43 +202,11 @@ internal static class KnockbackChainSystem
             IsApplyingChainDamage = wasApplyingChainDamage;
         }
 
-        if (spawnDistanceEffects)
-        {
-            Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
-            SpawnVfx(ResolveCollisionVfx(config, collisionIndex), chainHit.m_point, rotation, "knockback_chain_collision_vfx_missing");
-            SpawnVfx(config.CollisionSfx, chainHit.m_point, rotation, "knockback_chain_collision_sfx_missing");
-        }
+        Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
+        SpawnVfx(CollisionVfx, chainHit.m_point, rotation, "knockback_chain_collision_vfx_missing");
+        SpawnVfx(CollisionSfx, chainHit.m_point, rotation, "knockback_chain_collision_sfx_missing");
 
         return true;
-    }
-
-    private static bool ShouldSpawnCollisionDistanceEffects(KnockbackChainDefinition config, Character attacker, Vector3 point)
-    {
-        float minDistance = Mathf.Max(0f, config.CollisionVfxMinDistanceFromPlayer);
-        if (minDistance <= 0f)
-        {
-            return true;
-        }
-
-        if (attacker == null)
-        {
-            return false;
-        }
-
-        Vector3 attackerPoint = attacker.GetCenterPoint();
-        return (point - attackerPoint).sqrMagnitude >= minDistance * minDistance;
-    }
-
-    private static string ResolveCollisionVfx(KnockbackChainDefinition config, int collisionIndex)
-    {
-        if (collisionIndex <= 0)
-        {
-            return config.FirstCollisionVfx;
-        }
-
-        return collisionIndex == 1
-            ? config.SecondCollisionVfx
-            : config.LaterCollisionVfx;
     }
 
     private static Vector3 ResolveVfxPoint(HitData hit, Character target)
@@ -267,7 +230,7 @@ internal static class KnockbackChainSystem
         GameObject? prefab = ZNetScene.instance?.GetPrefab(normalizedPrefabName);
         if (prefab == null)
         {
-            if (SecondaryAttackManager.TryMarkCompatibilityWarningReported($"{warningPrefix}_{normalizedPrefabName}"))
+            if (SecondaryAttackWarningLog.TryMarkWarning($"{warningPrefix}_{normalizedPrefabName}"))
             {
                 SecondaryAttacksPlugin.ModLogger.LogWarning($"Knockback chain VFX prefab '{normalizedPrefabName}' was not found.");
             }
@@ -341,6 +304,9 @@ internal static class KnockbackChainSystem
 
 internal sealed class KnockbackChainState
 {
+    private const int MaxChainTargets = 5;
+    private const float HitCooldown = 0.2f;
+
     private readonly Dictionary<Character, float> _lastHitTimes = new();
 
     public KnockbackChainState(Character attacker, HitData sourceHit, KnockbackChainDefinition config)
@@ -358,16 +324,17 @@ internal sealed class KnockbackChainState
 
     public int CollateralHits { get; private set; }
 
-    public bool CanHit(Character target, float hitCooldown)
+    public bool HasReachedTargetLimit => CollateralHits >= MaxChainTargets;
+
+    public bool CanHit(Character target)
     {
-        if (target == null || CollateralHits >= Config.MaxChainTargets)
+        if (target == null || HasReachedTargetLimit)
         {
             return false;
         }
 
-        float cooldown = Mathf.Max(0.01f, hitCooldown);
         return !_lastHitTimes.TryGetValue(target, out float lastHitTime) ||
-               Time.time - lastHitTime >= cooldown;
+               Time.time - lastHitTime >= HitCooldown;
     }
 
     public void MarkHit(Character target)
@@ -379,6 +346,9 @@ internal sealed class KnockbackChainState
 
 internal sealed class KnockbackChainTracker : MonoBehaviour
 {
+    private const float Duration = 1.5f;
+    private const float MinSpeed = 0.5f;
+
     private Character? _target;
     private Rigidbody? _body;
     private KnockbackChainState? _state;
@@ -422,9 +392,8 @@ internal sealed class KnockbackChainTracker : MonoBehaviour
             return;
         }
 
-        KnockbackChainDefinition config = _state.Config;
-        if (Time.time - _startTime > config.Duration ||
-            _state.CollateralHits >= config.MaxChainTargets)
+        if (Time.time - _startTime > Duration ||
+            _state.HasReachedTargetLimit)
         {
             Destroy(this);
             return;
@@ -445,7 +414,7 @@ internal sealed class KnockbackChainTracker : MonoBehaviour
         }
 
         float speed = Mathf.Max(velocity.magnitude, displacement.magnitude / Mathf.Max(Time.deltaTime, 0.001f));
-        if (speed < config.MinSpeed)
+        if (speed < MinSpeed)
         {
             return;
         }

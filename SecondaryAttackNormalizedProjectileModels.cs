@@ -12,8 +12,6 @@ internal sealed class NormalizedMeleeOnProjectileHitConfig
 
     public float CooldownReductionFactor { get; set; } = 0.5f;
 
-    public string CooldownFallback { get; set; } = ProjectilePresetCooldownFallback.OriginalSecondary;
-
     public float ResourceMultiplier { get; set; } = 1f;
 
     public float DurabilityFactor { get; set; } = 1f;
@@ -68,8 +66,6 @@ internal sealed class NormalizedBoomerangConfig
 
     public float CooldownReductionFactor { get; set; } = 0.5f;
 
-    public string CooldownFallback { get; set; } = ProjectilePresetCooldownFallback.OriginalSecondary;
-
     public float ResourceMultiplier { get; set; } = 1.5f;
 
     public float DurabilityFactor { get; set; } = 1f;
@@ -110,8 +106,6 @@ internal sealed class NormalizedImpactBurstConfig
     public float Cooldown { get; set; } = 16f;
 
     public float CooldownReductionFactor { get; set; } = 0.5f;
-
-    public string CooldownFallback { get; set; } = ProjectilePresetCooldownFallback.OriginalSecondary;
 
     public float ResourceMultiplier { get; set; } = 1.5f;
 

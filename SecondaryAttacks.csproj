@@ -472,7 +472,6 @@
         <Compile Include="LaunchSlamSystem.cs" />
         <Compile Include="LocalizationManager.cs" />
         <Compile Include="Compat\GroundworkCompat.cs" />
-        <Compile Include="Compat\SecondaryAttackCompat.cs" />
         <Compile Include="MagicPluginSummonQualitySystem.cs" />
         <Compile Include="MeleePresetCooldownSystem.cs" />
         <Compile Include="MeleeProjectileHitCascadeSystem.cs" />
@@ -509,7 +508,6 @@
         <Compile Include="SecondaryAttackWeaponConfigNormalizer.cs" />
         <Compile Include="SecondaryAttackFacade.cs" />
         <Compile Include="SecondaryAttackConfigCompiler.cs" />
-        <Compile Include="SecondaryAttackDefinitionBuildContext.cs" />
         <Compile Include="SecondaryAttackDefinitionCompiler.cs" />
         <Compile Include="SecondaryAttackConfig.Normalized.cs" />
         <Compile Include="SecondaryAttackNormalizedMagicModels.cs" />
@@ -521,28 +519,23 @@
         <Compile Include="SecondaryAttackDefinition.cs" />
         <Compile Include="SecondaryAttackDefaultYamlResources.cs" />
         <Compile Include="SecondaryAttackManager.ConfigHelpers.cs" />
-        <Compile Include="SecondaryAttackDefinitionCompiler.Builder.cs" />
-        <Compile Include="SecondaryAttackDefinitionCompiler.Validation.cs" />
-        <Compile Include="SecondaryAttackManager.AttackContexts.cs" />
         <Compile Include="SecondaryAttackManager.CommonRuntime.cs" />
         <Compile Include="SecondaryAttackHarmonyDispatch.cs" />
         <Compile Include="SecondaryAttackHitDataFactory.cs" />
         <Compile Include="SecondaryAttackProjectileToolTierSystem.cs" />
         <Compile Include="SecondaryAttackStartAttackDispatch.cs" />
-        <Compile Include="SecondaryAttackManager.HarmonyHooks.cs" />
+        <Compile Include="SecondaryAttackHarmonyHooks.cs" />
         <Compile Include="SecondaryAttackNetworkCompat.cs" />
         <Compile Include="SecondaryAttackObjectDbStateStore.cs" />
         <Compile Include="SecondaryAttackManager.ProjectileDefinitions.cs" />
-        <Compile Include="SecondaryAttackManager.ProjectileRuntime.cs" />
-        <Compile Include="SecondaryAttackManager.RuntimeDefinitions.cs" />
+        <Compile Include="ProjectileRuntimeControllers.cs" />
         <Compile Include="SecondaryAttackManager.Diagnostics.cs" />
-        <Compile Include="SecondaryAttackManager.StaffRuntime.cs" />
+        <Compile Include="StaffRuntimeSystem.cs" />
         <Compile Include="SecondaryAttackManager.StaffSpecialDefinitions.cs" />
         <Compile Include="SecondaryAttackManager.cs" />
         <Compile Include="SecondaryAttackRuntimeWeaponRebind.cs" />
         <Compile Include="SecondaryAttackRuntimeContext.cs" />
         <Compile Include="SecondaryAttackRuntimeFacade.cs" />
-        <Compile Include="SecondaryAttackRuntimeTypes.cs" />
         <Compile Include="SecondaryAttackWorldApplySystem.cs" />
         <Compile Include="SecondaryAttackWarningLog.cs" />
         <Compile Include="SummonPrefabOverrideSystem.cs" />
@@ -550,8 +543,6 @@
         <Compile Include="ShieldAccess.cs" />
         <Compile Include="StickyDetonatorSystem.cs" />
         <Compile Include="WarfareTweaksBridge.cs" />
-        <Compile Include="WeaponEffectDefinitionCompiler.cs" />
-        <Compile Include="WeaponEffectManager.cs" />
     </ItemGroup>
     <ItemGroup>
         <Content Include=".gitignore"/>

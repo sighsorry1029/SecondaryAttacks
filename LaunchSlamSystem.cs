@@ -6,9 +6,12 @@ namespace SecondaryAttacks;
 
 internal static class LaunchSlamSystem
 {
-    private const float MinAirTime = 0.2f;
-    private const float LandingTimeout = 3f;
     private const float DefaultLandingAreaRadius = 0.75f;
+    private const float LandingAreaRadiusFactor = 1.5f;
+    private const float LandingAreaRadiusMax = 4f;
+    private const string LandingVfx = "vfx_archerytarget_bullseye";
+    private const string LandingSfx = "sfx_sledge_hit";
+    private static readonly Vector3 LandingVfxRotationOffset = new(90f, 0f, 0f);
 
     internal static bool IsApplyingLandingDamage { get; private set; }
 
@@ -65,14 +68,7 @@ internal static class LaunchSlamSystem
             attacker,
             hit,
             landingDamage,
-            launchHeight,
-            launchSlam.LandingAreaRadiusFactor,
-            launchSlam.LandingAreaRadiusMax,
-            launchSlam.Vfx,
-            launchSlam.VfxRotationOffset,
-            launchSlam.Sfx,
-            MinAirTime,
-            LandingTimeout);
+            launchHeight);
     }
 
     private static bool TryLaunchTarget(Character target, float liftHeight)
@@ -101,12 +97,7 @@ internal static class LaunchSlamSystem
         Character target,
         Character attacker,
         HitData sourceHit,
-        HitData.DamageTypes landingDamage,
-        float landingAreaRadiusFactor,
-        float landingAreaRadiusMax,
-        string landingVfx,
-        Vector3 landingVfxRotationOffset,
-        string landingSfx)
+        HitData.DamageTypes landingDamage)
     {
         if (target == null || attacker == null || target.IsDead() || landingDamage.GetTotalDamage() <= 0f)
         {
@@ -114,7 +105,7 @@ internal static class LaunchSlamSystem
         }
 
         Vector3 impactOrigin = target.transform.position;
-        float radius = ResolveLandingAreaRadius(target, landingAreaRadiusFactor, landingAreaRadiusMax);
+        float radius = ResolveLandingAreaRadius(target);
         List<Character> targets = GatherLandingAreaTargets(target, attacker, impactOrigin, radius);
         if (targets.Count == 0)
         {
@@ -122,9 +113,9 @@ internal static class LaunchSlamSystem
         }
 
         Quaternion effectRotation = SecondaryAttackNamedEffectSystem.RotationFromNormal(Vector3.up);
-        Quaternion vfxRotation = effectRotation * Quaternion.Euler(landingVfxRotationOffset);
-        SecondaryAttackNamedEffectSystem.Create(landingVfx, impactOrigin, vfxRotation, "launch_slam_landing_vfx_missing");
-        SecondaryAttackNamedEffectSystem.Create(landingSfx, impactOrigin, effectRotation, "launch_slam_landing_sfx_missing");
+        Quaternion vfxRotation = effectRotation * Quaternion.Euler(LandingVfxRotationOffset);
+        SecondaryAttackNamedEffectSystem.Create(LandingVfx, impactOrigin, vfxRotation, "launch_slam_landing_vfx_missing");
+        SecondaryAttackNamedEffectSystem.Create(LandingSfx, impactOrigin, effectRotation, "launch_slam_landing_sfx_missing");
 
         bool wasApplyingLandingDamage = IsApplyingLandingDamage;
         IsApplyingLandingDamage = true;
@@ -218,17 +209,10 @@ internal static class LaunchSlamSystem
         target.Damage(landingHit);
     }
 
-    private static float ResolveLandingAreaRadius(Character target, float radiusFactor, float radiusMax)
+    private static float ResolveLandingAreaRadius(Character target)
     {
-        float factor = Mathf.Max(0f, radiusFactor);
-        float max = Mathf.Max(0f, radiusMax);
-        if (factor <= 0f || max <= 0f)
-        {
-            return 0f;
-        }
-
         float footprintRadius = ResolveCharacterFootprintRadius(target);
-        return Mathf.Min(max, footprintRadius * factor);
+        return Mathf.Min(LandingAreaRadiusMax, footprintRadius * LandingAreaRadiusFactor);
     }
 
     private static float ResolveCharacterFootprintRadius(Character target)
@@ -351,19 +335,15 @@ internal static class LaunchSlamSystem
 
 internal sealed class LaunchSlamLandingTracker : MonoBehaviour
 {
+    private const float MinAirTime = 0.2f;
+    private const float LandingTimeout = 3f;
+
     private Character? _target;
     private Character? _attacker;
     private Rigidbody? _body;
     private HitData? _sourceHit;
     private HitData.DamageTypes _landingDamage = new();
     private float _targetApexHeight;
-    private float _landingAreaRadiusFactor;
-    private float _landingAreaRadiusMax;
-    private string _landingVfx = "";
-    private Vector3 _landingVfxRotationOffset = Vector3.zero;
-    private string _landingSfx = "";
-    private float _minAirTime;
-    private float _landingTimeout;
     private float _startTime;
     private float _startHeight;
     private bool _hasBeenAirborne;
@@ -375,14 +355,7 @@ internal sealed class LaunchSlamLandingTracker : MonoBehaviour
         Character attacker,
         HitData sourceHit,
         HitData.DamageTypes landingDamage,
-        float launchHeight,
-        float landingAreaRadiusFactor,
-        float landingAreaRadiusMax,
-        string landingVfx,
-        Vector3 landingVfxRotationOffset,
-        string landingSfx,
-        float minAirTime,
-        float landingTimeout)
+        float launchHeight)
     {
         float newDamage = landingDamage.GetTotalDamage();
         if (_sourceHit != null && newDamage <= _landingDamage.GetTotalDamage())
@@ -397,13 +370,6 @@ internal sealed class LaunchSlamLandingTracker : MonoBehaviour
         _sourceHit = sourceHit.Clone();
         _landingDamage = landingDamage.Clone();
         _targetApexHeight = target.transform.position.y + Mathf.Max(0f, launchHeight);
-        _landingAreaRadiusFactor = landingAreaRadiusFactor;
-        _landingAreaRadiusMax = landingAreaRadiusMax;
-        _landingVfx = landingVfx.Trim();
-        _landingVfxRotationOffset = landingVfxRotationOffset;
-        _landingSfx = landingSfx.Trim();
-        _minAirTime = minAirTime;
-        _landingTimeout = landingTimeout;
         _startTime = Time.time;
         _startHeight = target.transform.position.y;
         _hasBeenAirborne = false;
@@ -420,7 +386,7 @@ internal sealed class LaunchSlamLandingTracker : MonoBehaviour
         }
 
         float elapsed = Time.time - _startTime;
-        if (elapsed > _landingTimeout)
+        if (elapsed > LandingTimeout)
         {
             Destroy(this);
             return;
@@ -437,7 +403,7 @@ internal sealed class LaunchSlamLandingTracker : MonoBehaviour
             RestoreIgnoredCharacterCollisions();
         }
 
-        if (!_hasBeenAirborne || elapsed < _minAirTime || !onGround)
+        if (!_hasBeenAirborne || elapsed < MinAirTime || !onGround)
         {
             return;
         }
@@ -446,12 +412,7 @@ internal sealed class LaunchSlamLandingTracker : MonoBehaviour
             _target,
             _attacker,
             _sourceHit,
-            _landingDamage,
-            _landingAreaRadiusFactor,
-            _landingAreaRadiusMax,
-            _landingVfx,
-            _landingVfxRotationOffset,
-            _landingSfx);
+            _landingDamage);
         Destroy(this);
     }
 

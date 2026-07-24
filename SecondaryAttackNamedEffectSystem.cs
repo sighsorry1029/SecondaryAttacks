@@ -19,7 +19,7 @@ internal static class SecondaryAttackNamedEffectSystem
         string trimmedPrefabName = prefabName!.Trim();
         if (!TryResolvePrefab(trimmedPrefabName, out GameObject? resolvedPrefab))
         {
-            if (SecondaryAttackManager.TryMarkCompatibilityWarningReported($"named_effect_missing_{context}_{trimmedPrefabName}"))
+            if (SecondaryAttackWarningLog.TryMarkWarning($"named_effect_missing_{context}_{trimmedPrefabName}"))
             {
                 SecondaryAttacksPlugin.ModLogger.LogWarning($"Configured effect prefab '{trimmedPrefabName}' was not found for {context}.");
             }

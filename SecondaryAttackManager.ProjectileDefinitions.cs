@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -11,7 +10,6 @@ internal static partial class SecondaryAttackManager
         ItemDrop.ItemData.SharedData sharedData,
         Attack primaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects,
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
@@ -107,20 +105,9 @@ internal static partial class SecondaryAttackManager
             HasCustomAttackAnimation = hasCustomAttackAnimation,
             ResourceMultiplier = resourceMultiplier,
             OutputMultiplier = Mathf.Max(0f, GetNormalizedOutputMultiplier(weaponConfig)),
-            DurabilityFactor = durabilityFactor,
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            RiftTrail = CreateRiftTrailDefinition(weaponConfig),
-            FractureLine = CreateFractureLineDefinition(weaponConfig),
-            HarvestSweep = CreateHarvestSweepDefinition(weaponConfig),
-            OnProjectileHit = CreateMeleeOnProjectileHitDefinition(prefabName, weaponConfig.Secondary?.OnProjectileHit),
-            Boomerang = CreateBoomerangDefinition(weaponConfig),
-            SpinningSweep = CreateSpinningSweepDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = durabilityFactor
         };
+        ApplyProjectileDefinitionFeatures(definition, prefabName, weaponConfig);
         ApplyAttackResourceScaling(definition, primaryAttack, resourceMultiplier);
         return true;
     }
@@ -146,7 +133,6 @@ internal static partial class SecondaryAttackManager
         Attack primaryAttack,
         Attack sourceSecondaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects,
         out SecondaryAttackDefinition? definition)
     {
         string resolvedAttackAnimation = GetNormalizedAttackAnimation(weaponConfig);
@@ -167,20 +153,9 @@ internal static partial class SecondaryAttackManager
             HasCustomAttackAnimation = hasCustomAttackAnimation,
             ResourceMultiplier = Mathf.Max(0f, GetSelectedMeleeResourceMultiplier(weaponConfig)),
             OutputMultiplier = Mathf.Max(0f, GetNormalizedOutputMultiplier(weaponConfig)),
-            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig)),
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            RiftTrail = CreateRiftTrailDefinition(weaponConfig),
-            FractureLine = CreateFractureLineDefinition(weaponConfig),
-            HarvestSweep = CreateHarvestSweepDefinition(weaponConfig),
-            OnProjectileHit = CreateMeleeOnProjectileHitDefinition(prefabName, weaponConfig.Secondary?.OnProjectileHit),
-            Boomerang = CreateBoomerangDefinition(weaponConfig),
-            SpinningSweep = CreateSpinningSweepDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig))
         };
+        ApplyProjectileDefinitionFeatures(definition, prefabName, weaponConfig);
         ApplyAttackResourceScaling(definition, primaryAttack, GetSelectedMeleeResourceMultiplier(weaponConfig));
         return true;
     }
@@ -191,7 +166,6 @@ internal static partial class SecondaryAttackManager
         ItemDrop.ItemData.SharedData sharedData,
         Attack primaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects,
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
@@ -208,10 +182,9 @@ internal static partial class SecondaryAttackManager
                 weaponConfig.RiftTrail?.Enabled == true ||
                 weaponConfig.FractureLine?.Enabled == true ||
                 weaponConfig.HarvestSweep?.Enabled == true ||
-                weaponConfig.SpinningSweep?.Enabled == true ||
-                configuredEffects.Count > 0)
+                weaponConfig.SpinningSweep?.Enabled == true)
             {
-                definition = CreateEffectOnlyDefinition(prefabName, weaponConfig, configuredEffects);
+                definition = CreateEffectOnlyDefinition(prefabName, weaponConfig);
                 return true;
             }
 
@@ -236,20 +209,9 @@ internal static partial class SecondaryAttackManager
             HasCustomAttackAnimation = hasCustomAttackAnimation,
             ResourceMultiplier = Mathf.Max(0f, GetSelectedMeleeResourceMultiplier(weaponConfig)),
             OutputMultiplier = Mathf.Max(0f, GetNormalizedOutputMultiplier(weaponConfig)),
-            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig)),
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            RiftTrail = CreateRiftTrailDefinition(weaponConfig),
-            FractureLine = CreateFractureLineDefinition(weaponConfig),
-            HarvestSweep = CreateHarvestSweepDefinition(weaponConfig),
-            OnProjectileHit = CreateMeleeOnProjectileHitDefinition(prefabName, weaponConfig.Secondary?.OnProjectileHit),
-            Boomerang = CreateBoomerangDefinition(weaponConfig),
-            SpinningSweep = CreateSpinningSweepDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig))
         };
+        ApplyProjectileDefinitionFeatures(definition, prefabName, weaponConfig);
         ApplyAttackResourceScaling(definition, primaryAttack, GetSelectedMeleeResourceMultiplier(weaponConfig));
         return true;
     }
@@ -259,7 +221,6 @@ internal static partial class SecondaryAttackManager
         string prefabName,
         Attack primaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects,
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
@@ -275,10 +236,9 @@ internal static partial class SecondaryAttackManager
                 weaponConfig.KnockbackChain?.Enabled == true ||
                 weaponConfig.RiftTrail?.Enabled == true ||
                 weaponConfig.HarvestSweep?.Enabled == true ||
-                weaponConfig.SpinningSweep?.Enabled == true ||
-                configuredEffects.Count > 0)
+                weaponConfig.SpinningSweep?.Enabled == true)
             {
-                definition = CreateEffectOnlyDefinition(prefabName, weaponConfig, configuredEffects);
+                definition = CreateEffectOnlyDefinition(prefabName, weaponConfig);
                 return true;
             }
 
@@ -303,20 +263,9 @@ internal static partial class SecondaryAttackManager
             HasCustomAttackAnimation = hasCustomAttackAnimation,
             ResourceMultiplier = Mathf.Max(0f, GetSelectedMeleeResourceMultiplier(weaponConfig)),
             OutputMultiplier = Mathf.Max(0f, GetNormalizedOutputMultiplier(weaponConfig)),
-            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig)),
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            RiftTrail = CreateRiftTrailDefinition(weaponConfig),
-            FractureLine = CreateFractureLineDefinition(weaponConfig),
-            HarvestSweep = CreateHarvestSweepDefinition(weaponConfig),
-            OnProjectileHit = CreateMeleeOnProjectileHitDefinition(prefabName, weaponConfig.Secondary?.OnProjectileHit),
-            Boomerang = CreateBoomerangDefinition(weaponConfig),
-            SpinningSweep = CreateSpinningSweepDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig))
         };
+        ApplyProjectileDefinitionFeatures(definition, prefabName, weaponConfig);
         ApplyAttackResourceScaling(definition, primaryAttack, GetSelectedMeleeResourceMultiplier(weaponConfig));
         return true;
     }
@@ -342,7 +291,6 @@ internal static partial class SecondaryAttackManager
             PresetCooldown = CreatePresetCooldown(
                 config.Cooldown,
                 config.CooldownReductionFactor),
-            CooldownFallback = config.CooldownFallback,
             DurabilityFactor = Mathf.Max(0f, config.DurabilityFactor),
             ProjectileSpinAxis = config.ProjectileSpinAxis,
             ProjectileVisualRotationOffset = config.ProjectileVisualRotationOffset,

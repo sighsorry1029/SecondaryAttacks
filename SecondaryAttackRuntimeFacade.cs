@@ -27,26 +27,6 @@ internal static class SecondaryAttackRuntimeFacade
         return SecondaryAttackFacade.CurrentAppliedWorldSnapshot.DefinitionsByPrefabName.TryGetValue(weaponPrefabName, out definition!);
     }
 
-    internal static bool TryGetCurrentWeaponDefinition(out SecondaryAttackDefinition definition, out bool secondaryAttack)
-    {
-        definition = null!;
-        secondaryAttack = false;
-        Player? localPlayer = Player.m_localPlayer;
-        if (localPlayer == null)
-        {
-            return false;
-        }
-
-        Attack? currentAttack = ((Humanoid)localPlayer).m_currentAttack;
-        if (currentAttack?.m_weapon?.m_dropPrefab == null)
-        {
-            return false;
-        }
-
-        secondaryAttack = ((Humanoid)localPlayer).m_currentAttackIsSecondary;
-        return SecondaryAttackFacade.CurrentAppliedWorldSnapshot.DefinitionsByPrefabName.TryGetValue(currentAttack.m_weapon.m_dropPrefab.name, out definition!);
-    }
-
     internal static bool ShouldHandleBowDraw(ItemDrop.ItemData weapon)
     {
         return weapon != null &&
@@ -581,17 +561,20 @@ internal static class SecondaryAttackRuntimeFacade
             return true;
         }
 
+        return TryConsumeAttackResources(attack, stopAttackOnFailure: false, flashHudOnFailure: true);
+    }
+
+    private static bool TryConsumeAttackResources(
+        Attack attack,
+        bool stopAttackOnFailure,
+        bool flashHudOnFailure)
+    {
         float attackStamina = attack.GetAttackStamina();
         if (attackStamina > 0f)
         {
             if (!attack.m_character.HaveStamina(attackStamina))
             {
-                if (attack.m_character.IsPlayer())
-                {
-                    Hud.instance?.StaminaBarEmptyFlash();
-                }
-
-                return false;
+                return HandleResourceFailure(attack, stopAttackOnFailure, flashStamina: flashHudOnFailure);
             }
 
             attack.m_character.UseStamina(attackStamina);
@@ -602,7 +585,7 @@ internal static class SecondaryAttackRuntimeFacade
         {
             if (!attack.m_character.HaveEitr(attackEitr))
             {
-                return false;
+                return HandleResourceFailure(attack, stopAttackOnFailure);
             }
 
             attack.m_character.UseEitr(attackEitr);
@@ -613,18 +596,38 @@ internal static class SecondaryAttackRuntimeFacade
         {
             if (!attack.m_character.HaveHealth(attackHealth) && attack.m_attackHealthLowBlockUse)
             {
-                if (attack.m_character.IsPlayer())
-                {
-                    Hud.instance?.FlashHealthBar();
-                }
-
-                return false;
+                return HandleResourceFailure(attack, stopAttackOnFailure, flashHealth: flashHudOnFailure);
             }
 
             attack.m_character.UseHealth(Mathf.Min(attack.m_character.GetHealth() - 1f, attackHealth));
         }
 
         return true;
+    }
+
+    private static bool HandleResourceFailure(
+        Attack attack,
+        bool stopAttack,
+        bool flashStamina = false,
+        bool flashHealth = false)
+    {
+        if (stopAttack)
+        {
+            attack.Stop();
+        }
+        else if (attack.m_character.IsPlayer())
+        {
+            if (flashStamina)
+            {
+                Hud.instance?.StaminaBarEmptyFlash();
+            }
+            else if (flashHealth)
+            {
+                Hud.instance?.FlashHealthBar();
+            }
+        }
+
+        return false;
     }
 
     internal static bool TryHandleCustomProjectileBurst(Attack attack)
@@ -754,42 +757,6 @@ internal static class SecondaryAttackRuntimeFacade
             return true;
         }
 
-        float attackStamina = attack.GetAttackStamina();
-        if (attackStamina > 0f)
-        {
-            if (!attack.m_character.HaveStamina(attackStamina))
-            {
-                attack.Stop();
-                return false;
-            }
-
-            attack.m_character.UseStamina(attackStamina);
-        }
-
-        float attackEitr = attack.GetAttackEitr();
-        if (attackEitr > 0f)
-        {
-            if (!attack.m_character.HaveEitr(attackEitr))
-            {
-                attack.Stop();
-                return false;
-            }
-
-            attack.m_character.UseEitr(attackEitr);
-        }
-
-        float attackHealth = attack.GetAttackHealth();
-        if (attackHealth > 0f)
-        {
-            if (!attack.m_character.HaveHealth(attackHealth) && attack.m_attackHealthLowBlockUse)
-            {
-                attack.Stop();
-                return false;
-            }
-
-            attack.m_character.UseHealth(Mathf.Min(attack.m_character.GetHealth() - 1f, attackHealth));
-        }
-
-        return true;
+        return TryConsumeAttackResources(attack, stopAttackOnFailure: true, flashHudOnFailure: false);
     }
 }

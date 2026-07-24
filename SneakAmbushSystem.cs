@@ -135,7 +135,7 @@ internal static class SneakAmbushSystem
         Transform? source = prefab != null ? prefab.transform.Find(SmokeBombVfxChildName) : null;
         if (source == null)
         {
-            if (SecondaryAttackManager.TryMarkCompatibilityWarningReported("smoke_strike_vfx_missing"))
+            if (SecondaryAttackWarningLog.TryMarkWarning("smoke_strike_vfx_missing"))
             {
                 SecondaryAttacksPlugin.ModLogger.LogWarning($"Sneak Ambush VFX requires child '{SmokeBombVfxChildName}' on prefab '{SmokeBombExplosionPrefabName}', but it was not found.");
             }

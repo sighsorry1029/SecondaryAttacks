@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace SecondaryAttacks;
 
 internal sealed class NormalizedSneakAmbushConfig
@@ -81,12 +79,6 @@ internal sealed class NormalizedLaunchSlamConfig
     public float LaunchHeight { get; set; } = 4f;
 
     public float DamageFactor { get; set; } = 1f;
-
-    public string Vfx { get; set; } = "vfx_archerytarget_bullseye";
-
-    public Vector3 VfxRotationOffset { get; set; } = new(90f, 0f, 0f);
-
-    public string Sfx { get; set; } = "sfx_sledge_hit";
 
     public static NormalizedLaunchSlamConfig CreateDefault()
     {

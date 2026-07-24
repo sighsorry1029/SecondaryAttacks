@@ -1,20 +1,9 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace SecondaryAttacks;
 
 internal static partial class SecondaryAttackManager
 {
-    internal static float GetConfiguredSummonEmpowerMoveSpeedFactor(NormalizedWeaponConfig weaponConfig)
-    {
-        return weaponConfig.Secondary?.SummonEmpower.MoveSpeedFactor ?? 1f;
-    }
-
-    internal static float GetConfiguredSummonEmpowerAttackSpeedFactor(NormalizedWeaponConfig weaponConfig)
-    {
-        return weaponConfig.Secondary?.SummonEmpower.AttackSpeedFactor ?? 1f;
-    }
-
     private static float GetNormalizedResourceMultiplier(NormalizedWeaponConfig weaponConfig)
     {
         if (weaponConfig.HarvestSweep?.Enabled == true)
@@ -154,10 +143,7 @@ internal static partial class SecondaryAttackManager
                 launchSlam.CooldownReductionFactor),
             DurabilityFactor = Mathf.Max(0f, launchSlam.DurabilityFactor),
             LaunchHeight = Mathf.Max(0f, launchSlam.LaunchHeight),
-            DamageFactor = Mathf.Max(0f, launchSlam.DamageFactor),
-            Vfx = launchSlam.Vfx.Trim(),
-            VfxRotationOffset = launchSlam.VfxRotationOffset,
-            Sfx = launchSlam.Sfx.Trim()
+            DamageFactor = Mathf.Max(0f, launchSlam.DamageFactor)
         };
     }
 
@@ -291,7 +277,6 @@ internal static partial class SecondaryAttackManager
             PresetCooldown = CreatePresetCooldown(
                 boomerang.Cooldown,
                 boomerang.CooldownReductionFactor),
-            CooldownFallback = ProjectilePresetCooldownFallback.OriginalSecondary,
             Side = "right",
             ProjectileSpinAxis = boomerang.ProjectileSpinAxis,
             ProjectileVisualRotationOffset = boomerang.ProjectileVisualRotationOffset,
@@ -335,6 +320,40 @@ internal static partial class SecondaryAttackManager
         };
     }
 
+    private static void ApplyCoreDefinitionFeatures(
+        SecondaryAttackDefinition definition,
+        NormalizedWeaponConfig weaponConfig)
+    {
+        definition.SneakAmbush = CreateSneakAmbushDefinition(weaponConfig);
+        definition.CleavingThrust = CreateCleavingThrustDefinition(weaponConfig);
+        definition.LaunchSlam = CreateLaunchSlamDefinition(weaponConfig);
+        definition.KnockbackChain = CreateKnockbackChainDefinition(weaponConfig);
+        definition.Aftershock = CreateAftershockDefinition(weaponConfig);
+    }
+
+    private static void ApplyExtendedDefinitionFeatures(
+        SecondaryAttackDefinition definition,
+        NormalizedWeaponConfig weaponConfig)
+    {
+        ApplyCoreDefinitionFeatures(definition, weaponConfig);
+        definition.RiftTrail = CreateRiftTrailDefinition(weaponConfig);
+        definition.FractureLine = CreateFractureLineDefinition(weaponConfig);
+        definition.HarvestSweep = CreateHarvestSweepDefinition(weaponConfig);
+        definition.Boomerang = CreateBoomerangDefinition(weaponConfig);
+        definition.SpinningSweep = CreateSpinningSweepDefinition(weaponConfig);
+    }
+
+    private static void ApplyProjectileDefinitionFeatures(
+        SecondaryAttackDefinition definition,
+        string prefabName,
+        NormalizedWeaponConfig weaponConfig)
+    {
+        ApplyExtendedDefinitionFeatures(definition, weaponConfig);
+        definition.OnProjectileHit = CreateMeleeOnProjectileHitDefinition(
+            prefabName,
+            weaponConfig.Secondary?.OnProjectileHit);
+    }
+
     private static int ResolveAmmoConsumption(int configuredValue, bool usesAmmo, SecondaryAttackPreset preset, int projectileCount)
     {
         if (preset == SecondaryAttackPreset.OverchargedBomb)
@@ -362,10 +381,9 @@ internal static partial class SecondaryAttackManager
 
     internal static SecondaryAttackDefinition CreateEffectOnlyDefinition(
         string prefabName,
-        NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects)
+        NormalizedWeaponConfig weaponConfig)
     {
-        return new SecondaryAttackDefinition
+        SecondaryAttackDefinition definition = new()
         {
             PrefabName = prefabName,
             AppliesSecondaryOverride = false,
@@ -374,19 +392,10 @@ internal static partial class SecondaryAttackManager
             HasCustomAttackAnimation = false,
             ResourceMultiplier = Mathf.Max(0f, GetNormalizedResourceMultiplier(weaponConfig)),
             OutputMultiplier = Mathf.Max(0f, GetNormalizedOutputMultiplier(weaponConfig)),
-            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig)),
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            RiftTrail = CreateRiftTrailDefinition(weaponConfig),
-            FractureLine = CreateFractureLineDefinition(weaponConfig),
-            HarvestSweep = CreateHarvestSweepDefinition(weaponConfig),
-            Boomerang = CreateBoomerangDefinition(weaponConfig),
-            SpinningSweep = CreateSpinningSweepDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = Mathf.Max(0f, GetSelectedMeleeDurabilityFactor(weaponConfig))
         };
+        ApplyExtendedDefinitionFeatures(definition, weaponConfig);
+        return definition;
     }
 
 }

@@ -473,7 +473,6 @@ internal static class AftershockSystem
     {
         private int _nextWave;
         private float _nextWaveTime;
-        private bool _registered;
         private bool _durabilityDrained;
         private bool _finished;
 
@@ -501,8 +500,6 @@ internal static class AftershockSystem
                          attackerTransform.right * attack.m_attackOffset;
             _nextWave = 0;
             _nextWaveTime = Time.time;
-            _registered = true;
-            SecondaryAttackManager.RegisterAsyncSecondaryWork(attack.m_character);
             enabled = true;
         }
 
@@ -557,13 +554,5 @@ internal static class AftershockSystem
             Destroy(this);
         }
 
-        private void OnDestroy()
-        {
-            if (_registered)
-            {
-                SecondaryAttackManager.UnregisterAsyncSecondaryWork(Attack?.m_character);
-                _registered = false;
-            }
-        }
     }
 }

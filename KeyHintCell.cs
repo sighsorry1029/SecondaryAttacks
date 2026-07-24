@@ -38,14 +38,6 @@ internal sealed class KeyHintCell
 
     internal bool HasKeyTexts => _keys.Count > 0;
 
-    internal static KeyHintCell? Resolve(Transform owner, string transformPath)
-    {
-        Transform transform = owner.Find(transformPath);
-        return transform != null && IsUsableTemplate(transform.gameObject)
-            ? new KeyHintCell(transform.gameObject, hideOnRestore: false)
-            : null;
-    }
-
     internal static KeyHintCell? CloneFrom(KeyHintCell? template, string name, bool hideOnRestore)
     {
         return CloneFrom(template?.Root, name, hideOnRestore);
@@ -75,21 +67,6 @@ internal sealed class KeyHintCell
                template.transform.parent != null &&
                !template.name.StartsWith("SecondaryAttacks_") &&
                template.GetComponentsInChildren<TMP_Text>(includeInactive: true).Length > 0;
-    }
-
-    internal static Transform? FindParentWithTemplates(GameObject root, string name)
-    {
-        Transform transform = root.transform.Find(name);
-        if (transform == null)
-        {
-            return null;
-        }
-
-        return transform
-            .Cast<Transform>()
-            .Any(static child => IsUsableTemplate(child.gameObject))
-            ? transform
-            : null;
     }
 
     internal void Set(string label, IReadOnlyList<string> keys, float preferredTextWidth = 0f, bool hideExtraTexts = false)
@@ -301,33 +278,6 @@ internal sealed class KeyHintCell
         if (Root != null)
         {
             Root.SetActive(active);
-        }
-    }
-
-    internal void MoveBefore(GameObject? template)
-    {
-        if (template == null ||
-            Root == null ||
-            Root == template ||
-            Root.transform.parent != template.transform.parent)
-        {
-            return;
-        }
-
-        int currentIndex = Root.transform.GetSiblingIndex();
-        int templateIndex = template.transform.GetSiblingIndex();
-        int targetIndex = currentIndex < templateIndex ? templateIndex - 1 : templateIndex;
-        if (currentIndex != targetIndex)
-        {
-            Root.transform.SetSiblingIndex(Mathf.Max(0, targetIndex));
-        }
-    }
-
-    internal void MoveToEnd()
-    {
-        if (Root != null)
-        {
-            Root.transform.SetAsLastSibling();
         }
     }
 

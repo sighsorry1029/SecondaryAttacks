@@ -129,11 +129,6 @@ internal static class CopiedThrowProjectileVisualSystem
         ApplyCurrentWeaponHitEffects(projectile, visualWeapon);
         ApplyCopiedThrowAttribution(projectile, visualWeapon);
 
-        if (SecondaryAttackStartAttackDispatch.ShouldSkipProjectilePresetEffectsForCooldown(attack))
-        {
-            return;
-        }
-
         MeleeBoomerangProjectileSystem.TryApplyToProjectileSetup(projectile, attack, visualWeapon);
         MeleeProjectileHitCascadeSystem.RegisterOnProjectileHitSource(projectile, attack, visualWeapon);
     }

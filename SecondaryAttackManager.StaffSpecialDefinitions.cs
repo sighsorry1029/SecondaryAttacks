@@ -12,7 +12,6 @@ internal static partial class SecondaryAttackManager
         ItemDrop.ItemData.SharedData sharedData,
         Attack primaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects,
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
@@ -50,14 +49,9 @@ internal static partial class SecondaryAttackManager
             AttackAnimation = attackAnimation,
             HasCustomAttackAnimation = hasCustomAttackAnimation,
             ResourceMultiplier = Mathf.Max(0f, GetNormalizedResourceMultiplier(weaponConfig)),
-            DurabilityFactor = Mathf.Max(0f, GetNormalizedDurabilityFactor(weaponConfig)),
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = Mathf.Max(0f, GetNormalizedDurabilityFactor(weaponConfig))
         };
+        ApplyCoreDefinitionFeatures(definition, weaponConfig);
         ApplyAttackResourceScaling(definition, primaryAttack, GetNormalizedResourceMultiplier(weaponConfig));
         return true;
     }
@@ -67,7 +61,6 @@ internal static partial class SecondaryAttackManager
         ItemDrop.ItemData.SharedData sharedData,
         Attack primaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        List<ConfiguredWeaponEffectDefinition> configuredEffects,
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
@@ -102,14 +95,9 @@ internal static partial class SecondaryAttackManager
             AttackAnimation = attackAnimation,
             HasCustomAttackAnimation = hasCustomAttackAnimation,
             ResourceMultiplier = Mathf.Max(0f, GetNormalizedResourceMultiplier(weaponConfig)),
-            DurabilityFactor = Mathf.Max(0f, GetNormalizedDurabilityFactor(weaponConfig)),
-            SneakAmbush = CreateSneakAmbushDefinition(weaponConfig),
-            CleavingThrust = CreateCleavingThrustDefinition(weaponConfig),
-            LaunchSlam = CreateLaunchSlamDefinition(weaponConfig),
-            KnockbackChain = CreateKnockbackChainDefinition(weaponConfig),
-            Aftershock = CreateAftershockDefinition(weaponConfig),
-            ConfiguredEffects = configuredEffects
+            DurabilityFactor = Mathf.Max(0f, GetNormalizedDurabilityFactor(weaponConfig))
         };
+        ApplyCoreDefinitionFeatures(definition, weaponConfig);
         ApplyAttackResourceScaling(definition, primaryAttack, GetNormalizedResourceMultiplier(weaponConfig));
         return true;
     }
