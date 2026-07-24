@@ -2,7 +2,8 @@
 
 ## 1.1.4
 
-- Added an optional, server-synchronized quickstep for equipped Knives and Unarmed weapons, with configurable acceleration, duration, shield invincibility, cooldown, stamina cost, and double-press handoff to a regular dodge.
+- Replaced the individual Quickstep tuning entries with one server-synchronized `Quickstep Enabled` option in General, using fixed 200 acceleration, 0.25-second duration, 0.15-second shield invincibility, 0.5-second cooldown, and 60% dodge stamina cost.
+- Made a second dodge input during Quickstep hand off to a regular roll for the same 60% cost, and added a concise localized Compendium guide for fist and knife weapons.
 - Kept quickstep state isolated from Sneak Ambush and custom crouch effects, restored vanilla player state on interruptions, and disabled the integration when the standalone Quickstep plugin is loaded.
 - Added owner-authoritative fixed-target homing to launched Sentinel projectiles, using a limited turn rate without mid-flight target searches, retargeting, or additional network messages.
 

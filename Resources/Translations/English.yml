@@ -4,6 +4,8 @@ sa_summon_name_format: "{0} (Summon)"
 
 sa_compendium_title: Secondary Attacks
 sa_compendium_intro: Attack preset cooldowns are reduced according to the equipped weapon's skill level.
+sa_compendium_quickstep_name: Quickstep
+sa_compendium_quickstep_description: Quickstep is available while using fist or knife weapons. Press Dodge twice to transition from Quickstep into a regular dodge.
 sa_compendium_group_ranged: Ranged Presets
 sa_compendium_group_melee: Melee Presets
 sa_compendium_group_blood_magic: Blood Magic Presets

@@ -83,6 +83,15 @@ internal static class SecondaryAttackCompendiumManager
                 "Attack preset cooldowns are reduced according to the equipped weapon's skill level."))
             .Append("</color>\n\n");
 
+        builder
+            .Append("<color=#FFD27A><b>")
+            .Append(SecondaryAttackLocalization.Localize("$sa_compendium_quickstep_name", "Quickstep"))
+            .Append("</b></color>\n\n")
+            .Append(SecondaryAttackLocalization.Localize(
+                "$sa_compendium_quickstep_description",
+                "Quickstep is available while using fist or knife weapons. Press Dodge twice to transition from Quickstep into a regular dodge."))
+            .Append("\n\n\n");
+
         SecondaryAttackPresetGroup? previousGroup = null;
         foreach (SecondaryAttackPresetInfo entry in SecondaryAttackPresetCatalog.Entries)
         {

@@ -4,6 +4,8 @@ sa_summon_name_format: "{0} (소환)"
 
 sa_compendium_title: 보조 공격
 sa_compendium_intro: 공격 프리셋의 재사용 대기시간은 장착한 무기의 스킬 레벨에 따라 감소합니다.
+sa_compendium_quickstep_name: 퀵스텝
+sa_compendium_quickstep_description: 격투 또는 단검 무기 사용 중 퀵스텝을 사용할 수 있습니다. 구르기를 두 번 누르면 퀵스텝에서 일반 회피로 전환됩니다.
 sa_compendium_group_ranged: 원거리 프리셋
 sa_compendium_group_melee: 근접 프리셋
 sa_compendium_group_blood_magic: 혈마법 프리셋

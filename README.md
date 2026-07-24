@@ -10,7 +10,7 @@ Adds secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, 
 - Lets weapon groups use default presets from config while individual prefabs can be tuned through YAML.
 - Syncs YAML configuration through ServerSync for dedicated servers and multiplayer clients.
 - Supports cooldowns, durability cost, resource cost, ammo cost, skill gain, adrenaline gain, and HUD feedback.
-- Optionally replaces dodge with a configurable quickstep while a knife or Unarmed weapon is equipped.
+- Optionally replaces dodge with a fixed quickstep while a knife or Unarmed weapon is equipped.
 - Includes compatibility support for MagicPlugin summon projectiles and the companion WarfareTweaks mod.
 
 ## Ranged Presets
@@ -173,9 +173,9 @@ Overcharged Bomb greatly increases bomb damage and area size, at the cost of con
 
 ## Quickstep
 
-Enable `Quickstep Enabled` in the `5 - Quickstep` config group to replace dodge with a short dash while an equipped weapon uses the `Knives` or `Unarmed` skill. Bare fists are excluded.
+Enable `Quickstep Enabled` in the `1 - General` config group to replace dodge with a short dash while an equipped weapon uses the `Knives` or `Unarmed` skill. Bare fists are excluded.
 
-Dash force, duration, shield invincibility time, cooldown, stamina multiplier, and double-press handoff to a regular dodge are configurable and synchronized by the server. Quickstep cooldown prevents another dash but still allows a regular dodge. If the standalone `shudnal.Quickstep` plugin is loaded, the integrated implementation disables itself to avoid competing dodge patches.
+Quickstep uses fixed behavior: 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep consumes 60% of the current vanilla dodge stamina cost. Pressing dodge again during the dash hands off to a regular roll for another 60%; without enough stamina, the dash continues and the second input is consumed. During the quickstep cooldown, a standalone regular roll remains available at its full vanilla cost. If the standalone `shudnal.Quickstep` plugin is loaded, the integrated implementation disables itself to avoid competing dodge patches.
 
 ## Blood Magic
 

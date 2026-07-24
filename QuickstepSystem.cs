@@ -7,6 +7,12 @@ namespace SecondaryAttacks;
 
 internal static class QuickstepSystem
 {
+    internal const float DashAcceleration = 200f;
+    internal const float DashDuration = 0.25f;
+    internal const float ShieldInvincibilityDuration = 0.15f;
+    internal const float CooldownDuration = 0.5f;
+    internal const float StaminaUsageFactor = 0.6f;
+
     private static bool _initialized;
     private static bool _externalQuickstepLoaded;
     private static bool _conflictWarningLogged;
@@ -36,7 +42,7 @@ internal static class QuickstepSystem
         }
 
         _initialized = false;
-        _controller?.ResetState(applyExitDamping: false, clearFreeDodgeHandoff: true);
+        _controller?.ResetState(applyExitDamping: false, clearDodgeHandoff: true);
         _controller = null;
     }
 
@@ -61,24 +67,14 @@ internal static class QuickstepSystem
         }
     }
 
-    internal static bool ShouldSuppressDodgeStaminaCost(Player player)
-    {
-        // A handoff that already started must finish with zero cost and zero perfect-dodge refund,
-        // even if the setting is disabled while the vanilla roll is in progress.
-        return player != null &&
-               _controller != null &&
-               _controller.IsFor(player) &&
-               _controller.FreeDodgeHandoffActive;
-    }
-
     internal static void AdjustDodgeStaminaCost(Player player, ref float staminaUse)
     {
         if (player != null &&
             _controller != null &&
             _controller.IsFor(player) &&
-            _controller.Active)
+            (_controller.Active || _controller.DodgeHandoffActive))
         {
-            staminaUse *= _controller.StaminaUsageMultiplier;
+            staminaUse = _controller.DodgeStaminaUse;
         }
     }
 
@@ -86,7 +82,7 @@ internal static class QuickstepSystem
     {
         if (_controller != null && _controller.IsFor(player))
         {
-            _controller.UpdateFreeDodgeHandoff();
+            _controller.UpdateDodgeHandoff();
         }
     }
 
@@ -105,7 +101,7 @@ internal static class QuickstepSystem
             return;
         }
 
-        _controller.ResetState(applyExitDamping: false, clearFreeDodgeHandoff: true);
+        _controller.ResetState(applyExitDamping: false, clearDodgeHandoff: true);
     }
 
     internal static void NotifyControllerDestroyed(QuickstepController controller)
@@ -121,7 +117,7 @@ internal static class QuickstepSystem
         QuickstepController? controller = _controller != null && _controller.IsFor(player)
             ? _controller
             : null;
-        controller?.UpdateFreeDodgeHandoff();
+        controller?.UpdateDodgeHandoff();
         controller?.RetryPendingCleanup();
 
         if (!IsFeatureAvailable(player))
@@ -157,14 +153,28 @@ internal static class QuickstepSystem
 
             if (player.m_queuedDodgeTimer > 0f)
             {
-                if (controller.DodgeOnDoubleClick)
+                if (!CanHandoffToDodge(player))
                 {
-                    controller.Stop(applyExitDamping: true, startCooldown: true);
-                    controller.BeginFreeDodgeHandoff();
-                    return true;
+                    player.m_queuedDodgeTimer = 0f;
                 }
-
-                player.m_queuedDodgeTimer = 0f;
+                else
+                {
+                    float handoffStaminaUse = controller.DodgeStaminaUse;
+                    if (!player.HaveStamina(handoffStaminaUse))
+                    {
+                        player.m_queuedDodgeTimer = 0f;
+                        if (Hud.instance != null)
+                        {
+                            Hud.instance.StaminaBarEmptyFlash();
+                        }
+                    }
+                    else
+                    {
+                        controller.Stop(applyExitDamping: true, startCooldown: true);
+                        controller.BeginDodgeHandoff(handoffStaminaUse);
+                        return true;
+                    }
+                }
             }
 
             controller.Tick(dt);
@@ -172,7 +182,7 @@ internal static class QuickstepSystem
         }
 
         if (player.InDodge() ||
-            controller?.FreeDodgeHandoffActive == true ||
+            controller?.DodgeHandoffActive == true ||
             controller?.CoolingDown == true ||
             player.m_queuedDodgeTimer <= 0f ||
             !CanStart(player))
@@ -180,8 +190,7 @@ internal static class QuickstepSystem
             return true;
         }
 
-        QuickstepSettingsSnapshot settings = CaptureSettings();
-        float staminaUse = Mathf.Max(0f, player.GetDodgeStaminaUse() * settings.StaminaUsageMultiplier);
+        float staminaUse = Mathf.Max(0f, player.GetDodgeStaminaUse() * StaminaUsageFactor);
         if (!player.HaveStamina(staminaUse))
         {
             player.m_queuedDodgeTimer = Mathf.Max(0f, player.m_queuedDodgeTimer - Mathf.Max(0f, dt));
@@ -195,7 +204,6 @@ internal static class QuickstepSystem
 
         controller ??= GetOrAddController(player);
         controller.Begin(
-            settings,
             player.m_queuedDodgeDir,
             HasShieldEquipped(player),
             staminaUse);
@@ -262,16 +270,14 @@ internal static class QuickstepSystem
                !player.IsStaggering();
     }
 
-    private static QuickstepSettingsSnapshot CaptureSettings()
+    private static bool CanHandoffToDodge(Player player)
     {
-        float dashTime = Mathf.Clamp(SecondaryAttacksPlugin.QuickstepDashTime.Value, 0.05f, 2f);
-        return new QuickstepSettingsSnapshot(
-            Mathf.Clamp(SecondaryAttacksPlugin.QuickstepDashForce.Value, 0f, 200f),
-            dashTime,
-            Mathf.Clamp(SecondaryAttacksPlugin.QuickstepInvincibilityTimeWithShield.Value, 0f, dashTime),
-            Mathf.Clamp(SecondaryAttacksPlugin.QuickstepCooldown.Value, 0f, 10f),
-            Mathf.Clamp(SecondaryAttacksPlugin.QuickstepStaminaUsageMultiplier.Value, 0f, 5f),
-            SecondaryAttacksPlugin.QuickstepDodgeOnDoubleClick.Value == SecondaryAttacksPlugin.Toggle.On);
+        return player.IsOnGround() &&
+               !player.IsDead() &&
+               !player.IsTeleporting() &&
+               !player.InAttack() &&
+               !player.IsEncumbered() &&
+               !player.IsStaggering();
     }
 
     private static QuickstepController? GetExistingController(Player player)
@@ -338,9 +344,8 @@ internal static class QuickstepSystem
             return;
         }
 
-        _controller?.ResetState(applyExitDamping: true, clearFreeDodgeHandoff: false);
-        // Do not clear an in-flight vanilla handoff here; its stamina refund must stay suppressed
-        // until the roll ends or the short observation deadline expires.
+        _controller?.ResetState(applyExitDamping: true, clearDodgeHandoff: false);
+        // Keep an in-flight vanilla handoff scaled until its roll and possible stamina refund finish.
     }
 
     private static void DisableAfterRuntimeError(Player player, Exception exception)
@@ -351,22 +356,6 @@ internal static class QuickstepSystem
             $"Integrated Quickstep was disabled for this session after a runtime error. {exception}");
     }
 
-    internal readonly struct QuickstepSettingsSnapshot(
-        float dashForce,
-        float dashTime,
-        float invincibilityTimeWithShield,
-        float cooldown,
-        float staminaUsageMultiplier,
-        bool dodgeOnDoubleClick)
-    {
-        internal readonly float DashForce = dashForce;
-        internal readonly float DashTime = dashTime;
-        internal readonly float InvincibilityTimeWithShield = invincibilityTimeWithShield;
-        internal readonly float Cooldown = cooldown;
-        internal readonly float StaminaUsageMultiplier = staminaUsageMultiplier;
-        internal readonly bool DodgeOnDoubleClick = dodgeOnDoubleClick;
-    }
-
 }
 
 internal sealed class QuickstepController : MonoBehaviour
@@ -374,13 +363,13 @@ internal sealed class QuickstepController : MonoBehaviour
     private static readonly int EquippingAnimatorHash = ZSyncAnimation.GetHash("equipping");
 
     private Player? _player;
-    private QuickstepSystem.QuickstepSettingsSnapshot _settings;
     private QuickstepPhase _phase;
     private Vector3 _direction;
     private Vector3 _startingVelocity;
     private float _dashElapsed;
     private float _activeElapsed;
     private float _readyAt;
+    private float _dodgeStaminaUse;
     private float _originalAnimatorSpeed = 1f;
     private float _appliedAnimatorSpeed = 1f;
     private bool _hasShield;
@@ -393,21 +382,19 @@ internal sealed class QuickstepController : MonoBehaviour
     private bool _animatorSpeedTouched;
     private bool _dodgeStateTouched;
     private bool _invincibleApplied;
-    private bool _freeDodgeHandoff;
-    private bool _freeDodgeObserved;
-    private float _freeDodgeObserveDeadline;
-    private float _freeDodgeHardDeadline;
+    private bool _dodgeHandoff;
+    private bool _dodgeHandoffObserved;
+    private float _dodgeHandoffObserveDeadline;
+    private float _dodgeHandoffHardDeadline;
     private bool _cleanupErrorLogged;
 
     internal bool Active { get; private set; }
 
     internal bool CoolingDown => Time.time < _readyAt;
 
-    internal bool DodgeOnDoubleClick => _settings.DodgeOnDoubleClick;
+    internal bool DodgeHandoffActive => _dodgeHandoff;
 
-    internal float StaminaUsageMultiplier => _settings.StaminaUsageMultiplier;
-
-    internal bool FreeDodgeHandoffActive => _freeDodgeHandoff;
+    internal float DodgeStaminaUse => _dodgeStaminaUse;
 
     private void Awake()
     {
@@ -416,12 +403,12 @@ internal sealed class QuickstepController : MonoBehaviour
 
     private void OnDisable()
     {
-        ResetState(applyExitDamping: false, clearFreeDodgeHandoff: true);
+        ResetState(applyExitDamping: false, clearDodgeHandoff: true);
     }
 
     private void OnDestroy()
     {
-        ResetState(applyExitDamping: false, clearFreeDodgeHandoff: true);
+        ResetState(applyExitDamping: false, clearDodgeHandoff: true);
         QuickstepSystem.NotifyControllerDestroyed(this);
     }
 
@@ -436,7 +423,6 @@ internal sealed class QuickstepController : MonoBehaviour
     }
 
     internal void Begin(
-        QuickstepSystem.QuickstepSettingsSnapshot settings,
         Vector3 direction,
         bool hasShield,
         float staminaUse)
@@ -453,7 +439,7 @@ internal sealed class QuickstepController : MonoBehaviour
             throw new InvalidOperationException("Quickstep could not restore the previous player state.");
         }
 
-        ClearFreeDodgeHandoff();
+        ClearDodgeHandoff();
         Vector3 horizontalDirection = direction;
         horizontalDirection.y = 0f;
         if (horizontalDirection.sqrMagnitude <= 0.0001f)
@@ -462,9 +448,9 @@ internal sealed class QuickstepController : MonoBehaviour
             horizontalDirection.y = 0f;
         }
 
-        _settings = settings;
         _direction = horizontalDirection.normalized;
         _hasShield = hasShield;
+        _dodgeStaminaUse = staminaUse;
         _dashElapsed = 0f;
         _activeElapsed = 0f;
         _startingVelocity = player.m_body.linearVelocity;
@@ -490,7 +476,7 @@ internal sealed class QuickstepController : MonoBehaviour
         player.m_inDodge = true;
         player.m_beenHitWhileDodging = false;
         _dodgeStateTouched = true;
-        SetInvincible(value: !_hasShield || _settings.InvincibilityTimeWithShield > 0f);
+        SetInvincible(value: true);
 
         if (!wasCrouching)
         {
@@ -558,7 +544,7 @@ internal sealed class QuickstepController : MonoBehaviour
         _phase = QuickstepPhase.None;
         if (startCooldown)
         {
-            _readyAt = Time.time + _settings.Cooldown;
+            _readyAt = Time.time + QuickstepSystem.CooldownDuration;
         }
 
         Exception? cleanupException = null;
@@ -609,13 +595,13 @@ internal sealed class QuickstepController : MonoBehaviour
         _readyAt = 0f;
     }
 
-    internal void ResetState(bool applyExitDamping, bool clearFreeDodgeHandoff)
+    internal void ResetState(bool applyExitDamping, bool clearDodgeHandoff)
     {
         Stop(applyExitDamping, startCooldown: false);
         ClearCooldown();
-        if (clearFreeDodgeHandoff)
+        if (clearDodgeHandoff)
         {
-            ClearFreeDodgeHandoff();
+            ClearDodgeHandoff();
         }
     }
 
@@ -627,60 +613,62 @@ internal sealed class QuickstepController : MonoBehaviour
         }
     }
 
-    internal void BeginFreeDodgeHandoff()
+    internal void BeginDodgeHandoff(float staminaUse)
     {
-        _freeDodgeHandoff = true;
-        _freeDodgeObserved = false;
-        _freeDodgeObserveDeadline = Time.time + 0.6f;
-        _freeDodgeHardDeadline = Time.time + 3f;
+        _dodgeStaminaUse = Mathf.Max(0f, staminaUse);
+        _dodgeHandoff = true;
+        _dodgeHandoffObserved = false;
+        _dodgeHandoffObserveDeadline = Time.time + 0.6f;
+        _dodgeHandoffHardDeadline = Time.time + 3f;
     }
 
-    internal void UpdateFreeDodgeHandoff()
+    internal void UpdateDodgeHandoff()
     {
-        if (!_freeDodgeHandoff || _player == null)
+        if (!_dodgeHandoff || _player == null)
         {
             return;
         }
 
         if (_player.IsDead() ||
             _player.IsTeleporting() ||
-            Time.time >= _freeDodgeHardDeadline)
+            Time.time >= _dodgeHandoffHardDeadline)
         {
-            ClearFreeDodgeHandoff();
+            ClearDodgeHandoff();
             return;
         }
 
         bool inDodge = _player.InDodge();
-        if (_freeDodgeObserved)
+        if (_dodgeHandoffObserved)
         {
             if (inDodge || _player.m_dodgeInvincible)
             {
                 return;
             }
 
-            ClearFreeDodgeHandoff();
+            ClearDodgeHandoff();
             return;
         }
 
         if (inDodge || _player.m_dodgeInvincible)
         {
-            _freeDodgeObserved = true;
+            _dodgeHandoffObserved = true;
             return;
         }
 
         if (_player.m_queuedDodgeTimer <= 0f ||
-            Time.time >= _freeDodgeObserveDeadline)
+            Time.time >= _dodgeHandoffObserveDeadline)
         {
-            ClearFreeDodgeHandoff();
+            ClearDodgeHandoff();
         }
     }
 
-    private void ClearFreeDodgeHandoff()
+    private void ClearDodgeHandoff()
     {
-        _freeDodgeHandoff = false;
-        _freeDodgeObserved = false;
-        _freeDodgeObserveDeadline = 0f;
-        _freeDodgeHardDeadline = 0f;
+        _dodgeHandoff = false;
+        _dodgeHandoffObserved = false;
+        _dodgeHandoffObserveDeadline = 0f;
+        _dodgeHandoffHardDeadline = 0f;
+        _dodgeStaminaUse = 0f;
     }
 
     private void TickDash(float dt)
@@ -691,18 +679,18 @@ internal sealed class QuickstepController : MonoBehaviour
             return;
         }
 
-        float remaining = Mathf.Max(0f, _settings.DashTime - _dashElapsed);
+        float remaining = Mathf.Max(0f, QuickstepSystem.DashDuration - _dashElapsed);
         float appliedFraction = Mathf.Clamp01(remaining / dt);
-        if (_settings.DashForce > 0f && appliedFraction > 0f)
+        if (appliedFraction > 0f)
         {
             player.m_body.AddForce(
-                _direction * (_settings.DashForce * appliedFraction),
+                _direction * (QuickstepSystem.DashAcceleration * appliedFraction),
                 ForceMode.Acceleration);
         }
 
         _dashElapsed += Mathf.Min(dt, remaining);
 
-        if (_dashElapsed >= _settings.DashTime)
+        if (_dashElapsed >= QuickstepSystem.DashDuration)
         {
             Stop(applyExitDamping: true, startCooldown: true);
         }
@@ -846,7 +834,7 @@ internal sealed class QuickstepController : MonoBehaviour
         }
 
         _activeElapsed += dt;
-        if (_activeElapsed >= _settings.InvincibilityTimeWithShield)
+        if (_activeElapsed >= QuickstepSystem.ShieldInvincibilityDuration)
         {
             SetInvincible(value: false);
         }
@@ -890,17 +878,6 @@ internal static class PlayerUpdateDodgeQuickstepPatch
 [HarmonyPatch(typeof(Player), nameof(Player.GetDodgeStaminaUse))]
 internal static class PlayerGetDodgeStaminaUseQuickstepPatch
 {
-    private static bool Prefix(Player __instance, ref float __result)
-    {
-        if (!QuickstepSystem.ShouldSuppressDodgeStaminaCost(__instance))
-        {
-            return true;
-        }
-
-        __result = 0f;
-        return false;
-    }
-
     private static void Postfix(Player __instance, ref float __result)
     {
         QuickstepSystem.AdjustDodgeStaminaCost(__instance, ref __result);
