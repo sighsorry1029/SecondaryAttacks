@@ -13,6 +13,7 @@ internal static partial class ProjectileRuntimeSystem
     private const float PiercingShotHitCooldown = 0.25f;
     private const float SentinelTargetScanInterval = 0.15f;
     private const float SentinelTargetScanJitter = 0.03f;
+    private const float SentinelHomingTurnRateDegreesPerSecond = 180f;
     private static readonly HashSet<Attack> DeferredBurstFireReloadResets = new();
     private static readonly HashSet<Attack> ActiveBurstFireControllers = new();
     private static readonly ConditionalWeakTable<Projectile, PiercingShotState> PiercingShotProjectiles = new();
@@ -2098,6 +2099,7 @@ internal static partial class ProjectileRuntimeSystem
         private ItemDrop.ItemData _weapon = null!;
         private ItemDrop.ItemData? _ammo;
         private Projectile _projectile = null!;
+        private ZNetView? _nview;
         private SecondaryAttackDefinition _definition = null!;
         private ProjectileSecondaryBehavior _behavior = null!;
         private Collider[] _colliders = Array.Empty<Collider>();
@@ -2132,6 +2134,7 @@ internal static partial class ProjectileRuntimeSystem
             _weapon = weapon;
             _ammo = ammo;
             _projectile = projectile;
+            _nview = projectile.GetComponent<ZNetView>();
             _definition = definition;
             _behavior = (ProjectileSecondaryBehavior)definition.Behavior;
             _hitNoise = hitNoise;
@@ -2166,6 +2169,7 @@ internal static partial class ProjectileRuntimeSystem
         {
             if (_released)
             {
+                UpdateHoming();
                 return;
             }
 
@@ -2181,7 +2185,7 @@ internal static partial class ProjectileRuntimeSystem
             Character? target = TryAcquireTarget();
             if (target != null)
             {
-                Release(target.GetCenterPoint());
+                Release(target);
                 return;
             }
 
@@ -2216,8 +2220,9 @@ internal static partial class ProjectileRuntimeSystem
             return _cachedTarget;
         }
 
-        private void Release(Vector3 targetPoint)
+        private void Release(Character target)
         {
+            Vector3 targetPoint = target.GetCenterPoint();
             Vector3 direction = targetPoint - transform.position;
             if (direction.sqrMagnitude < 0.001f)
             {
@@ -2244,8 +2249,51 @@ internal static partial class ProjectileRuntimeSystem
                 secondaryAttack: true,
                 _definition,
                 disableCurrentAttackFallback: false);
+            _cachedTarget = target;
             _released = true;
-            Destroy(this);
+        }
+
+        private void UpdateHoming()
+        {
+            if (_projectile == null || !_projectile.enabled)
+            {
+                Destroy(this);
+                return;
+            }
+
+            if (_nview != null && (!_nview.IsValid() || !_nview.IsOwner()))
+            {
+                return;
+            }
+
+            Character? target = _cachedTarget;
+            if (_owner == null || target == null || target.IsDead() || !BaseAI.IsEnemy(_owner, target))
+            {
+                _cachedTarget = null;
+                Destroy(this);
+                return;
+            }
+
+            Vector3 targetDirection = target.GetCenterPoint() - transform.position;
+            Vector3 velocity = _projectile.GetVelocity();
+            float speed = velocity.magnitude;
+            if (speed < 0.01f)
+            {
+                Destroy(this);
+                return;
+            }
+
+            if (targetDirection.sqrMagnitude < 0.001f)
+            {
+                return;
+            }
+
+            Vector3 guidedDirection = Vector3.RotateTowards(
+                velocity / speed,
+                targetDirection.normalized,
+                SentinelHomingTurnRateDegreesPerSecond * Mathf.Deg2Rad * Time.fixedDeltaTime,
+                0f);
+            _projectile.m_vel = guidedDirection * speed;
         }
     }
 

@@ -492,6 +492,7 @@
         <Compile Include="Plugin.cs"/>
         <Compile Include="ProjectileAccess.cs" />
         <Compile Include="ProjectileRuntimeSystem.cs" />
+        <Compile Include="QuickstepSystem.cs" />
         <Compile Include="RiftTrailSystem.cs" />
         <Compile Include="Properties\AssemblyInfo.cs"/>
         <Compile Include="SecondaryAttackCompiledSnapshot.cs" />

@@ -14,11 +14,13 @@ namespace SecondaryAttacks;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string MagicPluginGuid = "blacks7ar.MagicPlugin";
+    internal const string QuickstepPluginGuid = "shudnal.Quickstep";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.1.3";
+    internal const string ModVersion = "1.1.4";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -44,6 +46,13 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> SecondaryCooldownHudPositionX => Settings.Ui.SecondaryCooldownHudPositionX;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
     internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.Admin.AdminNoPresetCooldowns;
+    internal static ConfigEntry<Toggle> QuickstepEnabled => Settings.Quickstep.Enabled;
+    internal static ConfigEntry<float> QuickstepDashForce => Settings.Quickstep.DashForce;
+    internal static ConfigEntry<float> QuickstepDashTime => Settings.Quickstep.DashTime;
+    internal static ConfigEntry<float> QuickstepInvincibilityTimeWithShield => Settings.Quickstep.InvincibilityTimeWithShield;
+    internal static ConfigEntry<float> QuickstepCooldown => Settings.Quickstep.Cooldown;
+    internal static ConfigEntry<float> QuickstepStaminaUsageMultiplier => Settings.Quickstep.StaminaUsageMultiplier;
+    internal static ConfigEntry<Toggle> QuickstepDodgeOnDoubleClick => Settings.Quickstep.DodgeOnDoubleClick;
     private FileSystemWatcher? _watcher;
     private SecondaryAttackReloadDebouncer? _configReloadDebouncer;
     private readonly object _reloadLock = new();
@@ -92,6 +101,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         Config.SaveOnConfigSet = false;
 
         Settings.Bind(this);
+        QuickstepSystem.Initialize();
         RemoveLegacyHudScaleConfig();
         RegisterWorldApplySettingHandlers();
         _serverConfigLocked = Settings.General.LockConfiguration;
@@ -111,6 +121,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
     private void OnDestroy()
     {
+        QuickstepSystem.Dispose();
         UnregisterWorldApplySettingHandlers();
         SecondaryAttackFacade.Dispose();
         SaveWithRespectToConfigSet();
@@ -309,12 +320,15 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
         internal AdminSettings Admin { get; } = new();
 
+        internal QuickstepSettings Quickstep { get; } = new();
+
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
             General.Bind(plugin);
             Ranged.Bind(plugin);
             Ui.Bind(plugin);
             Admin.Bind(plugin);
+            Quickstep.Bind(plugin);
         }
     }
 
@@ -391,6 +405,29 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
                 Toggle.Off,
                 "Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.",
                 synchronizedSetting: false);
+        }
+    }
+
+    internal sealed class QuickstepSettings
+    {
+        internal ConfigEntry<Toggle> Enabled = null!;
+        internal ConfigEntry<float> DashForce = null!;
+        internal ConfigEntry<float> DashTime = null!;
+        internal ConfigEntry<float> InvincibilityTimeWithShield = null!;
+        internal ConfigEntry<float> Cooldown = null!;
+        internal ConfigEntry<float> StaminaUsageMultiplier = null!;
+        internal ConfigEntry<Toggle> DodgeOnDoubleClick = null!;
+
+        internal void Bind(SecondaryAttacksPlugin plugin)
+        {
+            const string group = "5 - Quickstep";
+            Enabled = plugin.config(group, "Quickstep Enabled", Toggle.Off, new ConfigDescription("Enables quickstep for equipped Knives and Unarmed weapons. Bare fists are not included.", null, new ConfigurationManagerAttributes { Order = 700 }), synchronizedSetting: true);
+            DashForce = plugin.config(group, "Dash Force", 50f, new ConfigDescription("Horizontal quickstep acceleration. The force is applied on fixed physics ticks so travel does not depend on rendering frame rate.", new AcceptableValueRange<float>(0f, 200f), new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: true);
+            DashTime = plugin.config(group, "Dash Time", 0.25f, new ConfigDescription("Quickstep movement duration in seconds.", new AcceptableValueRange<float>(0.05f, 2f), new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
+            InvincibilityTimeWithShield = plugin.config(group, "Invincibility Time With Shield", 0.15f, new ConfigDescription("Invincibility duration in seconds while a shield is equipped. Runtime use is clamped to Dash Time. Without a shield, invincibility lasts for the full dash.", new AcceptableValueRange<float>(0f, 2f), new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
+            Cooldown = plugin.config(group, "Quickstep Cooldown", 0.5f, new ConfigDescription("Time in seconds before quickstep can be used again. A regular dodge remains available during this cooldown.", new AcceptableValueRange<float>(0f, 10f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
+            StaminaUsageMultiplier = plugin.config(group, "Stamina Usage Multiplier", 0.6f, new ConfigDescription("Multiplier applied to the current vanilla dodge stamina cost.", new AcceptableValueRange<float>(0f, 5f), new ConfigurationManagerAttributes { Order = 650 }), synchronizedSetting: true);
+            DodgeOnDoubleClick = plugin.config(group, "Dodge On Double Click", Toggle.On, new ConfigDescription("A second dodge input during an active quickstep hands off to a regular dodge without charging the dodge stamina cost twice.", null, new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
         }
     }
 

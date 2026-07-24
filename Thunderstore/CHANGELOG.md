@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4
+
+- Added an optional, server-synchronized quickstep for equipped Knives and Unarmed weapons, with configurable acceleration, duration, shield invincibility, cooldown, stamina cost, and double-press handoff to a regular dodge.
+- Kept quickstep state isolated from Sneak Ambush and custom crouch effects, restored vanilla player state on interruptions, and disabled the integration when the standalone Quickstep plugin is loaded.
+- Added owner-authoritative fixed-target homing to launched Sentinel projectiles, using a limited turn rate without mid-flight target searches, retargeting, or additional network messages.
+
 ## 1.1.3
 
 - Made Ranged, Melee, and Blood Magic YAML synchronization atomic through one strictly framed payload, rejecting malformed data and stale staged updates without replacing the last applied configuration.

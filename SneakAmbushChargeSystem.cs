@@ -46,7 +46,7 @@ internal static class SneakAmbushChargeSystem
         }
 
         float dt = Mathf.Max(0f, Time.deltaTime);
-        bool isSneaking = player.IsCrouching();
+        bool isSneaking = player.IsCrouching() && !QuickstepSystem.IsActive(player);
         if (dt > 0f)
         {
             if (isSneaking)

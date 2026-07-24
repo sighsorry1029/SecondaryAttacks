@@ -23,6 +23,7 @@ internal static class SneakVisibilitySystem
             player.m_nview == null ||
             !player.m_nview.IsValid() ||
             !player.m_nview.IsOwner() ||
+            QuickstepSystem.IsActive(player) ||
             !player.IsCrouching())
         {
             return;
@@ -48,7 +49,9 @@ internal static class SneakVisibilitySystem
 
     internal static void ApplyMovementSpeed(Player player, ref float speedFactor)
     {
-        if (player == null || !player.IsCrouching())
+        if (player == null ||
+            QuickstepSystem.IsActive(player) ||
+            !player.IsCrouching())
         {
             return;
         }
@@ -69,6 +72,7 @@ internal static class SneakVisibilitySystem
             player.m_nview == null ||
             !player.m_nview.IsValid() ||
             !player.m_nview.IsOwner() ||
+            QuickstepSystem.IsActive(player) ||
             !player.IsCrouching())
         {
             return default;

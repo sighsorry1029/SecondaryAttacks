@@ -2,7 +2,7 @@
 
 ![](https://i.ibb.co/PsySGSqH/sentinelcover.gif)
 
-Adds secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, with auto presets, per-prefab overrides, summon tools, cooldown HUD, and localization. Preserves loaded weapons and improves Sneak and Blood Magic progression.
+Adds secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, with auto presets, per-prefab overrides, summon tools, cooldown HUD, and localization. Preserves loaded weapons, adds an optional quickstep for knives and fist weapons, and improves Sneak and Blood Magic progression.
 
 ## Highlights
 
@@ -10,6 +10,7 @@ Adds secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, 
 - Lets weapon groups use default presets from config while individual prefabs can be tuned through YAML.
 - Syncs YAML configuration through ServerSync for dedicated servers and multiplayer clients.
 - Supports cooldowns, durability cost, resource cost, ammo cost, skill gain, adrenaline gain, and HUD feedback.
+- Optionally replaces dodge with a configurable quickstep while a knife or Unarmed weapon is equipped.
 - Includes compatibility support for MagicPlugin summon projectiles and the companion WarfareTweaks mod.
 
 ## Ranged Presets
@@ -169,6 +170,12 @@ Blob bombs can be set up as delayed traps and detonated when enemies move into p
 ![](https://i.ibb.co/N2HWQ8RP/overchargedbomb.gif)
 
 Overcharged Bomb greatly increases bomb damage and area size, at the cost of consuming multiple bombs at once.
+
+## Quickstep
+
+Enable `Quickstep Enabled` in the `5 - Quickstep` config group to replace dodge with a short dash while an equipped weapon uses the `Knives` or `Unarmed` skill. Bare fists are excluded.
+
+Dash force, duration, shield invincibility time, cooldown, stamina multiplier, and double-press handoff to a regular dodge are configurable and synchronized by the server. Quickstep cooldown prevents another dash but still allows a regular dodge. If the standalone `shudnal.Quickstep` plugin is loaded, the integrated implementation disables itself to avoid competing dodge patches.
 
 ## Blood Magic
 
