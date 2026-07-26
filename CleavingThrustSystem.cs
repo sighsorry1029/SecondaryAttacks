@@ -185,7 +185,7 @@ internal static class CleavingThrustSystem
             return false;
         }
 
-        if (!hitThroughWalls && IsBlockedByEnvironment(origin, point, null))
+        if (!hitThroughWalls && IsBlockedByEnvironment(origin, point, candidate))
         {
             return false;
         }

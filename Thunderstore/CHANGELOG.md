@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.5
+
+- Fixed Cleaving Thrust treating a placed training dummy's own `piece` collider as an environmental obstruction, allowing the special attack to damage `piece_TrainingDummy` while preserving real wall blocking.
+
 ## 1.1.4
 
 - Replaced the individual Quickstep tuning entries with one server-synchronized `Quickstep Enabled` option in General, using fixed 200 acceleration, 0.25-second duration, 0.15-second shield invincibility, 0.5-second cooldown, and 60% dodge stamina cost.
