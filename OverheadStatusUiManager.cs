@@ -78,6 +78,7 @@ internal static class OverheadStatusUiManager
         }
 
         GameObject textObject = new($"{CharacterHudTextName}_{characterInstanceId}");
+        textObject.SetActive(false);
         textObject.transform.SetParent(enemyHud.m_hudRoot.transform, false);
         TextMeshProUGUI statusText = textObject.AddComponent<TextMeshProUGUI>();
         TextMeshProUGUI sourceText = enemyHud.m_baseHudPlayer.transform.Find("Name").GetComponent<TextMeshProUGUI>();

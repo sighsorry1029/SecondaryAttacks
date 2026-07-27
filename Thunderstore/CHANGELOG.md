@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.6
+
+- Prevented transient TextMeshPro `LiberationSans SDF` warnings by keeping overhead Empower and Shield status text inactive until the Valheim HUD font has been assigned, without removing the status display.
+
 ## 1.1.5
 
 - Fixed Cleaving Thrust treating a placed training dummy's own `piece` collider as an environmental obstruction, allowing the special attack to damage `piece_TrainingDummy` while preserving real wall blocking.
