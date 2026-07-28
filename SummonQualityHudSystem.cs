@@ -65,6 +65,12 @@ internal static class SummonQualityHudSystem
             return;
         }
 
+        if (SummonQualityHudCompatibility.HasActiveExternalStarHud(hudData))
+        {
+            DestroyOwnedGroup(instanceId);
+            return;
+        }
+
         GameObject? group = GetOrCreateLevelGroup(instanceId, level, starCount, hudData, level3);
         if (group == null)
         {
@@ -133,16 +139,23 @@ internal static class SummonQualityHudSystem
 
         DestroyOwnedGroup(instanceId);
 
-        string levelName = $"level_{level}";
+        // CLLC owns level_N groups; the fallback must never take ownership of those external objects.
+        string levelName = $"SecondaryAttacks_level_{level}";
         Transform existing = guiTransform.Find(levelName);
         if (existing != null)
         {
-            ActiveGroups[instanceId] = new HudLevelGroup(level, existing.gameObject, guiTransform, ownsGroup: false);
+            if (existing.GetComponent<SummonQualityHudMarker>() == null)
+            {
+                return null;
+            }
+
+            ActiveGroups[instanceId] = new HudLevelGroup(level, existing.gameObject, guiTransform, ownsGroup: true);
             return existing.gameObject;
         }
 
         GameObject group = Object.Instantiate(level3.gameObject, guiTransform);
         group.name = levelName;
+        group.AddComponent<SummonQualityHudMarker>();
         group.SetActive(false);
 
         if (!TryAddExtraStars(group.transform, starCount))
@@ -213,6 +226,7 @@ internal static class SummonQualityHudSystem
 
         if (group.OwnsGroup && group.Group != null)
         {
+            group.Group.SetActive(false);
             Object.Destroy(group.Group);
         }
 

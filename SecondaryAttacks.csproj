@@ -484,6 +484,7 @@
         <Compile Include="SpinningSweepSystem.cs" />
         <Compile Include="SweepObserverVisualSystem.cs" />
         <Compile Include="SweepTrailResetSystem.cs" />
+        <Compile Include="SummonQualityHudCompatibility.cs" />
         <Compile Include="SummonQualityHudSystem.cs" />
         <Compile Include="SweepHitStopSystem.cs" />
         <Compile Include="ThrowProjectileVisualSpin.cs" />

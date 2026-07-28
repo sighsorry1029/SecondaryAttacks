@@ -15,12 +15,18 @@ namespace SecondaryAttacks;
 [BepInPlugin(ModGUID, ModName, ModVersion)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(SecondaryAttacksPlugin.CreatureManagerGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(SecondaryAttacksPlugin.CreatureLevelControlGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(SecondaryAttacksPlugin.StarLevelSystemGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string MagicPluginGuid = "blacks7ar.MagicPlugin";
     internal const string QuickstepPluginGuid = "shudnal.Quickstep";
+    internal const string CreatureManagerGuid = "sighsorry.CreatureManager";
+    internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
+    internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.1.6";
+    internal const string ModVersion = "1.1.7";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -96,6 +102,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
         Settings.Bind(this);
         QuickstepSystem.Initialize();
+        SummonQualityHudCompatibility.Initialize();
         RemoveLegacyConfigEntries();
         RegisterWorldApplySettingHandlers();
         _serverConfigLocked = Settings.General.LockConfiguration;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.7
+
+- Added automatic summon-star HUD compatibility for CreatureManager, Creature Level & Loot Control, and StarLevelSystem, yielding to an active external star display while keeping SecondaryAttacks as the fallback when none is active.
+- Isolated SecondaryAttacks' extended-star objects from CLLC's `level_N` groups so provider changes and level updates no longer reuse or alter externally owned HUD objects.
+
 ## 1.1.6
 
 - Prevented transient TextMeshPro `LiberationSans SDF` warnings by keeping overhead Empower and Shield status text inactive until the Valheim HUD font has been assigned, without removing the status display.
