@@ -149,7 +149,7 @@ internal static class SummonQualityHudSystem
                 return null;
             }
 
-            ActiveGroups[instanceId] = new HudLevelGroup(level, existing.gameObject, guiTransform, ownsGroup: true);
+            ActiveGroups[instanceId] = new HudLevelGroup(level, existing.gameObject, guiTransform);
             return existing.gameObject;
         }
 
@@ -164,7 +164,7 @@ internal static class SummonQualityHudSystem
             return null;
         }
 
-        ActiveGroups[instanceId] = new HudLevelGroup(level, group, guiTransform, ownsGroup: true);
+        ActiveGroups[instanceId] = new HudLevelGroup(level, group, guiTransform);
         return group;
     }
 
@@ -224,7 +224,7 @@ internal static class SummonQualityHudSystem
             return;
         }
 
-        if (group.OwnsGroup && group.Group != null)
+        if (group.Group != null)
         {
             group.Group.SetActive(false);
             Object.Destroy(group.Group);
@@ -237,7 +237,7 @@ internal static class SummonQualityHudSystem
     {
         foreach (HudLevelGroup group in ActiveGroups.Values)
         {
-            if (group.OwnsGroup && group.Group != null)
+            if (group.Group != null)
             {
                 group.Group.SetActive(false);
             }
@@ -246,12 +246,11 @@ internal static class SummonQualityHudSystem
 
     private sealed class HudLevelGroup
     {
-        internal HudLevelGroup(int level, GameObject group, Transform guiTransform, bool ownsGroup)
+        internal HudLevelGroup(int level, GameObject group, Transform guiTransform)
         {
             Level = level;
             Group = group;
             GuiTransform = guiTransform;
-            OwnsGroup = ownsGroup;
         }
 
         internal int Level { get; }
@@ -260,7 +259,6 @@ internal static class SummonQualityHudSystem
 
         internal Transform GuiTransform { get; }
 
-        internal bool OwnsGroup { get; }
     }
 
     private sealed class CachedTag

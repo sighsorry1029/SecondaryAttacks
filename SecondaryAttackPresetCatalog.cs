@@ -54,6 +54,67 @@ internal static class SecondaryAttackPresetCatalog
         return EntriesByKey.TryGetValue(presetKey ?? "", out info!);
     }
 
+    internal static string CanonicalizeKey(string? presetKey)
+    {
+        if (string.IsNullOrWhiteSpace(presetKey))
+        {
+            return "";
+        }
+
+        string trimmedPresetKey = presetKey!.Trim();
+        return TryGet(trimmedPresetKey, out SecondaryAttackPresetInfo info)
+            ? info.Key
+            : trimmedPresetKey;
+    }
+
+    internal static string GetKey(SecondaryAttackPreset preset)
+    {
+        return preset switch
+        {
+            SecondaryAttackPreset.Barrage => "barrage",
+            SecondaryAttackPreset.Volley => "volley",
+            SecondaryAttackPreset.Piercing => "piercing",
+            SecondaryAttackPreset.Scatter => "scatter",
+            SecondaryAttackPreset.Spiral => "spiral",
+            SecondaryAttackPreset.Sentinel => "sentinel",
+            SecondaryAttackPreset.Meteor => "meteor",
+            SecondaryAttackPreset.Burst => "burst",
+            SecondaryAttackPreset.StickyDetonator => "stickyDetonator",
+            SecondaryAttackPreset.OverchargedBomb => "overchargedBomb",
+            _ => preset.ToString()
+        };
+    }
+
+    internal static string? GetKey(MeleeSpecialPreset preset)
+    {
+        return preset switch
+        {
+            MeleeSpecialPreset.SneakAmbush => "sneakAmbush",
+            MeleeSpecialPreset.CleavingThrust => "cleavingThrust",
+            MeleeSpecialPreset.SpearRain => "spearRain",
+            MeleeSpecialPreset.ImpactBurst => "impactBurst",
+            MeleeSpecialPreset.Boomerang => "boomerang",
+            MeleeSpecialPreset.SpinningSweep => "spinningSweep",
+            MeleeSpecialPreset.LaunchSlam => "launchSlam",
+            MeleeSpecialPreset.KnockbackChain => "knockbackChain",
+            MeleeSpecialPreset.Aftershock => "aftershock",
+            MeleeSpecialPreset.RiftTrail => "riftTrail",
+            MeleeSpecialPreset.FractureLine => "fractureLine",
+            _ => null
+        };
+    }
+
+    internal static string? GetKey(SecondaryAttackBehavior behavior)
+    {
+        return behavior switch
+        {
+            ProjectileSecondaryBehavior projectile => GetKey(projectile.Preset),
+            SummonEmpowerSecondaryBehavior => "summonEmpower",
+            ShieldConvertSecondaryBehavior => "shieldConvert",
+            _ => null
+        };
+    }
+
     internal static Sprite? ResolveIcon(string presetKey)
     {
         if (ObjectDB.instance == null || !TryGet(presetKey, out SecondaryAttackPresetInfo info))

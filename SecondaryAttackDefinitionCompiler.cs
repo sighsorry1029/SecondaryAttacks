@@ -105,17 +105,7 @@ internal static class SecondaryAttackDefinitionCompiler
 
     private static DefinitionFeatures AnalyzeDefinitionFeatures(NormalizedWeaponConfig weaponConfig)
     {
-        bool hasMeleeFeatureConfig = weaponConfig.SneakAmbush?.Enabled == true ||
-                                     weaponConfig.CleavingThrust?.Enabled == true ||
-                                     weaponConfig.LaunchSlam?.Enabled == true ||
-                                     weaponConfig.KnockbackChain?.Enabled == true ||
-                                     weaponConfig.Aftershock?.Enabled == true ||
-                                     weaponConfig.RiftTrail?.Enabled == true ||
-                                     weaponConfig.FractureLine?.Enabled == true ||
-                                     weaponConfig.ImpactBurst?.Enabled == true ||
-                                     weaponConfig.Boomerang?.Enabled == true ||
-                                     weaponConfig.SpinningSweep?.Enabled == true ||
-                                     weaponConfig.HarvestSweep?.Enabled == true;
+        bool hasMeleeFeatureConfig = weaponConfig.HasEnabledMeleeFeatureConfig;
         bool hasSecondaryConfig = weaponConfig.Secondary != null;
         string secondaryType = weaponConfig.Secondary?.Type?.Trim() ?? "";
         bool usesSummonEmpower = secondaryType == "summonEmpower";

@@ -18,7 +18,6 @@ internal static class SummonPrefabOverrideSystem
     internal static void Apply(
         ZNetScene scene,
         IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> overrides,
-        int snapshotId,
         bool emitMissingWarnings)
     {
         if (scene == null)
@@ -32,7 +31,6 @@ internal static class SummonPrefabOverrideSystem
 
         if (overrides.Count == 0)
         {
-            state.LastAppliedSnapshotId = snapshotId;
             return;
         }
 
@@ -73,7 +71,6 @@ internal static class SummonPrefabOverrideSystem
             appliedCount++;
         }
 
-        state.LastAppliedSnapshotId = snapshotId;
         if (appliedCount > 0)
         {
             SecondaryAttacksPlugin.ModLogger.LogInfo($"Applied {appliedCount} magic summon prefab override(s).");
@@ -173,8 +170,7 @@ internal static class SummonPrefabOverrideSystem
             return false;
         }
 
-        if (TryResolveSpawnAbilityFromAttack(itemDrop.m_itemData.m_shared.m_attack, out spawnAbility, out targetName) ||
-            TryResolveSpawnAbilityFromAttack(itemDrop.m_itemData.m_shared.m_secondaryAttack, out spawnAbility, out targetName))
+        if (SummonSpawnAbilityResolver.TryResolve(itemDrop, out spawnAbility, out targetName))
         {
             return true;
         }
@@ -193,36 +189,6 @@ internal static class SummonPrefabOverrideSystem
 
         GameObject? itemPrefab = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(itemPrefabName) : null;
         return itemPrefab != null ? itemPrefab : scene.GetPrefab(itemPrefabName);
-    }
-
-    private static bool TryResolveSpawnAbilityFromAttack(Attack? attack, out SpawnAbility? spawnAbility, out string targetName)
-    {
-        spawnAbility = null;
-        targetName = "";
-        return attack?.m_attackProjectile != null &&
-               TryResolveSpawnAbilityFromPrefab(attack.m_attackProjectile, out spawnAbility, out targetName);
-    }
-
-    private static bool TryResolveSpawnAbilityFromPrefab(GameObject prefab, out SpawnAbility? spawnAbility, out string targetName)
-    {
-        spawnAbility = prefab.GetComponent<SpawnAbility>();
-        if (spawnAbility != null)
-        {
-            targetName = prefab.name;
-            return true;
-        }
-
-        Projectile? projectile = prefab.GetComponent<Projectile>();
-        GameObject? spawnOnHit = projectile?.m_spawnOnHit;
-        spawnAbility = spawnOnHit != null ? spawnOnHit.GetComponent<SpawnAbility>() : null;
-        if (spawnAbility != null)
-        {
-            targetName = spawnOnHit!.name;
-            return true;
-        }
-
-        targetName = prefab.name;
-        return false;
     }
 
     private static GameObject? CreateOrUpdateClonePrefab(
@@ -460,8 +426,6 @@ internal static class SummonPrefabOverrideSystem
 
     private sealed class SceneState
     {
-        internal int LastAppliedSnapshotId { get; set; }
-
         internal Dictionary<SpawnAbility, GameObject[]> OriginalSpawnPrefabs { get; } = new();
 
         internal Dictionary<string, GameObject> CreatedClonePrefabs { get; } = new(StringComparer.OrdinalIgnoreCase);

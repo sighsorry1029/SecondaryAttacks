@@ -55,12 +55,12 @@ internal static partial class ProjectileRuntimeSystem
         }
     }
 
-    internal static void FireBarrage(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireBarrage(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
@@ -86,13 +86,15 @@ internal static partial class ProjectileRuntimeSystem
                 originPoint,
                 horizontalForward,
                 horizontalRight);
-            return;
+            return true;
         }
 
         for (int projectileIndex = 0; projectileIndex < projectileBehavior.ProjectileCount; projectileIndex++)
         {
             SpawnBarrageShot(attack, launchData, projectileBehavior, originPoint, aimDirection, horizontalRight, projectileIndex);
         }
+
+        return true;
     }
 
     private static void SpawnBarrageShot(
@@ -126,7 +128,12 @@ internal static partial class ProjectileRuntimeSystem
 
         attack.GetProjectileSpawnPoint(out Vector3 originPoint, out Vector3 aimDirection);
         aimDirection = ApplyLaunchAngle(attack, aimDirection);
-        if (!TryResolveVolleyTargetPoint(attack, definition, launchData, originPoint, aimDirection, out Vector3 targetPoint))
+        if (!TryResolveVolleyTargetPoint(
+                attack,
+                definition,
+                originPoint,
+                aimDirection,
+                out Vector3 targetPoint))
         {
             return false;
         }
@@ -165,12 +172,12 @@ internal static partial class ProjectileRuntimeSystem
         return true;
     }
 
-    internal static void FirePiercingShot(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FirePiercingShot(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
@@ -210,6 +217,8 @@ internal static partial class ProjectileRuntimeSystem
             OverchargedBombSystem.RegisterProjectile(projectile, projectileBehavior.ProjectileScaleFactor, 1f);
             RegisterPiercingShotProjectile(projectile, projectileBehavior);
         }
+
+        return true;
     }
 
     private static void RegisterPiercingShotProjectile(
@@ -394,12 +403,12 @@ internal static partial class ProjectileRuntimeSystem
         return forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
     }
 
-    internal static void FireScatterRicochet(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireScatterRicochet(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         PrepareCustomProjectileBurst(attack);
@@ -414,7 +423,7 @@ internal static partial class ProjectileRuntimeSystem
         GameObject projectileObject = SpawnProjectileObject(attack, launchData, spawnPoint, aimDirection, speed, setLastProjectile: true, out Projectile? projectile);
         if (projectileObject == null || projectile == null)
         {
-            return;
+            return false;
         }
 
         RegisterScatterRicochetProjectile(
@@ -423,6 +432,7 @@ internal static partial class ProjectileRuntimeSystem
             launchData,
             (ProjectileSecondaryBehavior)definition.Behavior,
             speed);
+        return true;
     }
 
     private static void RegisterScatterRicochetProjectile(
@@ -684,12 +694,12 @@ internal static partial class ProjectileRuntimeSystem
                projectile.m_vel.magnitude > projectile.m_minBounceVel;
     }
 
-    internal static void FireSpiralBurst(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireSpiralBurst(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
@@ -716,7 +726,7 @@ internal static partial class ProjectileRuntimeSystem
                 spawnPoint,
                 burstUp,
                 burstRight);
-            return;
+            return true;
         }
 
         for (int projectileIndex = 0; projectileIndex < projectileCount; projectileIndex++)
@@ -732,14 +742,16 @@ internal static partial class ProjectileRuntimeSystem
                 projectileIndex,
                 projectileCount);
         }
+
+        return true;
     }
 
-    internal static void FireSentinel(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireSentinel(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
@@ -789,14 +801,16 @@ internal static partial class ProjectileRuntimeSystem
                 projectile.m_spawnOnHitChance = attack.m_spawnOnHitChance;
             }
         }
+
+        return true;
     }
 
-    internal static void FireMeteor(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireMeteor(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
@@ -823,13 +837,15 @@ internal static partial class ProjectileRuntimeSystem
                 targetPoint,
                 horizontalForward,
                 horizontalRight);
-            return;
+            return true;
         }
 
         for (int projectileIndex = 0; projectileIndex < projectileBehavior.ProjectileCount; projectileIndex++)
         {
             SpawnMeteor(attack, launchData, projectileBehavior, targetPoint, horizontalForward, horizontalRight);
         }
+
+        return true;
     }
 
     private static void SpawnMeteor(
@@ -890,28 +906,29 @@ internal static partial class ProjectileRuntimeSystem
         SpawnProjectile(attack, launchData, spawnPoint, direction);
     }
 
-    internal static void FireBurstFire(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireBurstFire(Attack attack, SecondaryAttackDefinition definition)
     {
         if (definition.Behavior is not ProjectileSecondaryBehavior projectileBehavior)
         {
-            return;
+            return false;
         }
 
         int shotCount = Mathf.Max(1, projectileBehavior.ProjectileCount);
         if (!FireSingleBurstFireShot(attack, definition))
         {
-            return;
+            return false;
         }
 
         if (shotCount <= 1)
         {
-            return;
+            return true;
         }
 
         DeferredBurstFireReloadResets.Add(attack);
         GameObject controllerObject = new($"SecondaryAttacks_{GetPresetName(projectileBehavior.Preset)}");
         BurstFireController controller = controllerObject.AddComponent<BurstFireController>();
         controller.Initialize(attack, definition, shotCount - 1);
+        return true;
     }
 
     internal static bool ShouldDeferBurstFireReloadReset(Attack attack)
@@ -1308,28 +1325,38 @@ internal static partial class ProjectileRuntimeSystem
         return projectile != null ? projectile.m_gravity : 0f;
     }
 
-    internal static bool CanStartBurstPreset(Attack attack, SecondaryAttackDefinition definition, SecondaryAttackPreset preset)
+    internal static bool CanStartBurstPreset(
+        Attack attack,
+        SecondaryAttackDefinition definition,
+        SecondaryAttackPreset preset,
+        ItemDrop.ItemData? ammoItem)
     {
-        if (preset is not SecondaryAttackPreset.Volley)
-        {
-            return true;
-        }
-
-        attack.GetProjectileSpawnPoint(out Vector3 originPoint, out Vector3 aimDirection);
-        aimDirection = ApplyLaunchAngle(attack, aimDirection);
-        ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!launchData.IsValid)
+        if (definition.Behavior is not ProjectileSecondaryBehavior projectileBehavior ||
+            !TryValidateBurstPresetPayload(
+                attack,
+                definition,
+                preset,
+                ammoItem))
         {
             return false;
         }
 
-        return TryResolveVolleyTargetPoint(attack, definition, launchData, originPoint, aimDirection, out _);
+        if (preset == SecondaryAttackPreset.OverchargedBomb &&
+            attack.m_character is Humanoid humanoid &&
+            !OverchargedBombSystem.CanStart(
+                humanoid,
+                attack.m_weapon,
+                projectileBehavior))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static bool TryResolveVolleyTargetPoint(
         Attack attack,
         SecondaryAttackDefinition definition,
-        ProjectileLaunchData launchData,
         Vector3 originPoint,
         Vector3 aimDirection,
         out Vector3 targetPoint)

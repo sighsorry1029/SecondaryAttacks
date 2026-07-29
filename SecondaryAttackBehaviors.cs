@@ -74,6 +74,8 @@ internal sealed class ProjectileSecondaryBehavior : SecondaryAttackBehavior
 
     public SecondaryAttackPreset Preset { get; set; }
 
+    public string CooldownGroup { get; set; } = "";
+
     public float Cooldown { get; set; } = 8f;
 
     public float CooldownReductionFactor { get; set; } = 0.5f;

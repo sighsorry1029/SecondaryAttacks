@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
@@ -14,10 +13,6 @@ internal static class GreatSwordSkillScalingSystem
     private const double MaxVisualSessionDuration = 3d;
     private const double MaxVisualSessionFutureSkew = 0.5d;
     private const double VisualSessionStaleGrace = 1d;
-    private static readonly FieldInfo AttackVisEquipmentField = AccessTools.Field(typeof(Attack), "m_visEquipment")!;
-    private static readonly FieldInfo VisRightItemInstanceField = AccessTools.Field(typeof(VisEquipment), "m_rightItemInstance")!;
-    private static readonly FieldInfo TrailBaseField = AccessTools.Field(typeof(MeleeWeaponTrail), "_base")!;
-    private static readonly FieldInfo TrailTipField = AccessTools.Field(typeof(MeleeWeaponTrail), "_tip")!;
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Transform, OriginalTrailTipState> OriginalTrailTipLocalPositions = new();
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Attack, List<Transform>> ScaledTrailTipsByAttack = new();
     private static readonly Dictionary<MeleeWeaponTrail, CleavingThrustObserverTrailScaleController> ObserverTrailScaleControllers = new();
@@ -95,18 +90,13 @@ internal static class GreatSwordSkillScalingSystem
 
     private static void ApplyTrailScale(Attack attack, float rangeScale)
     {
-        GameObject? rightItemInstance = GetRightItemInstance(attack);
-        if (rightItemInstance == null)
-        {
-            return;
-        }
-
         List<Transform> scaledTips = new();
-        foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+        foreach (MeleeWeaponTrail trail in WeaponTrailAccess.GetTrails(attack))
         {
-            Transform? baseTransform = TrailBaseField.GetValue(trail) as Transform;
-            Transform? tipTransform = TrailTipField.GetValue(trail) as Transform;
-            if (baseTransform == null || tipTransform == null)
+            if (!WeaponTrailAccess.TryGetEndpoints(
+                    trail,
+                    out Transform baseTransform,
+                    out Transform tipTransform))
             {
                 continue;
             }
@@ -150,33 +140,16 @@ internal static class GreatSwordSkillScalingSystem
         CleavingThrustDefinition? cleavingThrust = definition.CleavingThrust;
         if (cleavingThrust == null ||
             !CleavingThrustSystem.CanHandle(attack) ||
-            !MeleePresetCooldownSystem.IsReady(attack.m_character, attack.m_weapon, "cleavingThrust", cleavingThrust.PresetCooldown))
+            !MeleePresetCooldownSystem.IsReady(
+                attack.m_character,
+                "cleavingThrust",
+                cleavingThrust.PresetCooldown))
         {
             return false;
         }
 
         rangeScale = CleavingThrustSystem.ResolveVisualRangeScale(attack, definition);
         return rangeScale > 1.0001f;
-    }
-
-    private static GameObject? GetRightItemInstance(Attack attack)
-    {
-        VisEquipment? visEquipment = AttackVisEquipmentField.GetValue(attack) as VisEquipment;
-        GameObject? rightItemInstance = visEquipment != null
-            ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject
-            : null;
-        if (rightItemInstance != null)
-        {
-            return rightItemInstance;
-        }
-
-        return GetRightItemInstance(attack.m_character);
-    }
-
-    private static GameObject? GetRightItemInstance(Character? character)
-    {
-        VisEquipment? visEquipment = character != null ? character.GetComponent<VisEquipment>() : null;
-        return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
     }
 
     private static void SendCleavingThrustVisualSession(Attack attack, float rangeScale)
@@ -305,7 +278,7 @@ internal static class GreatSwordSkillScalingSystem
                 return;
             }
 
-            GameObject? currentRightItemInstance = GetRightItemInstance(_character);
+            GameObject? currentRightItemInstance = WeaponTrailAccess.GetRightItemInstance(_character);
             if (_rightItemInstance != currentRightItemInstance ||
                 _registeredTrails.Count == 0 ||
                 HasDestroyedRegisteredTrail())
@@ -325,9 +298,10 @@ internal static class GreatSwordSkillScalingSystem
                 return default;
             }
 
-            Transform? baseTransform = TrailBaseField.GetValue(trail) as Transform;
-            Transform? tipTransform = TrailTipField.GetValue(trail) as Transform;
-            if (baseTransform == null || tipTransform == null)
+            if (!WeaponTrailAccess.TryGetEndpoints(
+                    trail,
+                    out Transform baseTransform,
+                    out Transform tipTransform))
             {
                 return default;
             }
@@ -351,7 +325,7 @@ internal static class GreatSwordSkillScalingSystem
                 return;
             }
 
-            rightItemInstance ??= GetRightItemInstance(_character);
+            rightItemInstance ??= WeaponTrailAccess.GetRightItemInstance(_character);
             UnregisterTrails();
             _rightItemInstance = rightItemInstance;
             if (rightItemInstance == null)
@@ -359,7 +333,7 @@ internal static class GreatSwordSkillScalingSystem
                 return;
             }
 
-            foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+            foreach (MeleeWeaponTrail trail in WeaponTrailAccess.GetTrails(rightItemInstance))
             {
                 if (trail == null)
                 {
@@ -389,7 +363,7 @@ internal static class GreatSwordSkillScalingSystem
             for (int index = 0; index < _registeredTrails.Count; index++)
             {
                 MeleeWeaponTrail trail = _registeredTrails[index];
-                if (trail != null &&
+                if (!ReferenceEquals(trail, null) &&
                     ObserverTrailScaleControllers.TryGetValue(trail, out CleavingThrustObserverTrailScaleController? controller) &&
                     ReferenceEquals(controller, this))
                 {

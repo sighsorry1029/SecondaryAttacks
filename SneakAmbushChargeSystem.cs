@@ -31,7 +31,11 @@ internal static class SneakAmbushChargeSystem
         }
 
         if (secondaryAttackActive ||
-            MeleePresetCooldownSystem.IsCooldownActive(player, weapon, "sneakAmbush", out _))
+            MeleePresetCooldownSystem.IsCooldownActive(
+                player,
+                "sneakAmbush",
+                sneakAmbush!.PresetCooldown,
+                out _))
         {
             state.ChargeSeconds = 0f;
             state.ClearDisplay();

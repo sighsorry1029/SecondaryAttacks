@@ -286,17 +286,17 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         SneakAmbushConfig? rawSneakAmbush = raw.SneakAmbush;
         MeleeOnProjectileHitConfig? rawSpearRain = raw.SpearRain;
         NormalizedImpactBurstConfig? impactBurst = selectedPreset == MeleeSpecialPreset.ImpactBurst
-            ? NormalizeSelectedImpactBurst(raw.ImpactBurst, fallback?.ImpactBurst)
+            ? NormalizeImpactBurst(raw.ImpactBurst ?? new ImpactBurstConfig(), fallback?.ImpactBurst)
             : raw.ImpactBurst?.Enabled == false
                 ? NormalizeImpactBurst(raw.ImpactBurst, fallback?.ImpactBurst)
                 : null;
         NormalizedBoomerangConfig? boomerang = selectedPreset == MeleeSpecialPreset.Boomerang
-            ? NormalizeSelectedBoomerang(raw.Boomerang, fallback?.Boomerang)
+            ? NormalizeBoomerang(raw.Boomerang ?? new BoomerangConfig(), fallback?.Boomerang)
             : raw.Boomerang?.Enabled == false
                 ? NormalizeBoomerang(raw.Boomerang, fallback?.Boomerang)
                 : null;
         NormalizedSpinningSweepConfig? spinningSweep = selectedPreset == MeleeSpecialPreset.SpinningSweep
-            ? NormalizeSelectedSpinningSweep(raw.SpinningSweep, fallback?.SpinningSweep)
+            ? NormalizeSpinningSweep(raw.SpinningSweep ?? new SpinningSweepConfig(), fallback?.SpinningSweep)
             : raw.SpinningSweep?.Enabled == false
                 ? NormalizeSpinningSweep(raw.SpinningSweep, fallback?.SpinningSweep)
                 : null;
@@ -331,37 +331,37 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             Enabled = raw.Enabled ?? true,
             Secondary = secondary,
             SneakAmbush = selectedPreset == MeleeSpecialPreset.SneakAmbush
-                ? NormalizeSelectedSneakAmbush(rawSneakAmbush, fallback?.SneakAmbush)
+                ? NormalizeSneakAmbush(rawSneakAmbush ?? new SneakAmbushConfig(), fallback?.SneakAmbush)
                 : rawSneakAmbush?.Enabled == false
                     ? NormalizeSneakAmbush(rawSneakAmbush, fallback?.SneakAmbush)
                     : null,
             CleavingThrust = selectedPreset == MeleeSpecialPreset.CleavingThrust
-                ? NormalizeSelectedCleavingThrust(raw.CleavingThrust, fallback?.CleavingThrust)
+                ? NormalizeCleavingThrust(raw.CleavingThrust ?? new CleavingThrustConfig(), fallback?.CleavingThrust)
                 : raw.CleavingThrust?.Enabled == false
                     ? NormalizeCleavingThrust(raw.CleavingThrust, fallback?.CleavingThrust)
                     : null,
             LaunchSlam = selectedPreset == MeleeSpecialPreset.LaunchSlam
-                ? NormalizeSelectedLaunchSlam(raw.LaunchSlam, fallback?.LaunchSlam)
+                ? NormalizeLaunchSlam(raw.LaunchSlam ?? new LaunchSlamConfig(), fallback?.LaunchSlam)
                 : raw.LaunchSlam?.Enabled == false
                     ? NormalizeLaunchSlam(raw.LaunchSlam, fallback?.LaunchSlam)
                     : null,
             KnockbackChain = selectedPreset == MeleeSpecialPreset.KnockbackChain
-                ? NormalizeSelectedKnockbackChain(raw.KnockbackChain, fallback?.KnockbackChain)
+                ? NormalizeKnockbackChain(raw.KnockbackChain ?? new KnockbackChainConfig(), fallback?.KnockbackChain)
                 : raw.KnockbackChain?.Enabled == false
                     ? NormalizeKnockbackChain(raw.KnockbackChain, fallback?.KnockbackChain)
                     : null,
             Aftershock = selectedPreset == MeleeSpecialPreset.Aftershock
-                ? NormalizeSelectedAftershock(raw.Aftershock, fallback?.Aftershock)
+                ? NormalizeAftershock(raw.Aftershock ?? new AftershockConfig(), fallback?.Aftershock)
                 : raw.Aftershock?.Enabled == false
                     ? NormalizeAftershock(raw.Aftershock, fallback?.Aftershock)
                     : null,
             RiftTrail = selectedPreset == MeleeSpecialPreset.RiftTrail
-                ? NormalizeSelectedRiftTrail(raw.RiftTrail, fallback?.RiftTrail)
+                ? NormalizeRiftTrail(raw.RiftTrail ?? new RiftTrailConfig(), fallback?.RiftTrail)
                 : raw.RiftTrail?.Enabled == false
                     ? NormalizeRiftTrail(raw.RiftTrail, fallback?.RiftTrail)
                     : null,
             FractureLine = selectedPreset == MeleeSpecialPreset.FractureLine
-                ? NormalizeSelectedFractureLine(raw.FractureLine, fallback?.FractureLine)
+                ? NormalizeFractureLine(raw.FractureLine ?? new FractureLineConfig(), fallback?.FractureLine)
                 : raw.FractureLine?.Enabled == false
                     ? NormalizeFractureLine(raw.FractureLine, fallback?.FractureLine)
                     : null,
@@ -417,74 +417,13 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             return true;
         }
 
-        if (normalizedPreset.Equals("sneakAmbush", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.SneakAmbush;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("cleavingThrust", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.CleavingThrust;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("spearRain", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.SpearRain;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("impactBurst", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.ImpactBurst;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("boomerang", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.Boomerang;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("spinningSweep", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.SpinningSweep;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("launchSlam", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.LaunchSlam;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("knockbackChain", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.KnockbackChain;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("aftershock", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.Aftershock;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("riftTrail", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.RiftTrail;
-            return true;
-        }
-
-        if (normalizedPreset.Equals("fractureLine", StringComparison.OrdinalIgnoreCase))
-        {
-            preset = MeleeSpecialPreset.FractureLine;
-            return true;
-        }
-
         preset = MeleeSpecialPreset.None;
-        return false;
+        return SecondaryAttackPresetCatalog.TryGet(
+                   normalizedPreset,
+                   out SecondaryAttackPresetInfo presetInfo) &&
+               presetInfo.Group == SecondaryAttackPresetGroup.Melee &&
+               Enum.TryParse(presetInfo.Key, ignoreCase: true, out preset) &&
+               preset != MeleeSpecialPreset.None;
     }
 
     private static MeleeSpecialPreset ResolveImplicitMeleePreset(string prefabName, MeleeWeaponConfig raw)
@@ -634,21 +573,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
 
     private static string FormatMeleePreset(MeleeSpecialPreset preset)
     {
-        return preset switch
-        {
-            MeleeSpecialPreset.SneakAmbush => "sneakAmbush",
-            MeleeSpecialPreset.CleavingThrust => "cleavingThrust",
-            MeleeSpecialPreset.SpearRain => "spearRain",
-            MeleeSpecialPreset.ImpactBurst => "impactBurst",
-            MeleeSpecialPreset.Boomerang => "boomerang",
-            MeleeSpecialPreset.SpinningSweep => "spinningSweep",
-            MeleeSpecialPreset.LaunchSlam => "launchSlam",
-            MeleeSpecialPreset.KnockbackChain => "knockbackChain",
-            MeleeSpecialPreset.Aftershock => "aftershock",
-            MeleeSpecialPreset.RiftTrail => "riftTrail",
-            MeleeSpecialPreset.FractureLine => "fractureLine",
-            _ => "none"
-        };
+        return SecondaryAttackPresetCatalog.GetKey(preset) ?? "none";
     }
 
     private static void LogIgnoredExplicitMeleePresetBlocks(
@@ -719,76 +644,6 @@ internal static class SecondaryAttackWeaponConfigNormalizer
 
         SecondaryAttacksPlugin.ModLogger.LogWarning(
             $"Ignoring melee preset block(s) {string.Join(", ", ignoredBlocks)} on {prefabName} because preset is {FormatMeleePreset(selectedPreset)}.");
-    }
-
-    private static NormalizedSneakAmbushConfig? NormalizeSelectedSneakAmbush(
-        SneakAmbushConfig? rawSneakAmbush,
-        NormalizedSneakAmbushConfig? fallback)
-    {
-        return NormalizeSneakAmbush(rawSneakAmbush ?? new SneakAmbushConfig(), fallback);
-    }
-
-    private static NormalizedCleavingThrustConfig? NormalizeSelectedCleavingThrust(
-        CleavingThrustConfig? rawCleavingThrust,
-        NormalizedCleavingThrustConfig? fallback)
-    {
-        return NormalizeCleavingThrust(rawCleavingThrust ?? new CleavingThrustConfig(), fallback);
-    }
-
-    private static NormalizedLaunchSlamConfig? NormalizeSelectedLaunchSlam(
-        LaunchSlamConfig? rawLaunchSlam,
-        NormalizedLaunchSlamConfig? fallback)
-    {
-        return NormalizeLaunchSlam(rawLaunchSlam ?? new LaunchSlamConfig(), fallback);
-    }
-
-    private static NormalizedKnockbackChainConfig? NormalizeSelectedKnockbackChain(
-        KnockbackChainConfig? rawKnockbackChain,
-        NormalizedKnockbackChainConfig? fallback)
-    {
-        return NormalizeKnockbackChain(rawKnockbackChain ?? new KnockbackChainConfig(), fallback);
-    }
-
-    private static NormalizedAftershockConfig? NormalizeSelectedAftershock(
-        AftershockConfig? rawAftershock,
-        NormalizedAftershockConfig? fallback)
-    {
-        return NormalizeAftershock(rawAftershock ?? new AftershockConfig(), fallback);
-    }
-
-    private static NormalizedRiftTrailConfig? NormalizeSelectedRiftTrail(
-        RiftTrailConfig? rawRiftTrail,
-        NormalizedRiftTrailConfig? fallback)
-    {
-        return NormalizeRiftTrail(rawRiftTrail ?? new RiftTrailConfig(), fallback);
-    }
-
-    private static NormalizedFractureLineConfig? NormalizeSelectedFractureLine(
-        FractureLineConfig? rawFractureLine,
-        NormalizedFractureLineConfig? fallback)
-    {
-        return NormalizeFractureLine(rawFractureLine ?? new FractureLineConfig(), fallback);
-    }
-
-    private static NormalizedImpactBurstConfig? NormalizeSelectedImpactBurst(
-        ImpactBurstConfig? rawImpactBurst,
-        NormalizedImpactBurstConfig? fallback)
-    {
-        return NormalizeImpactBurst(rawImpactBurst ?? new ImpactBurstConfig(), fallback);
-    }
-
-    private static NormalizedBoomerangConfig? NormalizeSelectedBoomerang(
-        BoomerangConfig? rawBoomerang,
-        NormalizedBoomerangConfig? fallback)
-    {
-        return NormalizeBoomerang(rawBoomerang ?? new BoomerangConfig(), fallback);
-    }
-
-    private static NormalizedSpinningSweepConfig? NormalizeSelectedSpinningSweep(
-        SpinningSweepConfig? rawSpinningSweep,
-        NormalizedSpinningSweepConfig? fallback)
-    {
-        return NormalizeSpinningSweep(rawSpinningSweep ?? new SpinningSweepConfig(), fallback);
     }
 
     internal static NormalizedSecondaryModeConfig CreateImpactBurstSecondary(NormalizedImpactBurstConfig impactBurst)
@@ -864,7 +719,8 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         string? presetOverride = null)
     {
         NormalizedSecondaryModeConfig baseConfig = fallback ?? new NormalizedSecondaryModeConfig();
-        string preset = presetOverride?.Trim() ?? rawRanged.Preset?.Trim() ?? baseConfig.Projectile.Preset;
+        string preset = SecondaryAttackPresetCatalog.CanonicalizeKey(
+            presetOverride ?? rawRanged.Preset ?? baseConfig.Projectile.Preset);
         bool isBombPreset = IsBombRangedPreset(preset);
         return new NormalizedSecondaryModeConfig
         {
@@ -974,6 +830,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                         : "";
                 }
 
+                preset = SecondaryAttackPresetCatalog.CanonicalizeKey(preset);
                 bool isSpearRainPreset = preset.Equals("spearRain", StringComparison.OrdinalIgnoreCase);
                 return new NormalizedMeleeOnProjectileHitConfig
                 {
@@ -1349,7 +1206,8 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         NormalizedSecondaryModeConfig baseConfig = fallback ?? new NormalizedSecondaryModeConfig();
         NormalizedSummonEmpowerSecondaryConfig summonEmpowerBase = fallback?.SummonEmpower ?? new NormalizedSummonEmpowerSecondaryConfig();
         NormalizedShieldConvertSecondaryConfig shieldConvertBase = fallback?.ShieldConvert ?? new NormalizedShieldConvertSecondaryConfig();
-        string preset = presetOverride?.Trim() ?? rawBloodMagic.Preset?.Trim() ?? baseConfig.Type;
+        string preset = SecondaryAttackPresetCatalog.CanonicalizeKey(
+            presetOverride ?? rawBloodMagic.Preset ?? baseConfig.Type);
         float summonEmpowerRadius = rawBloodMagic.Radius ?? summonEmpowerBase.Radius;
         float shieldConvertRadius = rawBloodMagic.Radius ?? shieldConvertBase.Radius;
         return new NormalizedSecondaryModeConfig

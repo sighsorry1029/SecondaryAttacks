@@ -290,6 +290,7 @@ internal sealed class MeleePresetCooldownDefinition
 {
     public float Cooldown { get; set; }
 
+    public string CooldownGroup { get; set; } = "";
 
     public string CooldownSkill { get; set; } = "weapon";
 

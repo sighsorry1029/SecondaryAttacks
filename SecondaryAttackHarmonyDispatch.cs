@@ -90,11 +90,9 @@ internal static class SecondaryAttackHarmonyDispatch
         if (player == Player.m_localPlayer)
         {
             SecondaryAttackFacade.TryApplyPendingConfig();
-            SecondaryAttackAdminAccessSystem.Update();
             MeleeBoomerangProjectileSystem.UpdateDeferredReturnAutoEquips(player);
             SecondaryAttackRuntimeFacade.TryUpdateSecondaryProjectileHoldRepeat(player, secondaryAttackHold);
-            MeleePresetCooldownSystem.UpdateActiveCooldowns(player);
-            RangedSecondaryCooldownSystem.UpdateActiveCooldowns(player);
+            SecondaryCooldownGroupSystem.UpdateActiveCooldowns(player);
             SneakAmbushChargeSystem.Update(player);
             SecondaryCooldownHudSystem.Update(player);
             BowSecondaryKeyHintSystem.RefreshKeyHintUi();

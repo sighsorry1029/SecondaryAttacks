@@ -6,20 +6,7 @@ internal static partial class ProjectileRuntimeSystem
 {
     internal static string GetPresetName(SecondaryAttackPreset preset)
     {
-        return preset switch
-        {
-            SecondaryAttackPreset.Barrage => "barrage",
-            SecondaryAttackPreset.Volley => "volley",
-            SecondaryAttackPreset.Piercing => "piercing",
-            SecondaryAttackPreset.Scatter => "scatter",
-            SecondaryAttackPreset.Spiral => "spiral",
-            SecondaryAttackPreset.Sentinel => "sentinel",
-            SecondaryAttackPreset.Meteor => "meteor",
-            SecondaryAttackPreset.Burst => "burst",
-            SecondaryAttackPreset.StickyDetonator => "stickyDetonator",
-            SecondaryAttackPreset.OverchargedBomb => "overchargedBomb",
-            _ => preset.ToString()
-        };
+        return SecondaryAttackPresetCatalog.GetKey(preset);
     }
 
     internal static bool TryValidateConfiguredPayload(string weaponPrefabName, Attack primaryAttack, SecondaryAttackPreset preset, bool usesAmmo, out string reason)
@@ -45,36 +32,81 @@ internal static partial class ProjectileRuntimeSystem
         return TryValidatePayloadPrefab(weaponPrefabName, payloadPrefab, preset, out reason);
     }
 
+    internal static bool TryValidateBurstPresetPayload(
+        Attack attack,
+        SecondaryAttackDefinition definition,
+        SecondaryAttackPreset preset,
+        ItemDrop.ItemData? ammoItem)
+    {
+        if (!UsesProjectilePayloadPreset(preset))
+        {
+            ReportCompatibilityIssue(
+                attack,
+                definition,
+                $"unsupported projectile preset '{GetPresetName(preset)}'.");
+            return false;
+        }
+
+        GameObject? payloadPrefab = ResolveEffectiveProjectilePayload(attack, ammoItem);
+        if (payloadPrefab == null)
+        {
+            ReportCompatibilityIssue(
+                attack,
+                definition,
+                $"no effective projectile payload was found for preset '{GetPresetName(preset)}'.");
+            return false;
+        }
+
+        string weaponPrefabName =
+            attack.m_weapon?.m_dropPrefab != null
+                ? attack.m_weapon.m_dropPrefab.name
+                : definition.PrefabName;
+        if (TryValidatePayloadPrefab(
+                weaponPrefabName,
+                payloadPrefab,
+                preset,
+                out string reason))
+        {
+            return true;
+        }
+
+        ReportCompatibilityIssue(attack, definition, reason);
+        return false;
+    }
+
+    private static GameObject? ResolveEffectiveProjectilePayload(
+        Attack attack,
+        ItemDrop.ItemData? ammoItem)
+    {
+        GameObject? ammoProjectile =
+            ammoItem?.m_shared?.m_attack?.m_attackProjectile;
+        return ammoProjectile != null
+            ? ammoProjectile
+            : attack.m_attackProjectile;
+    }
+
     internal static bool TryHandleBurstPreset(Attack attack, SecondaryAttackDefinition definition, SecondaryAttackPreset preset)
     {
         switch (preset)
         {
             case SecondaryAttackPreset.Barrage:
-                FireBarrage(attack, definition);
-                return true;
+                return FireBarrage(attack, definition);
             case SecondaryAttackPreset.Volley:
                 return FireVolley(attack, definition);
             case SecondaryAttackPreset.Piercing:
-                FirePiercingShot(attack, definition);
-                return true;
+                return FirePiercingShot(attack, definition);
             case SecondaryAttackPreset.Scatter:
-                FireScatterRicochet(attack, definition);
-                return true;
+                return FireScatterRicochet(attack, definition);
             case SecondaryAttackPreset.Spiral:
-                FireSpiralBurst(attack, definition);
-                return true;
+                return FireSpiralBurst(attack, definition);
             case SecondaryAttackPreset.Sentinel:
-                FireSentinel(attack, definition);
-                return true;
+                return FireSentinel(attack, definition);
             case SecondaryAttackPreset.Meteor:
-                FireMeteor(attack, definition);
-                return true;
+                return FireMeteor(attack, definition);
             case SecondaryAttackPreset.Burst:
-                FireBurstFire(attack, definition);
-                return true;
+                return FireBurstFire(attack, definition);
             case SecondaryAttackPreset.StickyDetonator:
-                FireStickyDetonator(attack, definition);
-                return true;
+                return FireStickyDetonator(attack, definition);
             case SecondaryAttackPreset.OverchargedBomb:
                 return FireOverchargedBomb(attack, definition);
             default:

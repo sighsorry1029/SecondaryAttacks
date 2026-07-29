@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.8
+
+- Changed secondary cooldown sharing to use automatically detected weapon families first, with independent Blood Magic summon and shield groups and per-preset fallback for unrecognized modded weapons.
+- Added localized preset descriptions to applied weapon tooltips with a client-side on/off option.
+- Hardened projectile secondary startup so cooldown, payload, resources, and the selected ammunition prefab are validated before ammo, durability, item, or reload side effects are committed.
+- Consolidated preset, weapon-family, cooldown, summon, key-hint, and weapon-trail runtime paths while preserving dynamic ObjectDB rebinding and server-synchronized admin access.
+
 ## 1.1.7
 
 - Added automatic summon-star HUD compatibility for CreatureManager, Creature Level & Loot Control, and StarLevelSystem, yielding to an active external star display while keeping SecondaryAttacks as the fallback when none is active.

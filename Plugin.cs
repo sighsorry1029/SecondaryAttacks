@@ -26,15 +26,19 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.1.7";
+    internal const string ModVersion = "1.1.8";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
     private static string ConfigFileFullPath = Paths.ConfigPath + Path.DirectorySeparatorChar + ConfigFileName;
-    internal static string ConnectionError = "";
     private readonly Harmony _harmony = new(ModGUID);
     public static readonly ManualLogSource ModLogger = BepInEx.Logging.Logger.CreateLogSource(ModName);
-    internal static readonly ConfigSync ConfigSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
+    internal static readonly ConfigSync ConfigSync = new(ModGUID)
+    {
+        DisplayName = ModName,
+        CurrentVersion = ModVersion,
+        MinimumRequiredVersion = ModVersion
+    };
     internal static PluginSettings Settings { get; } = new();
     internal static ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor => Settings.General.BloodMagicHealthCostSkillRaiseFactor;
     internal static ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth => Settings.General.BloodMagicHealthCostUsesMaxHealth;
@@ -49,6 +53,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<RangedPresetSelection> CrossbowPreset => Settings.Ranged.CrossbowPreset;
     internal static ConfigEntry<BombPresetSelection> BombPreset => Settings.Ranged.BombPreset;
     internal static ConfigEntry<Toggle> SecondaryCooldownHudEnabled => Settings.Ui.SecondaryCooldownHudEnabled;
+    internal static ConfigEntry<Toggle> SecondaryAttackTooltipsEnabled => Settings.Ui.SecondaryAttackTooltipsEnabled;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionX => Settings.Ui.SecondaryCooldownHudPositionX;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
     internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.Admin.AdminNoPresetCooldowns;
@@ -99,22 +104,24 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
         bool saveOnSet = Config.SaveOnConfigSet;
         Config.SaveOnConfigSet = false;
+        try
+        {
+            Settings.Bind(this);
+            QuickstepSystem.Initialize();
+            SummonQualityHudCompatibility.Initialize();
+            RemoveLegacyConfigEntries();
+            RegisterWorldApplySettingHandlers();
+            _serverConfigLocked = Settings.General.LockConfiguration;
+            _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
+            Assembly assembly = Assembly.GetExecutingAssembly();
+            _harmony.PatchAll(assembly);
+            SecondaryAttackFacade.Initialize();
+            SetupWatcher();
 
-        Settings.Bind(this);
-        QuickstepSystem.Initialize();
-        SummonQualityHudCompatibility.Initialize();
-        RemoveLegacyConfigEntries();
-        RegisterWorldApplySettingHandlers();
-        _serverConfigLocked = Settings.General.LockConfiguration;
-        _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
-        Assembly assembly = Assembly.GetExecutingAssembly();
-        _harmony.PatchAll(assembly);
-        SecondaryAttackFacade.Initialize();
-        SetupWatcher();
-
-        Config.Save();
-        _lastConfigFileText = ReadFileTextIfExists(ConfigFileFullPath);
-        if (saveOnSet)
+            Config.Save();
+            _lastConfigFileText = ReadFileTextIfExists(ConfigFileFullPath);
+        }
+        finally
         {
             Config.SaveOnConfigSet = saveOnSet;
         }
@@ -122,12 +129,14 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
     private void OnDestroy()
     {
+        _watcher?.Dispose();
+        _watcher = null;
+        _configReloadDebouncer?.Dispose();
+        _configReloadDebouncer = null;
         QuickstepSystem.Dispose();
         UnregisterWorldApplySettingHandlers();
         SecondaryAttackFacade.Dispose();
         SaveWithRespectToConfigSet();
-        _watcher?.Dispose();
-        _configReloadDebouncer?.Dispose();
     }
 
     private void SetupWatcher()
@@ -390,6 +399,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal sealed class UiSettings
     {
         internal ConfigEntry<Toggle> SecondaryCooldownHudEnabled = null!;
+        internal ConfigEntry<Toggle> SecondaryAttackTooltipsEnabled = null!;
         internal ConfigEntry<float> SecondaryCooldownHudPositionX = null!;
         internal ConfigEntry<float> SecondaryCooldownHudPositionY = null!;
 
@@ -397,6 +407,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         {
             const string group = "3 - UI";
             SecondaryCooldownHudEnabled = plugin.config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns and charge progress are shown in a dedicated HUD block. Off hides this display without changing cooldown behavior.", synchronizedSetting: false);
+            SecondaryAttackTooltipsEnabled = plugin.config(group, "Secondary Attack Tooltips Enabled", Toggle.On, "If on, weapons with an applied SecondaryAttacks preset show its localized name and description in item tooltips. Off hides only this client-side tooltip section.", synchronizedSetting: false);
             SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.615f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
             SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
         }

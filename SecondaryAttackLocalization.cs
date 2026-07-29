@@ -9,6 +9,8 @@ internal static class SecondaryAttackLocalization
     internal const string HintDetonate = "$sa_hint_detonate";
     internal const string HudEmpower = "$sa_hud_empower";
     internal const string SummonNameFormat = "$sa_summon_name_format";
+    internal const string ItemTooltipSecondaryAttack = "$sa_item_tooltip_secondary_attack";
+    internal const string ItemTooltipSummonQuality = "$sa_item_tooltip_summon_quality";
 
     internal static void Load()
     {

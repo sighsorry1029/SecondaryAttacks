@@ -1,31 +1,63 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace SecondaryAttacks;
 
 internal sealed class SecondaryAttackCompiledSnapshot
 {
-    public static readonly SecondaryAttackCompiledSnapshot Empty = new(0, new NormalizedSecondaryAttackConfigFile());
+    public static readonly SecondaryAttackCompiledSnapshot Empty = new(
+        0,
+        new Dictionary<string, NormalizedWeaponConfig>(StringComparer.OrdinalIgnoreCase),
+        new Dictionary<string, NormalizedWeaponConfig>(StringComparer.OrdinalIgnoreCase),
+        new Dictionary<string, NormalizedWeaponConfig>(StringComparer.OrdinalIgnoreCase),
+        null,
+        new Dictionary<string, NormalizedMagicSummonOverrideConfig>(StringComparer.OrdinalIgnoreCase));
 
-    public SecondaryAttackCompiledSnapshot(int snapshotId, NormalizedSecondaryAttackConfigFile config)
+    public SecondaryAttackCompiledSnapshot(
+        int snapshotId,
+        IReadOnlyDictionary<string, NormalizedWeaponConfig> weapons,
+        IReadOnlyDictionary<string, NormalizedWeaponConfig> globalRangedPresets,
+        IReadOnlyDictionary<string, NormalizedWeaponConfig> globalBloodMagicPresets,
+        NormalizedWeaponConfig? globalMeleeFallback,
+        IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> magicSummons)
     {
         SnapshotId = snapshotId;
-        Config = config ?? throw new ArgumentNullException(nameof(config));
+        Weapons = CopyAsReadOnly(weapons);
+        GlobalRangedPresets = CopyAsReadOnly(globalRangedPresets);
+        GlobalBloodMagicPresets = CopyAsReadOnly(globalBloodMagicPresets);
+        GlobalMeleeFallback = globalMeleeFallback?.Clone();
+        MagicSummons = CopyAsReadOnly(magicSummons);
     }
 
     public int SnapshotId { get; }
 
-    public NormalizedSecondaryAttackConfigFile Config { get; }
+    public IReadOnlyDictionary<string, NormalizedWeaponConfig> Weapons { get; }
 
-    public IReadOnlyDictionary<string, NormalizedWeaponConfig> Weapons => Config.Weapons;
+    public IReadOnlyDictionary<string, NormalizedWeaponConfig> GlobalRangedPresets { get; }
 
-    public IReadOnlyDictionary<string, NormalizedWeaponConfig> GlobalRangedPresets => Config.GlobalRangedPresets;
+    public IReadOnlyDictionary<string, NormalizedWeaponConfig> GlobalBloodMagicPresets { get; }
 
-    public IReadOnlyDictionary<string, NormalizedWeaponConfig> GlobalBloodMagicPresets => Config.GlobalBloodMagicPresets;
+    public NormalizedWeaponConfig? GlobalMeleeFallback { get; }
 
-    public NormalizedWeaponConfig? GlobalMeleeFallback => Config.GlobalMeleeFallback;
+    public IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> MagicSummons { get; }
 
-    public IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> MagicSummons => Config.MagicSummons;
+    private static IReadOnlyDictionary<string, TValue> CopyAsReadOnly<TValue>(
+        IReadOnlyDictionary<string, TValue> source)
+    {
+        if (source == null)
+        {
+            throw new ArgumentNullException(nameof(source));
+        }
+
+        Dictionary<string, TValue> copy = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string key, TValue value) in source)
+        {
+            copy[key] = value;
+        }
+
+        return new ReadOnlyDictionary<string, TValue>(copy);
+    }
 }
 
 internal sealed class SecondaryAttackAppliedWorldSnapshot

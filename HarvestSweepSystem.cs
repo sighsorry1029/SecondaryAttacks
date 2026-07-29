@@ -38,7 +38,11 @@ internal static class HarvestSweepSystem
             return true;
         }
 
-        if (!MeleePresetCooldownSystem.TryConsume(humanoid, attack.m_weapon, PresetName, harvestSweep.PresetCooldown, out _))
+        if (!MeleePresetCooldownSystem.TryConsume(
+                humanoid,
+                attack.m_weapon,
+                PresetName,
+                harvestSweep.PresetCooldown))
         {
             return false;
         }

@@ -15,12 +15,12 @@ internal sealed class KeyHintCell
     private readonly List<GameObject> _keyParents = [];
     private readonly List<TMP_Text> _extraTexts = [];
     private readonly List<string> _originalKeyTexts = [];
+    private readonly List<bool> _originalKeyStates = [];
     private readonly List<bool> _originalKeyParentStates = [];
     private readonly List<bool> _originalExtraTextStates = [];
-    private readonly HashSet<GameObject> _generatedKeyParents = [];
-    private readonly List<TMP_Text> _generatedSeparatorTexts = [];
     private TMP_Text? _label;
     private bool _capturedOriginals;
+    private bool _originalLabelState;
     private bool _originalRootActive;
     private string _originalLabel = string.Empty;
     private float? _originalLabelPreferredWidth;
@@ -37,11 +37,6 @@ internal sealed class KeyHintCell
     internal bool IsValid => Root != null && (_label != null || _keys.Count > 0 || _extraTexts.Count > 0);
 
     internal bool HasKeyTexts => _keys.Count > 0;
-
-    internal static KeyHintCell? CloneFrom(KeyHintCell? template, string name, bool hideOnRestore)
-    {
-        return CloneFrom(template?.Root, name, hideOnRestore);
-    }
 
     internal static KeyHintCell? CloneFrom(GameObject? template, string name, bool hideOnRestore)
     {
@@ -69,146 +64,63 @@ internal sealed class KeyHintCell
                template.GetComponentsInChildren<TMP_Text>(includeInactive: true).Length > 0;
     }
 
-    internal void Set(string label, IReadOnlyList<string> keys, float preferredTextWidth = 0f, bool hideExtraTexts = false)
+    internal void Set(string label, string key, float preferredTextWidth = 0f)
     {
-        EnsureKeyCount(keys.Count);
+        SetSingleKey(key, label, preferredTextWidth, updateLabel: true);
+    }
+
+    internal void SetKey(string key)
+    {
+        SetSingleKey(key, label: null, preferredTextWidth: 0f, updateLabel: false);
+    }
+
+    private void SetSingleKey(string key, string? label, float preferredTextWidth, bool updateLabel)
+    {
+        if (Root == null)
+        {
+            return;
+        }
+
         CaptureOriginals();
         Root.SetActive(true);
 
-        if (_label != null)
+        if (updateLabel && _label != null)
         {
-            SetText(_label, label);
+            SetText(_label, label ?? string.Empty);
             if (preferredTextWidth > 0f && _label.TryGetComponent(out LayoutElement layoutElement))
             {
                 layoutElement.preferredWidth = preferredTextWidth;
             }
         }
 
-        for (int i = 0; i < _keys.Count; i++)
+        TMP_Text? selectedKey = _keys.FirstOrDefault();
+        SetKeyVisibility(selectedKey, _label);
+        if (selectedKey != null)
         {
-            bool show = i < keys.Count;
-            if (i < _keyParents.Count && _keyParents[i] != null)
-            {
-                _keyParents[i].SetActive(show);
-            }
-
-            if (show)
-            {
-                SetText(_keys[i], keys[i]);
-            }
+            SetText(selectedKey, key);
         }
 
-        if (hideExtraTexts)
+        foreach (TMP_Text extraText in _extraTexts)
         {
-            foreach (TMP_Text extraText in _extraTexts)
+            if (extraText != null)
             {
-                if (extraText != null)
-                {
-                    extraText.gameObject.SetActive(false);
-                }
-            }
-        }
-        else
-        {
-            EnsureSeparatorCount(Mathf.Max(0, keys.Count - 1));
-            for (int i = 0; i < _generatedSeparatorTexts.Count; i++)
-            {
-                TMP_Text separator = _generatedSeparatorTexts[i];
-                if (separator == null)
-                {
-                    continue;
-                }
-
-                bool show = i < keys.Count - 1;
-                separator.gameObject.SetActive(show);
-                if (show)
-                {
-                    SetText(separator, "+");
-                }
-            }
-
-            foreach (TMP_Text extraText in _extraTexts)
-            {
-                if (extraText != null)
-                {
-                    extraText.gameObject.SetActive(keys.Count > 1);
-                }
-            }
-        }
-    }
-
-    internal void SetKeys(IReadOnlyList<string> keys, bool hideExtraTexts = false)
-    {
-        EnsureKeyCount(keys.Count);
-        CaptureOriginals();
-        Root.SetActive(true);
-
-        for (int i = 0; i < _keys.Count; i++)
-        {
-            bool show = i < keys.Count;
-            if (i < _keyParents.Count && _keyParents[i] != null)
-            {
-                _keyParents[i].SetActive(show);
-            }
-
-            if (show)
-            {
-                SetText(_keys[i], keys[i]);
-            }
-        }
-
-        if (hideExtraTexts)
-        {
-            foreach (TMP_Text extraText in _extraTexts)
-            {
-                if (extraText != null)
-                {
-                    extraText.gameObject.SetActive(false);
-                }
-            }
-        }
-        else
-        {
-            EnsureSeparatorCount(Mathf.Max(0, keys.Count - 1));
-            for (int i = 0; i < _generatedSeparatorTexts.Count; i++)
-            {
-                TMP_Text separator = _generatedSeparatorTexts[i];
-                if (separator == null)
-                {
-                    continue;
-                }
-
-                bool show = i < keys.Count - 1;
-                separator.gameObject.SetActive(show);
-                if (show)
-                {
-                    SetText(separator, "+");
-                }
-            }
-
-            foreach (TMP_Text extraText in _extraTexts)
-            {
-                if (extraText != null)
-                {
-                    extraText.gameObject.SetActive(keys.Count > 1);
-                }
+                extraText.gameObject.SetActive(false);
             }
         }
     }
 
     internal void SetText(string value)
     {
+        if (Root == null)
+        {
+            return;
+        }
+
         CaptureOriginals();
         Root.SetActive(true);
         TMP_Text? target = _label ?? _keys.FirstOrDefault() ?? _extraTexts.FirstOrDefault();
         SetText(target, value);
-        foreach (GameObject keyParent in _keyParents)
-        {
-            if (keyParent != null)
-            {
-                keyParent.SetActive(false);
-            }
-        }
+        SetKeyVisibility(target != null && _keys.Contains(target) ? target : null, target);
 
         foreach (TMP_Text extraText in _extraTexts)
         {
@@ -221,6 +133,11 @@ internal sealed class KeyHintCell
 
     internal void Restore()
     {
+        if (Root == null)
+        {
+            return;
+        }
+
         if (!_capturedOriginals)
         {
             if (_hideOnRestore)
@@ -235,6 +152,7 @@ internal sealed class KeyHintCell
         if (_label != null)
         {
             SetText(_label, _originalLabel);
+            _label.gameObject.SetActive(_originalLabelState);
             if (_originalLabelPreferredWidth.HasValue &&
                 _label.TryGetComponent(out LayoutElement layoutElement))
             {
@@ -247,12 +165,19 @@ internal sealed class KeyHintCell
             SetText(_keys[i], _originalKeyTexts[i]);
         }
 
+        for (int i = 0; i < _keys.Count && i < _originalKeyStates.Count; i++)
+        {
+            if (_keys[i] != null)
+            {
+                _keys[i].gameObject.SetActive(_originalKeyStates[i]);
+            }
+        }
+
         for (int i = 0; i < _keyParents.Count && i < _originalKeyParentStates.Count; i++)
         {
             if (_keyParents[i] != null)
             {
-                bool active = !_generatedKeyParents.Contains(_keyParents[i]) && _originalKeyParentStates[i];
-                _keyParents[i].SetActive(active);
+                _keyParents[i].SetActive(_originalKeyParentStates[i]);
             }
         }
 
@@ -264,21 +189,6 @@ internal sealed class KeyHintCell
             }
         }
 
-        foreach (TMP_Text separator in _generatedSeparatorTexts)
-        {
-            if (separator != null)
-            {
-                separator.gameObject.SetActive(false);
-            }
-        }
-    }
-
-    internal void SetActive(bool active)
-    {
-        if (Root != null)
-        {
-            Root.SetActive(active);
-        }
     }
 
     internal void MoveToStart()
@@ -287,11 +197,6 @@ internal sealed class KeyHintCell
         {
             Root.transform.SetAsFirstSibling();
         }
-    }
-
-    internal bool Contains(TMP_Text? text)
-    {
-        return text != null && Root != null && text.transform.IsChildOf(Root.transform);
     }
 
     internal void RebuildParentLayout()
@@ -304,7 +209,7 @@ internal sealed class KeyHintCell
 
     private void CaptureOriginals()
     {
-        if (_capturedOriginals)
+        if (_capturedOriginals || Root == null)
         {
             return;
         }
@@ -312,6 +217,7 @@ internal sealed class KeyHintCell
         _capturedOriginals = true;
         _originalRootActive = Root.activeSelf;
         _originalLabel = _label != null ? _label.text : string.Empty;
+        _originalLabelState = _label != null && _label.gameObject.activeSelf;
         _originalLabelPreferredWidth = _label != null &&
                                        _label.TryGetComponent(out LayoutElement layoutElement)
             ? layoutElement.preferredWidth
@@ -321,6 +227,12 @@ internal sealed class KeyHintCell
         foreach (TMP_Text key in _keys)
         {
             _originalKeyTexts.Add(key != null ? key.text : string.Empty);
+        }
+
+        _originalKeyStates.Clear();
+        foreach (TMP_Text key in _keys)
+        {
+            _originalKeyStates.Add(key != null && key.gameObject.activeSelf);
         }
 
         _originalKeyParentStates.Clear();
@@ -333,91 +245,6 @@ internal sealed class KeyHintCell
         foreach (TMP_Text extraText in _extraTexts)
         {
             _originalExtraTextStates.Add(extraText != null && extraText.gameObject.activeSelf);
-        }
-    }
-
-    private void EnsureKeyCount(int count)
-    {
-        if (count <= _keys.Count &&
-            _keys.Count == _keyParents.Count &&
-            _keys.TrueForAll(static key => key != null) &&
-            _keyParents.TrueForAll(static parent => parent != null))
-        {
-            return;
-        }
-
-        RefreshChildren();
-        if (count <= _keys.Count || _keyParents.Count == 0)
-        {
-            return;
-        }
-
-        GameObject template = _keyParents[0];
-        Transform parent = template.transform.parent;
-        while (_keys.Count < count)
-        {
-            GameObject clone = Object.Instantiate(template, parent, false);
-            clone.name = _keys.Count == 1 ? "key_bkg (1)" : $"key_bkg ({_keys.Count})";
-            _generatedKeyParents.Add(clone);
-            RefreshChildren();
-            if (_keys.Count == 0)
-            {
-                break;
-            }
-        }
-    }
-
-    private void EnsureSeparatorCount(int count)
-    {
-        if (count <= 0 || _keyParents.Count == 0 || _extraTexts.Count > 0)
-        {
-            return;
-        }
-
-        Transform? parent = _keyParents[0].transform.parent;
-        TMP_Text? templateText = _label ?? _keys.FirstOrDefault();
-        if (parent == null || templateText == null)
-        {
-            return;
-        }
-
-        while (_generatedSeparatorTexts.Count < count)
-        {
-            GameObject separatorObject = new($"SecondaryAttacks_KeyHintSeparator_{_generatedSeparatorTexts.Count}");
-            separatorObject.transform.SetParent(parent, false);
-            RectTransform rectTransform = separatorObject.AddComponent<RectTransform>();
-            rectTransform.sizeDelta = new Vector2(18f, 24f);
-
-            TextMeshProUGUI separator = separatorObject.AddComponent<TextMeshProUGUI>();
-            separator.font = templateText.font;
-            separator.fontSharedMaterial = templateText.fontSharedMaterial;
-            separator.fontSize = templateText.fontSize;
-            separator.fontStyle = templateText.fontStyle;
-            separator.color = templateText.color;
-            separator.alignment = TextAlignmentOptions.Center;
-            separator.raycastTarget = false;
-            separator.text = "+";
-
-            LayoutElement layoutElement = separatorObject.AddComponent<LayoutElement>();
-            layoutElement.preferredWidth = 18f;
-            layoutElement.minWidth = 12f;
-
-            _generatedSeparatorTexts.Add(separator);
-        }
-
-        for (int i = 0; i < _generatedSeparatorTexts.Count; i++)
-        {
-            TMP_Text separator = _generatedSeparatorTexts[i];
-            if (separator == null)
-            {
-                continue;
-            }
-
-            int targetKeyIndex = Mathf.Min(i + 1, _keyParents.Count - 1);
-            if (targetKeyIndex >= 0 && targetKeyIndex < _keyParents.Count && _keyParents[targetKeyIndex] != null)
-            {
-                separator.transform.SetSiblingIndex(_keyParents[targetKeyIndex].transform.GetSiblingIndex());
-            }
         }
     }
 
@@ -514,6 +341,35 @@ internal sealed class KeyHintCell
 
         Localization.instance?.RemoveTextFromCache(text);
         text.text = value;
+    }
+
+    private void SetKeyVisibility(TMP_Text? visibleKey, TMP_Text? protectedText)
+    {
+        foreach (GameObject keyParent in _keyParents.Distinct())
+        {
+            if (keyParent == null)
+            {
+                continue;
+            }
+
+            bool containsVisibleKey = ContainsText(keyParent, visibleKey);
+            bool containsProtectedText = keyParent == Root || ContainsText(keyParent, protectedText);
+            keyParent.SetActive(containsVisibleKey || containsProtectedText);
+        }
+
+        foreach (TMP_Text key in _keys)
+        {
+            if (key != null)
+            {
+                key.gameObject.SetActive(key == visibleKey);
+            }
+        }
+    }
+
+    private static bool ContainsText(GameObject container, TMP_Text? text)
+    {
+        return text != null &&
+               (container == text.gameObject || text.transform.IsChildOf(container.transform));
     }
 
     private static bool LooksLikeKeyBindingText(string? text)

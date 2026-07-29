@@ -104,8 +104,6 @@ internal sealed class SecondaryAttackYamlTexts
         }
     }
 
-    public IReadOnlyDictionary<SecondaryAttackYamlDomainId, string> All => _texts;
-
     public string Get(SecondaryAttackYamlDomainId id)
     {
         return _texts.TryGetValue(id, out string? text) ? text : string.Empty;

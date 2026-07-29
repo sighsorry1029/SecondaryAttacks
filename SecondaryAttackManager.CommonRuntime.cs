@@ -245,11 +245,6 @@ internal static partial class SecondaryAttackManager
         return false;
     }
 
-    internal static void PlayTriggeredAttackEffects(Attack attack)
-    {
-        PlayTriggeredAttackEffects(attack, 1f);
-    }
-
     internal static void PlayTriggeredAttackEffects(Attack attack, float durabilityFactor)
     {
         DrainAttackDurability(attack, durabilityFactor);
@@ -307,7 +302,7 @@ internal static partial class SecondaryAttackManager
             return SecondaryAttackDurabilityAdjustmentState.Empty;
         }
 
-        float factor = Mathf.Max(0f, ResolveActiveAttackDurabilityFactor(activeAttack));
+        float factor = Mathf.Max(0f, activeAttack.Definition.DurabilityFactor);
         if (Mathf.Approximately(factor, 1f))
         {
             return SecondaryAttackDurabilityAdjustmentState.Empty;
@@ -340,11 +335,6 @@ internal static partial class SecondaryAttackManager
     {
         EndSecondaryAttackDurabilityAdjustment(state);
         state = SecondaryAttackDurabilityAdjustmentState.Empty;
-    }
-
-    internal static float ResolveActiveAttackDurabilityFactor(ActiveSecondaryAttack activeAttack)
-    {
-        return activeAttack.Definition.DurabilityFactor;
     }
 
     internal readonly struct SecondaryAttackDurabilityAdjustmentState

@@ -67,14 +67,6 @@ internal static class SecondaryAttackFacade
         _applyRetryDebouncer = null;
     }
 
-    public static void ApplyToObjectDb(ObjectDB objectDb, bool emitMissingWarnings)
-    {
-        RefreshYamlAuthorityMode();
-        ApplyCompiledSnapshotToObjectDb(objectDb, _currentCompiledSnapshot, emitMissingWarnings);
-        _hasPendingWorldReapply = false;
-        ResetApplyFailure(PendingWorldApplyFailure);
-    }
-
     internal static void TryApplyPendingConfig()
     {
         RefreshYamlAuthorityMode();
@@ -97,47 +89,18 @@ internal static class SecondaryAttackFacade
 
     internal static void ApplyPendingConfigToObjectDb(ObjectDB objectDb, bool emitMissingWarnings)
     {
-        RefreshYamlAuthorityMode();
-        bool applyingPendingConfig = _hasPendingConfig && _pendingCompiledSnapshot != null;
-        SecondaryAttackCompiledSnapshot snapshot = applyingPendingConfig
-            ? _pendingCompiledSnapshot!
-            : _currentCompiledSnapshot;
-        string fingerprint = applyingPendingConfig
-            ? _pendingYamlFingerprint ?? _currentYamlFingerprint
-            : _currentYamlFingerprint;
-        ApplyFailureState failureState = applyingPendingConfig
-            ? PendingConfigApplyFailure
-            : PendingWorldApplyFailure;
-
-        try
-        {
-            ApplyCompiledSnapshotToObjectDb(objectDb, snapshot, emitMissingWarnings);
-        }
-        catch (Exception exception)
-        {
-            if (!applyingPendingConfig)
-            {
-                _hasPendingWorldReapply = true;
-            }
-
-            RecordApplyFailure(
-                applyingPendingConfig ? "staged YAML configuration" : "world configuration",
-                exception,
-                failureState);
-            return;
-        }
-
-        if (applyingPendingConfig)
-        {
-            CompletePendingConfigCommit(snapshot, fingerprint);
-        }
-
-        _hasPendingWorldReapply = false;
-        ResetApplyFailure(PendingConfigApplyFailure);
-        ResetApplyFailure(PendingWorldApplyFailure);
+        ApplyPendingConfigToWorld(ZNetScene.instance, objectDb, emitMissingWarnings);
     }
 
     internal static void ApplyPendingConfigToZNetScene(ZNetScene scene, bool emitMissingWarnings)
+    {
+        ApplyPendingConfigToWorld(scene, ObjectDB.instance, emitMissingWarnings);
+    }
+
+    private static void ApplyPendingConfigToWorld(
+        ZNetScene? scene,
+        ObjectDB? objectDb,
+        bool emitMissingWarnings)
     {
         RefreshYamlAuthorityMode();
         bool applyingPendingConfig = _hasPendingConfig && _pendingCompiledSnapshot != null;
@@ -150,8 +113,6 @@ internal static class SecondaryAttackFacade
         ApplyFailureState failureState = applyingPendingConfig
             ? PendingConfigApplyFailure
             : PendingWorldApplyFailure;
-        ObjectDB? objectDb = ObjectDB.instance;
-
         try
         {
             ApplyCompiledSnapshotToWorld(scene, objectDb, snapshot, emitMissingWarnings);
@@ -475,7 +436,11 @@ internal static class SecondaryAttackFacade
         string fingerprint = _pendingYamlFingerprint ?? _currentYamlFingerprint;
         try
         {
-            ApplyCompiledSnapshotToObjectDb(objectDb, snapshot, emitMissingWarnings: true);
+            ApplyCompiledSnapshotToWorld(
+                ZNetScene.instance,
+                objectDb,
+                snapshot,
+                emitMissingWarnings: true);
         }
         catch (Exception exception)
         {
@@ -514,7 +479,11 @@ internal static class SecondaryAttackFacade
 
         try
         {
-            ApplyCompiledSnapshotToObjectDb(ObjectDB.instance, _currentCompiledSnapshot, emitMissingWarnings: true);
+            ApplyCompiledSnapshotToWorld(
+                ZNetScene.instance,
+                ObjectDB.instance,
+                _currentCompiledSnapshot,
+                emitMissingWarnings: true);
         }
         catch (Exception exception)
         {
@@ -526,18 +495,6 @@ internal static class SecondaryAttackFacade
         ResetApplyFailure(PendingWorldApplyFailure);
         SecondaryAttacksPlugin.ModLogger.LogInfo("Applied staged world-apply config changes.");
         return true;
-    }
-
-    private static void ApplyCompiledSnapshotToObjectDb(
-        ObjectDB objectDb,
-        SecondaryAttackCompiledSnapshot compiledSnapshot,
-        bool emitMissingWarnings)
-    {
-        ApplyCompiledSnapshotToWorld(
-            ZNetScene.instance,
-            objectDb,
-            compiledSnapshot,
-            emitMissingWarnings);
     }
 
     private static void ApplyCompiledSnapshotToWorld(
@@ -552,7 +509,10 @@ internal static class SecondaryAttackFacade
         {
             if (scene != null)
             {
-                ApplyCompiledSnapshotToZNetScene(scene, compiledSnapshot, emitMissingWarnings);
+                SecondaryAttackWorldApplySystem.ApplyToZNetScene(
+                    scene,
+                    compiledSnapshot,
+                    emitMissingWarnings);
             }
 
             if (objectDb != null)
@@ -583,7 +543,7 @@ internal static class SecondaryAttackFacade
         {
             if (scene != null)
             {
-                ApplyCompiledSnapshotToZNetScene(
+                SecondaryAttackWorldApplySystem.ApplyToZNetScene(
                     scene,
                     rollbackSnapshot,
                     emitMissingWarnings: false);
@@ -605,14 +565,6 @@ internal static class SecondaryAttackFacade
                 "Failed to restore the previously applied SecondaryAttacks world after an apply error. " +
                 $"Apply error: {applyException}\nCompensation error: {compensationException}");
         }
-    }
-
-    private static void ApplyCompiledSnapshotToZNetScene(
-        ZNetScene scene,
-        SecondaryAttackCompiledSnapshot compiledSnapshot,
-        bool emitMissingWarnings)
-    {
-        SecondaryAttackWorldApplySystem.ApplyToZNetScene(scene, compiledSnapshot, emitMissingWarnings);
     }
 
     private static bool CanApplyPendingConfigNow()

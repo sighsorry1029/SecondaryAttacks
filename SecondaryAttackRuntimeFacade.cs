@@ -60,19 +60,33 @@ internal static class SecondaryAttackRuntimeFacade
             return false;
         }
 
-        if (projectileBehavior.AmmoConsumption <= 0 || string.IsNullOrWhiteSpace(weapon.m_shared.m_ammoType))
+        string ammoType = weapon.m_shared.m_ammoType;
+        Inventory? inventory = humanoid.GetInventory();
+        ItemDrop.ItemData? ammoItem = null;
+        if (!string.IsNullOrWhiteSpace(ammoType))
+        {
+            ammoItem = FindConfiguredAmmo(humanoid, weapon, inventory, ammoType);
+            if (ammoItem == null ||
+                (projectileBehavior.AmmoConsumption > 0 &&
+                 (inventory == null ||
+                  CountAmmo(inventory, ammoItem) < projectileBehavior.AmmoConsumption)))
+            {
+                humanoid.Message(MessageHud.MessageType.Center, "$msg_outof " + ammoType);
+                return false;
+            }
+        }
+
+        Attack? configuredAttack = weapon.m_shared.m_secondaryAttack;
+        if (configuredAttack == null)
         {
             return true;
         }
 
-        if (humanoid.GetInventory() != null &&
-            CountAmmo(humanoid.GetInventory(), weapon.m_shared.m_ammoType) >= projectileBehavior.AmmoConsumption)
-        {
-            return true;
-        }
-
-        humanoid.Message(MessageHud.MessageType.Center, "$msg_outof " + weapon.m_shared.m_ammoType);
-        return false;
+        return ProjectileRuntimeSystem.TryValidateBurstPresetPayload(
+            configuredAttack,
+            definition,
+            projectileBehavior.Preset,
+            ammoItem);
     }
 
     internal static bool BeginProjectileHitContext(Projectile projectile, Collider collider, UnityEngine.Vector3 hitPoint, bool water, UnityEngine.Vector3 normal)
@@ -193,7 +207,7 @@ internal static class SecondaryAttackRuntimeFacade
         {
             float adrenalineFactor = definition.Behavior is ProjectileSecondaryBehavior projectileBehavior
                 ? projectileBehavior.AdrenalineFactor
-                : SecondaryAttackAdrenalineSystem.ResolveDefinitionFactor(definition);
+                : 1f;
             SecondaryAttackAdrenalineSystem.ApplyProjectileFactor(projectile, currentAttack, adrenalineFactor);
         }
 
@@ -278,8 +292,7 @@ internal static class SecondaryAttackRuntimeFacade
                     attack.m_character,
                     attack.m_weapon,
                     "cleavingThrust",
-                    activeAttack.Definition.CleavingThrust.PresetCooldown,
-                    out _))
+                    activeAttack.Definition.CleavingThrust.PresetCooldown))
             {
                 return false;
             }
@@ -303,8 +316,7 @@ internal static class SecondaryAttackRuntimeFacade
                     attack.m_character,
                     attack.m_weapon,
                     "aftershock",
-                    activeAttack.Definition.Aftershock.PresetCooldown,
-                    out _))
+                    activeAttack.Definition.Aftershock.PresetCooldown))
             {
                 return false;
             }
@@ -331,7 +343,11 @@ internal static class SecondaryAttackRuntimeFacade
             return true;
         }
 
-        TriggerConfiguredAttack(attack, activeAttack);
+        if (!TriggerConfiguredAttack(attack, activeAttack))
+        {
+            attack.Stop();
+        }
+
         return true;
     }
 
@@ -354,8 +370,7 @@ internal static class SecondaryAttackRuntimeFacade
                 attack.m_character,
                 attack.m_weapon,
                 "riftTrail",
-                activeAttack.Definition.RiftTrail.PresetCooldown,
-                out _))
+                activeAttack.Definition.RiftTrail.PresetCooldown))
         {
             return;
         }
@@ -383,8 +398,7 @@ internal static class SecondaryAttackRuntimeFacade
                 attack.m_character,
                 attack.m_weapon,
                 "fractureLine",
-                activeAttack.Definition.FractureLine.PresetCooldown,
-                out _))
+                activeAttack.Definition.FractureLine.PresetCooldown))
         {
             return;
         }
@@ -395,11 +409,15 @@ internal static class SecondaryAttackRuntimeFacade
 
     private static bool TriggerCleavingThrust(Attack attack, ActiveSecondaryAttack activeAttack)
     {
-        if (!ConsumeConfiguredAmmo(attack, activeAttack.Definition))
+        if (!TryPrepareConfiguredAmmo(
+                attack,
+                activeAttack.Definition,
+                out ConfiguredAmmoContext ammoContext))
         {
             return false;
         }
 
+        CommitConfiguredAmmo(attack, ammoContext);
         activeAttack.Triggered = true;
         CleavingThrustSystem.Trigger(attack, activeAttack.Definition);
         ApplyAttackTriggerSideEffects(attack);
@@ -448,8 +466,13 @@ internal static class SecondaryAttackRuntimeFacade
 
         bool consumeRepeatedStartResources = activeAttack.ProjectileTriggered;
         activeAttack.NextHoldRepeatTime = Time.time + repeatInterval;
-        if ((consumeRepeatedStartResources && !TryConsumeRepeatedProjectileStartResources(attack)) ||
-            !TriggerConfiguredAttack(attack, activeAttack))
+        if (!TryPrepareConfiguredAttack(
+                attack,
+                activeAttack,
+                out ConfiguredAmmoContext ammoContext) ||
+            (consumeRepeatedStartResources &&
+             !TryConsumeRepeatedProjectileStartResources(attack)) ||
+            !TriggerPreparedConfiguredAttack(attack, activeAttack, ammoContext))
         {
             attack.Stop();
         }
@@ -457,11 +480,74 @@ internal static class SecondaryAttackRuntimeFacade
 
     private static bool TriggerConfiguredAttack(Attack attack, ActiveSecondaryAttack activeAttack)
     {
-        if (!ConsumeConfiguredAmmo(attack, activeAttack.Definition))
+        if (!TryPrepareConfiguredAttack(
+                attack,
+                activeAttack,
+                out ConfiguredAmmoContext ammoContext))
         {
             return false;
         }
 
+        return TriggerPreparedConfiguredAttack(attack, activeAttack, ammoContext);
+    }
+
+    private static bool TryPrepareConfiguredAttack(
+        Attack attack,
+        ActiveSecondaryAttack activeAttack,
+        out ConfiguredAmmoContext ammoContext)
+    {
+        ammoContext = default;
+        if (!IsSupportedConfiguredAttackType(attack.m_attackType))
+        {
+            return false;
+        }
+
+        ProjectileSecondaryBehavior? projectileBehavior =
+            activeAttack.Definition.Behavior as ProjectileSecondaryBehavior;
+        if (attack.m_attackType == Attack.AttackType.Projectile &&
+            projectileBehavior != null &&
+            !ProjectileRuntimeSystem.IsBurstFireControllerActive(attack) &&
+            !RangedSecondaryCooldownSystem.CanUse(attack, projectileBehavior))
+        {
+            return false;
+        }
+
+        if (!TryPrepareConfiguredAmmo(
+                attack,
+                activeAttack.Definition,
+                out ammoContext))
+        {
+            return false;
+        }
+
+        if (attack.m_attackType != Attack.AttackType.Projectile ||
+            projectileBehavior == null)
+        {
+            return true;
+        }
+
+        if (!ProjectileRuntimeSystem.CanStartBurstPreset(
+                attack,
+                activeAttack.Definition,
+                projectileBehavior.Preset,
+                ammoContext.AmmoItem))
+        {
+            return false;
+        }
+
+        return !attack.m_perBurstResourceUsage ||
+               HasAttackResources(
+                   attack,
+                   stopAttackOnFailure: false,
+                   flashHudOnFailure: true);
+    }
+
+    private static bool TriggerPreparedConfiguredAttack(
+        Attack attack,
+        ActiveSecondaryAttack activeAttack,
+        ConfiguredAmmoContext ammoContext)
+    {
+        CommitConfiguredAmmo(attack, ammoContext);
         switch (attack.m_attackType)
         {
             case Attack.AttackType.Horizontal:
@@ -479,10 +565,22 @@ internal static class SecondaryAttackRuntimeFacade
             case Attack.AttackType.None:
                 attack.DoNonAttack();
                 break;
+            default:
+                return false;
         }
 
         ApplyAttackTriggerSideEffects(attack);
         return true;
+    }
+
+    private static bool IsSupportedConfiguredAttackType(Attack.AttackType attackType)
+    {
+        return attackType is
+            Attack.AttackType.Horizontal or
+            Attack.AttackType.Vertical or
+            Attack.AttackType.Area or
+            Attack.AttackType.Projectile or
+            Attack.AttackType.None;
     }
 
     private static void ApplyAttackTriggerSideEffects(Attack attack)
@@ -569,37 +667,63 @@ internal static class SecondaryAttackRuntimeFacade
         bool stopAttackOnFailure,
         bool flashHudOnFailure)
     {
+        if (!HasAttackResources(attack, stopAttackOnFailure, flashHudOnFailure))
+        {
+            return false;
+        }
+
         float attackStamina = attack.GetAttackStamina();
+        float attackEitr = attack.GetAttackEitr();
+        float attackHealth = attack.GetAttackHealth();
+
         if (attackStamina > 0f)
         {
-            if (!attack.m_character.HaveStamina(attackStamina))
-            {
-                return HandleResourceFailure(attack, stopAttackOnFailure, flashStamina: flashHudOnFailure);
-            }
-
             attack.m_character.UseStamina(attackStamina);
         }
 
-        float attackEitr = attack.GetAttackEitr();
         if (attackEitr > 0f)
         {
-            if (!attack.m_character.HaveEitr(attackEitr))
-            {
-                return HandleResourceFailure(attack, stopAttackOnFailure);
-            }
-
             attack.m_character.UseEitr(attackEitr);
         }
 
-        float attackHealth = attack.GetAttackHealth();
         if (attackHealth > 0f)
         {
-            if (!attack.m_character.HaveHealth(attackHealth) && attack.m_attackHealthLowBlockUse)
-            {
-                return HandleResourceFailure(attack, stopAttackOnFailure, flashHealth: flashHudOnFailure);
-            }
-
             attack.m_character.UseHealth(Mathf.Min(attack.m_character.GetHealth() - 1f, attackHealth));
+        }
+
+        return true;
+    }
+
+    private static bool HasAttackResources(
+        Attack attack,
+        bool stopAttackOnFailure,
+        bool flashHudOnFailure)
+    {
+        float attackStamina = attack.GetAttackStamina();
+        float attackEitr = attack.GetAttackEitr();
+        float attackHealth = attack.GetAttackHealth();
+
+        if (attackStamina > 0f && !attack.m_character.HaveStamina(attackStamina))
+        {
+            return HandleResourceFailure(
+                attack,
+                stopAttackOnFailure,
+                flashStamina: flashHudOnFailure);
+        }
+
+        if (attackEitr > 0f && !attack.m_character.HaveEitr(attackEitr))
+        {
+            return HandleResourceFailure(attack, stopAttackOnFailure);
+        }
+
+        if (attackHealth > 0f &&
+            !attack.m_character.HaveHealth(attackHealth) &&
+            attack.m_attackHealthLowBlockUse)
+        {
+            return HandleResourceFailure(
+                attack,
+                stopAttackOnFailure,
+                flashHealth: flashHudOnFailure);
         }
 
         return true;
@@ -653,7 +777,11 @@ internal static class SecondaryAttackRuntimeFacade
             return true;
         }
 
-        if (!ProjectileRuntimeSystem.CanStartBurstPreset(attack, activeAttack.Definition, projectileBehavior.Preset))
+        if (!ProjectileRuntimeSystem.CanStartBurstPreset(
+                attack,
+                activeAttack.Definition,
+                projectileBehavior.Preset,
+                attack.m_ammoItem))
         {
             attack.Stop();
             return true;
@@ -669,65 +797,116 @@ internal static class SecondaryAttackRuntimeFacade
         {
             RangedSecondaryCooldownSystem.StartCooldown(attack, projectileBehavior);
         }
-
-        return handled;
-    }
-
-    private static bool ConsumeConfiguredAmmo(Attack attack, SecondaryAttackDefinition definition)
-    {
-        attack.m_ammoItem = null;
-        attack.m_lastUsedAmmo = null;
-        ProjectileSecondaryBehavior? projectileBehavior = definition.Behavior as ProjectileSecondaryBehavior;
-
-        if (string.IsNullOrWhiteSpace(attack.m_weapon.m_shared.m_ammoType))
+        else if (!burstFireControllerActive)
         {
-            return true;
+            attack.Stop();
         }
 
-        int ammoCountBefore = CountAmmo(attack.m_character.GetInventory(), attack.m_weapon.m_shared.m_ammoType);
-
-        ItemDrop.ItemData ammoItem = Attack.FindAmmo(attack.m_character, attack.m_weapon);
-        if (ammoItem != null && !IsAmmoItemForType(ammoItem, attack.m_weapon.m_shared.m_ammoType))
-        {
-            ammoItem = attack.m_character.GetInventory()
-                .GetAllItems()
-                .FirstOrDefault(item => IsAmmoItemForType(item, attack.m_weapon.m_shared.m_ammoType));
-        }
-
-        if (ammoItem == null)
-        {
-            attack.m_character.Message(MessageHud.MessageType.Center, "$msg_outof " + attack.m_weapon.m_shared.m_ammoType);
-            return false;
-        }
-
-        attack.m_ammoItem = ammoItem;
-        attack.m_lastUsedAmmo = ammoItem;
-
-        if (projectileBehavior == null || projectileBehavior.AmmoConsumption <= 0)
-        {
-            return true;
-        }
-
-        if (ammoCountBefore < projectileBehavior.AmmoConsumption)
-        {
-            attack.m_character.Message(MessageHud.MessageType.Center, "$msg_outof " + attack.m_weapon.m_shared.m_ammoType);
-            return false;
-        }
-
-        RemoveAmmo(attack.m_character.GetInventory(), attack.m_weapon.m_shared.m_ammoType, projectileBehavior.AmmoConsumption);
         return true;
     }
 
-    private static int CountAmmo(Inventory inventory, string ammoType)
+    private static bool TryPrepareConfiguredAmmo(
+        Attack attack,
+        SecondaryAttackDefinition definition,
+        out ConfiguredAmmoContext context)
+    {
+        context = default;
+        ProjectileSecondaryBehavior? projectileBehavior = definition.Behavior as ProjectileSecondaryBehavior;
+        string ammoType = attack.m_weapon.m_shared.m_ammoType;
+        if (string.IsNullOrWhiteSpace(ammoType))
+        {
+            return true;
+        }
+
+        Inventory? inventory = attack.m_character.GetInventory();
+        ItemDrop.ItemData? ammoItem =
+            FindConfiguredAmmo(attack.m_character, attack.m_weapon, inventory, ammoType);
+
+        if (ammoItem == null)
+        {
+            attack.m_character.Message(
+                MessageHud.MessageType.Center,
+                "$msg_outof " + ammoType);
+            return false;
+        }
+
+        int removalCount = Mathf.Max(0, projectileBehavior?.AmmoConsumption ?? 0);
+        if (removalCount > 0 &&
+            (inventory == null || CountAmmo(inventory, ammoItem) < removalCount))
+        {
+            attack.m_character.Message(
+                MessageHud.MessageType.Center,
+                "$msg_outof " + ammoType);
+            return false;
+        }
+
+        context = new ConfiguredAmmoContext(
+            inventory,
+            ammoItem,
+            removalCount);
+        return true;
+    }
+
+    private static ItemDrop.ItemData? FindConfiguredAmmo(
+        Humanoid character,
+        ItemDrop.ItemData weapon,
+        Inventory? inventory,
+        string ammoType)
+    {
+        ItemDrop.ItemData? ammoItem = Attack.FindAmmo(character, weapon);
+        if (ammoItem != null && IsAmmoItemForType(ammoItem, ammoType))
+        {
+            return ammoItem;
+        }
+
+        return inventory?.GetAllItems()
+            .FirstOrDefault(item => IsAmmoItemForType(item, ammoType));
+    }
+
+    private static void CommitConfiguredAmmo(
+        Attack attack,
+        ConfiguredAmmoContext context)
+    {
+        attack.m_ammoItem = context.AmmoItem;
+        attack.m_lastUsedAmmo = context.AmmoItem;
+        if (context.Inventory == null ||
+            context.AmmoItem == null ||
+            context.RemovalCount <= 0)
+        {
+            return;
+        }
+
+        RemoveAmmo(
+            context.Inventory,
+            context.AmmoItem,
+            context.RemovalCount);
+    }
+
+    private static int CountAmmo(
+        Inventory inventory,
+        ItemDrop.ItemData selectedAmmo)
     {
         return inventory.GetAllItems()
-            .Where(item => IsAmmoItemForType(item, ammoType))
+            .Where(item => IsSameAmmoPrefab(item, selectedAmmo))
             .Sum(item => item.m_stack);
     }
 
-    private static void RemoveAmmo(Inventory inventory, string ammoType, int amount)
+    private static void RemoveAmmo(
+        Inventory inventory,
+        ItemDrop.ItemData selectedAmmo,
+        int amount)
     {
-        foreach (ItemDrop.ItemData item in inventory.GetAllItems().Where(item => IsAmmoItemForType(item, ammoType)).ToList())
+        int selectedRemoval = Mathf.Min(selectedAmmo.m_stack, amount);
+        if (selectedRemoval > 0)
+        {
+            inventory.RemoveItem(selectedAmmo, selectedRemoval);
+            amount -= selectedRemoval;
+        }
+
+        foreach (ItemDrop.ItemData item in inventory.GetAllItems()
+                     .Where(item => !ReferenceEquals(item, selectedAmmo) &&
+                                    IsSameAmmoPrefab(item, selectedAmmo))
+                     .ToList())
         {
             if (amount <= 0)
             {
@@ -738,6 +917,28 @@ internal static class SecondaryAttackRuntimeFacade
             inventory.RemoveItem(item, removeCount);
             amount -= removeCount;
         }
+    }
+
+    private static bool IsSameAmmoPrefab(
+        ItemDrop.ItemData? candidate,
+        ItemDrop.ItemData? selectedAmmo)
+    {
+        if (candidate == null || selectedAmmo == null)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(candidate, selectedAmmo))
+        {
+            return true;
+        }
+
+        return candidate.m_dropPrefab != null &&
+               selectedAmmo.m_dropPrefab != null &&
+               string.Equals(
+                   candidate.m_dropPrefab.name,
+                   selectedAmmo.m_dropPrefab.name,
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAmmoItemForType(ItemDrop.ItemData? item, string ammoType)
@@ -758,5 +959,24 @@ internal static class SecondaryAttackRuntimeFacade
         }
 
         return TryConsumeAttackResources(attack, stopAttackOnFailure: true, flashHudOnFailure: false);
+    }
+
+    private readonly struct ConfiguredAmmoContext
+    {
+        internal ConfiguredAmmoContext(
+            Inventory? inventory,
+            ItemDrop.ItemData? ammoItem,
+            int removalCount)
+        {
+            Inventory = inventory;
+            AmmoItem = ammoItem;
+            RemovalCount = removalCount;
+        }
+
+        internal Inventory? Inventory { get; }
+
+        internal ItemDrop.ItemData? AmmoItem { get; }
+
+        internal int RemovalCount { get; }
     }
 }

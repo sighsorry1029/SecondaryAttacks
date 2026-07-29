@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.Globalization;
-using System.Reflection;
-using HarmonyLib;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -19,15 +17,6 @@ internal static class RiftTrailSystem
     private const float FanStepDegrees = 4f;
     private const string ObserverSamplePayloadType = "S";
     private const string ObserverFallbackPayloadType = "F";
-    private static readonly FieldInfo AttackVisEquipmentField = AccessTools.Field(typeof(Attack), "m_visEquipment")!;
-    private static readonly FieldInfo VisRightItemInstanceField = AccessTools.Field(typeof(VisEquipment), "m_rightItemInstance")!;
-    private static readonly FieldInfo TrailBaseField = AccessTools.Field(typeof(MeleeWeaponTrail), "_base")!;
-    private static readonly FieldInfo TrailTipField = AccessTools.Field(typeof(MeleeWeaponTrail), "_tip")!;
-    private static readonly FieldInfo TrailMaterialField = AccessTools.Field(typeof(MeleeWeaponTrail), "_material")!;
-    private static readonly FieldInfo TrailColorsField = AccessTools.Field(typeof(MeleeWeaponTrail), "_colors")!;
-    private static readonly FieldInfo TrailSizesField = AccessTools.Field(typeof(MeleeWeaponTrail), "_sizes")!;
-    private static readonly FieldInfo TrailLifeTimeField = AccessTools.Field(typeof(MeleeWeaponTrail), "_lifeTime")!;
-    private static readonly FieldInfo TrailSubdivisionsField = AccessTools.Field(typeof(MeleeWeaponTrail), "subdivisions")!;
     private static readonly RaycastHit[] SweepHits = new RaycastHit[128];
     private static readonly HashSet<GameObject> HitObjects = new();
     private static readonly List<RiftTrailHitTarget> HitTargets = new();
@@ -437,41 +426,15 @@ internal static class RiftTrailSystem
         return _riftMaterial;
     }
 
-    private static GameObject? GetRightItemInstance(Attack attack)
-    {
-        VisEquipment? visEquipment = AttackVisEquipmentField.GetValue(attack) as VisEquipment;
-        GameObject? rightItemInstance = visEquipment != null
-            ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject
-            : null;
-        if (rightItemInstance != null)
-        {
-            return rightItemInstance;
-        }
-
-        return GetRightItemInstance(attack.m_character);
-    }
-
-    private static GameObject? GetRightItemInstance(Character? character)
-    {
-        VisEquipment? visEquipment = character != null ? character.GetComponent<VisEquipment>() : null;
-        return visEquipment != null ? VisRightItemInstanceField.GetValue(visEquipment) as GameObject : null;
-    }
-
     private static List<ObserverTrailMetadata> ResolveObserverTrailMetadata(Character character)
     {
         List<ObserverTrailMetadata> metadata = new();
-        GameObject? rightItemInstance = GetRightItemInstance(character);
-        if (rightItemInstance == null)
-        {
-            return metadata;
-        }
-
-        foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
+        foreach (MeleeWeaponTrail trail in WeaponTrailAccess.GetTrails(character))
         {
             metadata.Add(new ObserverTrailMetadata(
-                TrailMaterialField.GetValue(trail) as Material,
-                TrailColorsField.GetValue(trail) as Color[],
-                TrailSizesField.GetValue(trail) as float[]));
+                WeaponTrailAccess.GetMaterial(trail),
+                WeaponTrailAccess.GetColors(trail),
+                WeaponTrailAccess.GetSizes(trail)));
         }
 
         return metadata;
@@ -1602,26 +1565,21 @@ internal static class RiftTrailSystem
                 return;
             }
 
-            GameObject? rightItemInstance = GetRightItemInstance(Attack);
-            if (rightItemInstance == null)
+            foreach (MeleeWeaponTrail trail in WeaponTrailAccess.GetTrails(Attack))
             {
-                return;
-            }
-
-            foreach (MeleeWeaponTrail trail in rightItemInstance.GetComponentsInChildren<MeleeWeaponTrail>(includeInactive: true))
-            {
-                Transform? baseTransform = TrailBaseField.GetValue(trail) as Transform;
-                Transform? tipTransform = TrailTipField.GetValue(trail) as Transform;
-                if (baseTransform == null || tipTransform == null)
+                if (!WeaponTrailAccess.TryGetEndpoints(
+                        trail,
+                        out Transform baseTransform,
+                        out Transform tipTransform))
                 {
                     continue;
                 }
 
-                Material? material = TrailMaterialField.GetValue(trail) as Material;
-                Color[]? colors = TrailColorsField.GetValue(trail) as Color[];
-                float[]? sizes = TrailSizesField.GetValue(trail) as float[];
-                float lifeTime = TrailLifeTimeField.GetValue(trail) is float trailLifeTime ? trailLifeTime : 0.2f;
-                int subdivisions = TrailSubdivisionsField.GetValue(trail) is int trailSubdivisions ? trailSubdivisions : 0;
+                Material? material = WeaponTrailAccess.GetMaterial(trail);
+                Color[]? colors = WeaponTrailAccess.GetColors(trail);
+                float[]? sizes = WeaponTrailAccess.GetSizes(trail);
+                float lifeTime = WeaponTrailAccess.GetLifeTime(trail, fallback: 0.2f);
+                int subdivisions = WeaponTrailAccess.GetSubdivisions(trail, fallback: 0);
                 _trailSamplers.Add(new TrailSampler(baseTransform, tipTransform, material, colors, sizes, lifeTime, subdivisions));
             }
         }

@@ -10,6 +10,8 @@ sa_compendium_group_ranged: Ranged Presets
 sa_compendium_group_melee: Melee Presets
 sa_compendium_group_blood_magic: Blood Magic Presets
 sa_compendium_group_summon_quality: Magic Summon Quality
+sa_item_tooltip_secondary_attack: Secondary Attack
+sa_item_tooltip_summon_quality: Summon Quality
 
 sa_compendium_preset_barrage_name: Barrage
 sa_compendium_preset_barrage_description: Fires multiple projectiles across a spread or a laterally spaced formation.

@@ -74,6 +74,20 @@ internal static class MagicSummonQualityPresetSystem
         }
     }
 
+    internal static bool TryGetItemQualityPreset(
+        ItemDrop.ItemData? item,
+        out MagicSummonQualityPreset preset)
+    {
+        preset = MagicSummonQualityPreset.None;
+        if (!TryResolveItemRule(item, out QualityRule rule))
+        {
+            return false;
+        }
+
+        preset = rule.Preset;
+        return preset != MagicSummonQualityPreset.None;
+    }
+
     internal static void ApplyToZNetScene(
         ZNetScene scene,
         IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> summonConfigs)
@@ -307,7 +321,7 @@ internal static class MagicSummonQualityPresetSystem
         ObjectDB? objectDb)
     {
         _activeRules = BuildQualityRules(summonConfigs);
-        AppendGlobalQualityRules(_activeRules, objectDb);
+        AppendGlobalQualityRules(_activeRules, objectDb, summonConfigs);
         RulesByItemPrefab.Clear();
         ActiveGroupIds.Clear();
 
@@ -332,7 +346,6 @@ internal static class MagicSummonQualityPresetSystem
             string itemPrefabName = TrimOrEmpty(config.EntryId);
 
             rules.Add(new QualityRule(
-                config.EntryId,
                 itemPrefabName,
                 config.QualityPreset,
                 Mathf.Clamp(config.MaxQuality, 1, 10)));
@@ -341,7 +354,10 @@ internal static class MagicSummonQualityPresetSystem
         return rules;
     }
 
-    private static void AppendGlobalQualityRules(List<QualityRule> rules, ObjectDB? objectDb)
+    private static void AppendGlobalQualityRules(
+        List<QualityRule> rules,
+        ObjectDB? objectDb,
+        IReadOnlyDictionary<string, NormalizedMagicSummonOverrideConfig> summonConfigs)
     {
         MagicSummonQualityPreset globalPreset = GetConfiguredGlobalPreset();
         if (globalPreset == MagicSummonQualityPreset.None || objectDb?.m_items == null)
@@ -350,6 +366,11 @@ internal static class MagicSummonQualityPresetSystem
         }
 
         HashSet<string> explicitItems = new(rules.Select(rule => rule.ItemPrefabName), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> summonOverrideItems = new(
+            summonConfigs.Values
+                .Where(static config => config != null && config.Summons.Count > 0)
+                .Select(static config => TrimOrEmpty(config.EntryId)),
+            StringComparer.OrdinalIgnoreCase);
         foreach (GameObject itemPrefab in objectDb.m_items)
         {
             if (itemPrefab == null ||
@@ -360,13 +381,12 @@ internal static class MagicSummonQualityPresetSystem
             }
 
             ItemDrop? itemDrop = itemPrefab.GetComponent<ItemDrop>();
-            if (!IsBloodMagicSummonItem(itemDrop))
+            if (!IsBloodMagicSummonItem(itemDrop, summonOverrideItems.Contains(itemPrefab.name)))
             {
                 continue;
             }
 
             rules.Add(new QualityRule(
-                itemPrefab.name,
                 itemPrefab.name,
                 globalPreset,
                 GlobalMaxQuality));
@@ -384,7 +404,7 @@ internal static class MagicSummonQualityPresetSystem
         };
     }
 
-    private static bool IsBloodMagicSummonItem(ItemDrop? itemDrop)
+    private static bool IsBloodMagicSummonItem(ItemDrop? itemDrop, bool hasSummonOverride)
     {
         ItemDrop.ItemData.SharedData? shared = itemDrop?.m_itemData?.m_shared;
         if (shared == null || shared.m_skillType != Skills.SkillType.BloodMagic)
@@ -392,8 +412,9 @@ internal static class MagicSummonQualityPresetSystem
             return false;
         }
 
-        return TryResolveSpawnAbilityFromAttack(shared.m_attack, out _, out _) ||
-               TryResolveSpawnAbilityFromAttack(shared.m_secondaryAttack, out _, out _);
+        return SummonSpawnAbilityResolver.TryResolve(shared, out SpawnAbility? spawnAbility, out _) &&
+               (hasSummonOverride ||
+                spawnAbility?.m_spawnPrefab?.Any(static prefab => prefab != null) == true);
     }
 
     private static void RestoreOriginalMaxQualities(ObjectDB objectDb, ObjectDbState state)
@@ -413,14 +434,7 @@ internal static class MagicSummonQualityPresetSystem
 
     private static bool TryResolveRule(SpawnAbility spawnAbility, ItemDrop.ItemData item, out QualityRule rule)
     {
-        string itemPrefabName = item.m_dropPrefab != null ? item.m_dropPrefab.name : "";
-        if (!string.IsNullOrWhiteSpace(itemPrefabName) && RulesByItemPrefab.TryGetValue(itemPrefabName, out rule))
-        {
-            return true;
-        }
-
-        string sharedName = item.m_shared?.m_name ?? "";
-        if (!string.IsNullOrWhiteSpace(sharedName) && RulesBySharedName.TryGetValue(sharedName, out rule))
+        if (TryResolveItemRule(item, out rule))
         {
             return true;
         }
@@ -435,6 +449,26 @@ internal static class MagicSummonQualityPresetSystem
         string rawSpawnAbilityName = spawnAbility.gameObject != null ? spawnAbility.gameObject.name : "";
         if (!string.IsNullOrWhiteSpace(rawSpawnAbilityName) &&
             RulesBySpawnAbilityPrefab.TryGetValue(rawSpawnAbilityName, out rule))
+        {
+            return true;
+        }
+
+        rule = null!;
+        return false;
+    }
+
+    private static bool TryResolveItemRule(ItemDrop.ItemData? item, out QualityRule rule)
+    {
+        string itemPrefabName = item?.m_dropPrefab != null ? item.m_dropPrefab.name : "";
+        if (!string.IsNullOrWhiteSpace(itemPrefabName) &&
+            RulesByItemPrefab.TryGetValue(itemPrefabName, out rule))
+        {
+            return true;
+        }
+
+        string sharedName = item?.m_shared?.m_name ?? "";
+        if (!string.IsNullOrWhiteSpace(sharedName) &&
+            RulesBySharedName.TryGetValue(sharedName, out rule))
         {
             return true;
         }
@@ -459,8 +493,7 @@ internal static class MagicSummonQualityPresetSystem
             return false;
         }
 
-        return TryResolveSpawnAbilityFromAttack(itemDrop.m_itemData.m_shared.m_attack, out spawnAbility, out targetName) ||
-               TryResolveSpawnAbilityFromAttack(itemDrop.m_itemData.m_shared.m_secondaryAttack, out spawnAbility, out targetName);
+        return SummonSpawnAbilityResolver.TryResolve(itemDrop, out spawnAbility, out targetName);
     }
 
     private static GameObject? ResolveItemPrefab(ZNetScene scene, string itemPrefabName)
@@ -472,42 +505,6 @@ internal static class MagicSummonQualityPresetSystem
 
         GameObject? itemPrefab = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(itemPrefabName) : null;
         return itemPrefab != null ? itemPrefab : scene.GetPrefab(itemPrefabName);
-    }
-
-    private static bool TryResolveSpawnAbilityFromAttack(
-        Attack? attack,
-        out SpawnAbility? spawnAbility,
-        out string targetName)
-    {
-        spawnAbility = null;
-        targetName = "";
-        return attack?.m_attackProjectile != null &&
-               TryResolveSpawnAbilityFromPrefab(attack.m_attackProjectile, out spawnAbility, out targetName);
-    }
-
-    private static bool TryResolveSpawnAbilityFromPrefab(
-        GameObject prefab,
-        out SpawnAbility? spawnAbility,
-        out string targetName)
-    {
-        spawnAbility = prefab.GetComponent<SpawnAbility>();
-        if (spawnAbility != null)
-        {
-            targetName = prefab.name;
-            return true;
-        }
-
-        Projectile? projectile = prefab.GetComponent<Projectile>();
-        GameObject? spawnOnHit = projectile?.m_spawnOnHit;
-        spawnAbility = spawnOnHit != null ? spawnOnHit.GetComponent<SpawnAbility>() : null;
-        if (spawnAbility != null)
-        {
-            targetName = spawnOnHit!.name;
-            return true;
-        }
-
-        targetName = prefab.name;
-        return false;
     }
 
     private static void TagSpawnPrefabs(SpawnAbility spawnAbility, QualityRule rule, int maxInstances, int summonLevel)
@@ -767,19 +764,15 @@ internal static class MagicSummonQualityPresetSystem
     private sealed class QualityRule
     {
         internal QualityRule(
-            string entryId,
             string itemPrefabName,
             MagicSummonQualityPreset preset,
             int maxQuality)
         {
-            EntryId = entryId;
             ItemPrefabName = itemPrefabName;
             Preset = preset;
             MaxQuality = maxQuality;
             GroupId = $"SecondaryAttacks.MagicSummon.{SanitizeGroupKey(itemPrefabName)}";
         }
-
-        internal string EntryId { get; }
 
         internal string ItemPrefabName { get; }
 

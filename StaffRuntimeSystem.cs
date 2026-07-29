@@ -65,8 +65,7 @@ internal static class StaffRuntimeSystem
             attack.m_character,
             attack.m_weapon,
             presetName,
-            cooldown,
-            out _);
+            cooldown);
     }
 
     internal static bool CanStartStaffSpecial(Humanoid humanoid, ItemDrop.ItemData weapon)
@@ -83,7 +82,7 @@ internal static class StaffRuntimeSystem
             return true;
         }
 
-        return MeleePresetCooldownSystem.IsReady(humanoid, weapon, presetName, cooldown);
+        return MeleePresetCooldownSystem.IsReady(humanoid, presetName, cooldown);
     }
 
     private static bool TryResolveStaffSpecialCooldown(

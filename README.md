@@ -10,6 +10,7 @@ Adds secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, 
 - Lets weapon groups use default presets from config while individual prefabs can be tuned through YAML.
 - Syncs YAML configuration through ServerSync for dedicated servers and multiplayer clients.
 - Supports cooldowns, durability cost, resource cost, ammo cost, skill gain, adrenaline gain, and HUD feedback.
+- Shares cooldowns by automatically recognized weapon family, with preset-based fallback for unrecognized weapons; Blood Magic summon and shield families remain independent.
 - Optionally replaces dodge with a fixed quickstep while a knife or Unarmed weapon is equipped.
 - Includes compatibility support for MagicPlugin summon projectiles and the companion WarfareTweaks mod.
 

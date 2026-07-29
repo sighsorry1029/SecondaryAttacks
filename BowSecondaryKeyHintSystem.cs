@@ -7,8 +7,6 @@ namespace SecondaryAttacks;
 internal static class BowSecondaryKeyHintSystem
 {
     private const int MissingBlockHintRefreshFrames = 30;
-    private static readonly string[] BowSecondaryHintKeys = new string[1];
-    private static readonly string[] DetonateBlockHintKeys = new string[1];
     private static KeyHints? _activeKeyHints;
     private static KeyHintCell? _bowSecondaryHint;
     private static KeyHintCell? _detonateBlockHint;
@@ -96,8 +94,7 @@ internal static class BowSecondaryKeyHintSystem
             _lastGamepadActive != gamepadActive ||
             !string.Equals(_lastButtonLabel, buttonLabel, System.StringComparison.Ordinal))
         {
-            BowSecondaryHintKeys[0] = buttonLabel;
-            _bowSecondaryHint.SetKeys(BowSecondaryHintKeys, hideExtraTexts: true);
+            _bowSecondaryHint.SetKey(buttonLabel);
             _lastButtonLabel = buttonLabel;
             _lastGamepadActive = gamepadActive;
             _keyHintApplied = true;
@@ -339,8 +336,7 @@ internal static class BowSecondaryKeyHintSystem
         string detonateLabel = SecondaryAttackLocalization.Localize(SecondaryAttackLocalization.HintDetonate, "Detonate");
         if (hint.HasKeyTexts)
         {
-            DetonateBlockHintKeys[0] = buttonLabel;
-            hint.Set(detonateLabel, DetonateBlockHintKeys, hideExtraTexts: true);
+            hint.Set(detonateLabel, buttonLabel);
             return;
         }
 

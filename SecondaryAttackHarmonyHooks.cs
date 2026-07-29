@@ -698,16 +698,12 @@ internal static class HumanoidStartAttackPatch
         Humanoid __instance,
         bool secondaryAttack,
         ref bool __result,
-        ItemDrop.ItemData ___m_leftItem,
-        ItemDrop.ItemData ___m_rightItem,
         out SecondaryAttackStartAttackDispatch.StartAttackState __state)
     {
         return SecondaryAttackStartAttackDispatch.Prefix(
             __instance,
             secondaryAttack,
             ref __result,
-            ___m_leftItem,
-            ___m_rightItem,
             out __state);
     }
 

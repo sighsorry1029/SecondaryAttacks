@@ -182,7 +182,11 @@ internal static class MeleeProjectileHitCascadeSystem
             return;
         }
 
-        if (!TryConsumeSpearRainCooldown(state))
+        if (!MeleePresetCooldownSystem.TryConsume(
+                state.Owner,
+                state.Weapon,
+                SpearRainPresetName,
+                state.Config.PresetCooldown))
         {
             return;
         }
@@ -571,20 +575,6 @@ internal static class MeleeProjectileHitCascadeSystem
         }
 
         return _impactBurstMask;
-    }
-
-    private static bool TryConsumeSpearRainCooldown(OnProjectileHitSourceState state)
-    {
-        if (MeleePresetCooldownSystem.TryConsume(
-                state.Owner,
-                state.Weapon,
-                SpearRainPresetName,
-                state.Config.PresetCooldown,
-                out _))
-        {
-            return true;
-        }
-        return false;
     }
 
     private static Vector3 ResolveSpearRainTargetPoint(OnProjectileHitSourceState state, Character? target, Vector3 fallbackPoint)

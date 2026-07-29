@@ -48,7 +48,11 @@ internal static class KnockbackChainSystem
             return false;
         }
 
-        if (!MeleePresetCooldownSystem.TryConsume(attacker, null, "knockbackChain", knockbackChain.PresetCooldown, out _))
+        if (!MeleePresetCooldownSystem.TryConsume(
+                attacker,
+                null,
+                "knockbackChain",
+                knockbackChain.PresetCooldown))
         {
             return false;
         }

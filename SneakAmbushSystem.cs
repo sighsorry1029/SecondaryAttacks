@@ -46,7 +46,11 @@ internal static class SneakAmbushSystem
             return;
         }
 
-        if (!MeleePresetCooldownSystem.TryConsume(player, null, "sneakAmbush", sneakAmbush.PresetCooldown, out _))
+        if (!MeleePresetCooldownSystem.TryConsume(
+                player,
+                null,
+                "sneakAmbush",
+                sneakAmbush.PresetCooldown))
         {
             return;
         }

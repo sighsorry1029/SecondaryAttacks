@@ -38,7 +38,11 @@ internal static class LaunchSlamSystem
             return;
         }
 
-        if (!MeleePresetCooldownSystem.TryConsume(attacker, null, "launchSlam", launchSlam.PresetCooldown, out _))
+        if (!MeleePresetCooldownSystem.TryConsume(
+                attacker,
+                null,
+                "launchSlam",
+                launchSlam.PresetCooldown))
         {
             return;
         }

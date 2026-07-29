@@ -8,12 +8,12 @@ namespace SecondaryAttacks;
 
 internal static partial class ProjectileRuntimeSystem
 {
-    internal static void FireStickyDetonator(Attack attack, SecondaryAttackDefinition definition)
+    internal static bool FireStickyDetonator(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
-            return;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
@@ -55,6 +55,8 @@ internal static partial class ProjectileRuntimeSystem
                 definition,
                 projectileBehavior);
         }
+
+        return true;
     }
 }
 

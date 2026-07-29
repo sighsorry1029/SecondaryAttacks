@@ -13,14 +13,14 @@ internal static partial class ProjectileRuntimeSystem
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
             attack.m_consumeItem = false;
-            return true;
+            return false;
         }
 
         ProjectileSecondaryBehavior projectileBehavior = (ProjectileSecondaryBehavior)definition.Behavior;
         if (!OverchargedBombSystem.TryConsumeStackCost(attack, projectileBehavior))
         {
             attack.m_consumeItem = false;
-            return true;
+            return false;
         }
 
         PrepareCustomProjectileBurst(attack);

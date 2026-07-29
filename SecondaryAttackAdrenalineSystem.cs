@@ -306,11 +306,6 @@ internal static class SecondaryAttackAdrenalineSystem
                 return projectile.AdrenalineFactor;
         }
 
-        return ResolveDefinitionFactor(definition);
-    }
-
-    internal static float ResolveDefinitionFactor(SecondaryAttackDefinition definition)
-    {
         return 1f;
     }
 

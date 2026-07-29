@@ -335,17 +335,12 @@ internal static partial class SecondaryAttackManager
     private static bool TryParsePreset(string presetText, out SecondaryAttackPreset preset)
     {
         string configuredPreset = presetText.Trim();
-        foreach (SecondaryAttackPreset candidate in Enum.GetValues(typeof(SecondaryAttackPreset)))
-        {
-            if (ProjectileRuntimeSystem.GetPresetName(candidate) == configuredPreset)
-            {
-                preset = candidate;
-                return true;
-            }
-        }
-
         preset = default;
-        return false;
+        return SecondaryAttackPresetCatalog.TryGet(
+                   configuredPreset,
+                   out SecondaryAttackPresetInfo presetInfo) &&
+               presetInfo.Group == SecondaryAttackPresetGroup.Ranged &&
+               Enum.TryParse(presetInfo.Key, ignoreCase: true, out preset);
     }
 
     private static void ApplyAttackResourceScaling(SecondaryAttackDefinition definition, Attack sourceAttack, float resourceMultiplier)

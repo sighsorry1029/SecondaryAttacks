@@ -49,8 +49,6 @@ internal static class SecondaryAttackStartAttackDispatch
         Humanoid humanoid,
         bool secondaryAttack,
         ref bool result,
-        ItemDrop.ItemData leftItem,
-        ItemDrop.ItemData rightItem,
         out StartAttackState state)
     {
         state = StartAttackState.Empty;
@@ -203,7 +201,10 @@ internal static class SecondaryAttackStartAttackDispatch
 
         if (IsSpearRainPreset(presetName))
         {
-            bool cooldownReady = MeleePresetCooldownSystem.IsReady(attack.m_character, attack.m_weapon, presetName, cooldown!);
+            bool cooldownReady = MeleePresetCooldownSystem.IsReady(
+                attack.m_character,
+                presetName,
+                cooldown!);
             bool pending = MeleeProjectileHitCascadeSystem.HasPendingSpearRain(attack.m_character);
             if (cooldownReady && !pending)
             {
@@ -218,8 +219,7 @@ internal static class SecondaryAttackStartAttackDispatch
                 attack.m_character,
                 attack.m_weapon,
                 presetName,
-                cooldown!,
-                out _))
+                cooldown!))
         {
             MarkProjectilePresetCooldownConsumed(attack);
             return true;
@@ -253,7 +253,10 @@ internal static class SecondaryAttackStartAttackDispatch
             return false;
         }
 
-        bool cooldownReady = MeleePresetCooldownSystem.IsReady(humanoid, currentWeapon, presetName, cooldown!);
+        bool cooldownReady = MeleePresetCooldownSystem.IsReady(
+            humanoid,
+            presetName,
+            cooldown!);
         bool spearRainPending = IsSpearRainPreset(presetName) &&
                                 MeleeProjectileHitCascadeSystem.HasPendingSpearRain(humanoid);
         bool ready = cooldownReady && !spearRainPending;

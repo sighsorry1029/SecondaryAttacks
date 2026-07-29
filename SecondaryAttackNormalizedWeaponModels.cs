@@ -38,6 +38,19 @@ internal sealed class NormalizedWeaponConfig
 
     public bool HasExplicitMeleePreset { get; set; }
 
+    public bool HasEnabledMeleeFeatureConfig =>
+        SneakAmbush?.Enabled == true ||
+        CleavingThrust?.Enabled == true ||
+        LaunchSlam?.Enabled == true ||
+        KnockbackChain?.Enabled == true ||
+        Aftershock?.Enabled == true ||
+        RiftTrail?.Enabled == true ||
+        FractureLine?.Enabled == true ||
+        ImpactBurst?.Enabled == true ||
+        Boomerang?.Enabled == true ||
+        SpinningSweep?.Enabled == true ||
+        HarvestSweep?.Enabled == true;
+
     public NormalizedWeaponConfig Clone()
     {
         return (NormalizedWeaponConfig)MemberwiseClone();

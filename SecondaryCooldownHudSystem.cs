@@ -40,8 +40,7 @@ internal static class SecondaryCooldownHudSystem
         bool previewMode = InventoryGui.IsVisible();
         Entries.Clear();
         SneakAmbushChargeSystem.CollectHudEntries(player, Entries);
-        MeleePresetCooldownSystem.CollectHudEntries(player, Entries);
-        RangedSecondaryCooldownSystem.CollectHudEntries(player, Entries);
+        SecondaryCooldownGroupSystem.CollectHudEntries(player, Entries);
         Entries.Sort((left, right) =>
         {
             int modeCompare = left.SortOrder.CompareTo(right.SortOrder);

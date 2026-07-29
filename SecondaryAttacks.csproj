@@ -484,6 +484,7 @@
         <Compile Include="SpinningSweepSystem.cs" />
         <Compile Include="SweepObserverVisualSystem.cs" />
         <Compile Include="SweepTrailResetSystem.cs" />
+        <Compile Include="WeaponTrailAccess.cs" />
         <Compile Include="SummonQualityHudCompatibility.cs" />
         <Compile Include="SummonQualityHudSystem.cs" />
         <Compile Include="SweepHitStopSystem.cs" />
@@ -502,16 +503,18 @@
         <Compile Include="SecondaryAttackConfigLoader.cs" />
         <Compile Include="SecondaryAttackReloadDebouncer.cs" />
         <Compile Include="SecondaryAttackLocalization.cs" />
+        <Compile Include="SecondaryAttackItemTooltipSystem.cs" />
         <Compile Include="SecondaryAttackPresetCatalog.cs" />
         <Compile Include="SecondaryAttackAdrenalineSystem.cs" />
         <Compile Include="SecondaryAttackAdminAccessSystem.cs" />
         <Compile Include="SecondaryAttackNamedEffectSystem.cs" />
         <Compile Include="SecondaryAttackMagicSummonNormalizer.cs" />
+        <Compile Include="SecondaryAttackCooldownGroupResolver.cs" />
+        <Compile Include="SecondaryAttackWeaponFamilyResolver.cs" />
         <Compile Include="SecondaryAttackWeaponConfigNormalizer.cs" />
         <Compile Include="SecondaryAttackFacade.cs" />
         <Compile Include="SecondaryAttackConfigCompiler.cs" />
         <Compile Include="SecondaryAttackDefinitionCompiler.cs" />
-        <Compile Include="SecondaryAttackConfig.Normalized.cs" />
         <Compile Include="SecondaryAttackNormalizedMagicModels.cs" />
         <Compile Include="SecondaryAttackNormalizedMeleeModels.cs" />
         <Compile Include="SecondaryAttackNormalizedProjectileModels.cs" />
@@ -527,7 +530,6 @@
         <Compile Include="SecondaryAttackProjectileToolTierSystem.cs" />
         <Compile Include="SecondaryAttackStartAttackDispatch.cs" />
         <Compile Include="SecondaryAttackHarmonyHooks.cs" />
-        <Compile Include="SecondaryAttackNetworkCompat.cs" />
         <Compile Include="SecondaryAttackObjectDbStateStore.cs" />
         <Compile Include="SecondaryAttackManager.ProjectileDefinitions.cs" />
         <Compile Include="ProjectileRuntimeControllers.cs" />
@@ -540,7 +542,9 @@
         <Compile Include="SecondaryAttackRuntimeFacade.cs" />
         <Compile Include="SecondaryAttackWorldApplySystem.cs" />
         <Compile Include="SecondaryAttackWarningLog.cs" />
+        <Compile Include="SecondaryCooldownGroupSystem.cs" />
         <Compile Include="SummonPrefabOverrideSystem.cs" />
+        <Compile Include="SummonSpawnAbilityResolver.cs" />
         <Compile Include="SummonEmpowerMovementSystem.cs" />
         <Compile Include="ShieldAccess.cs" />
         <Compile Include="StickyDetonatorSystem.cs" />
@@ -553,7 +557,7 @@
         <Content Include="Libs\ServerSync.dll">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
-        <Content Include="LICENSE.txt"/>
+        <Content Include="LICENSE"/>
         <Content Include="README.md"/>
         <Content Include="Thunderstore\CHANGELOG.md"/>
         <Content Include="Thunderstore\icon.png"/>

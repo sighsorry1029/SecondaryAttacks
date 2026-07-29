@@ -33,7 +33,11 @@ internal static class SpinningSweepSystem
             return true;
         }
 
-        if (!MeleePresetCooldownSystem.TryConsume(humanoid, attack.m_weapon, PresetName, spinningSweep.PresetCooldown, out _))
+        if (!MeleePresetCooldownSystem.TryConsume(
+                humanoid,
+                attack.m_weapon,
+                PresetName,
+                spinningSweep.PresetCooldown))
         {
             return false;
         }
