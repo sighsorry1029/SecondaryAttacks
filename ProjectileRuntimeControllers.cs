@@ -1946,8 +1946,15 @@ internal static partial class ProjectileRuntimeSystem
             _nextShotAt = Time.time + _interval;
             _remainingShots--;
             ReplayFireAnimation();
-            FireSingleBurstFireShot(_attack, _definition);
-            if (_remainingShots <= 0)
+            if (!SecondaryAttackRuntimeFacade.TryBeginBurstFireRepeat(_attack))
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            bool shotFired = FireSingleBurstFireShot(_attack, _definition);
+            SecondaryAttackRuntimeFacade.CompleteBurstFireRepeat(_attack);
+            if (!shotFired || _remainingShots <= 0)
             {
                 Destroy(gameObject);
             }
@@ -1964,7 +1971,17 @@ internal static partial class ProjectileRuntimeSystem
                 return false;
             }
 
-            return _owner is not Humanoid humanoid || humanoid.GetCurrentWeapon() == _attack.m_weapon;
+            if (_owner is not Humanoid humanoid)
+            {
+                return true;
+            }
+
+            if (humanoid.GetCurrentWeapon() != _attack.m_weapon)
+            {
+                return false;
+            }
+
+            return ReferenceEquals(humanoid.m_currentAttack, _attack);
         }
 
         private void ReplayFireAnimation()
@@ -1988,6 +2005,12 @@ internal static partial class ProjectileRuntimeSystem
             ClearDeferredBurstFireReloadReset(_attack);
             if (_attack.m_character == null || !_attack.m_requiresReload)
             {
+                return;
+            }
+
+            if (_attack.m_character is Player player && player.m_weaponLoaded != _attack.m_weapon)
+            {
+                SecondaryAttackManager.ConsumePersistedReloadedWeaponState(player, _attack.m_weapon);
                 return;
             }
 

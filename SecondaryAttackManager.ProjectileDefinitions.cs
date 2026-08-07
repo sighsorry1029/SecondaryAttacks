@@ -28,7 +28,7 @@ internal static partial class SecondaryAttackManager
         }
 
         int projectileCount = Mathf.Max(1, projectileConfig.Count);
-        int ammoConsumption = ResolveAmmoConsumption(projectileConfig.AmmoConsumption, usesAmmo, preset, projectileCount);
+        int ammoConsumption = ResolveAmmoConsumption(projectileConfig.AmmoConsumption, usesAmmo, preset);
         string resolvedAttackAnimation = GetNormalizedAttackAnimation(weaponConfig);
         bool hasCustomAttackAnimation = !string.IsNullOrWhiteSpace(resolvedAttackAnimation);
         string attackAnimation = hasCustomAttackAnimation

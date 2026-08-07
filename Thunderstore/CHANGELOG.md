@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.9
+
+- Fixed the final shot of the ranged Burst preset losing its weapon and attack trigger VFX/SFX, while preserving per-shot ammunition, durability, and post-trigger side effects.
+- Prevented delayed Burst animation events, zero-cooldown attacks, rapid-fire hold handling, and weapons with multiple native projectile bursts from starting duplicate Burst sequences.
+- Made `ammoConsumption: -1` for Burst consume one item per repeated shot instead of scaling to the configured shot count for every shot, and safely consumed persisted reload state when a Burst is interrupted by switching weapons.
+
 ## 1.1.8
 
 - Changed secondary cooldown sharing to use automatically detected weapon families first, with independent Blood Magic summon and shield groups and per-preset fallback for unrecognized modded weapons.

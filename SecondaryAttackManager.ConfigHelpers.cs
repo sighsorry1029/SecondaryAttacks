@@ -354,7 +354,7 @@ internal static partial class SecondaryAttackManager
             weaponConfig.Secondary?.OnProjectileHit);
     }
 
-    private static int ResolveAmmoConsumption(int configuredValue, bool usesAmmo, SecondaryAttackPreset preset, int projectileCount)
+    private static int ResolveAmmoConsumption(int configuredValue, bool usesAmmo, SecondaryAttackPreset preset)
     {
         if (preset == SecondaryAttackPreset.OverchargedBomb)
         {
@@ -369,11 +369,6 @@ internal static partial class SecondaryAttackManager
         if (!usesAmmo)
         {
             return 0;
-        }
-
-        if (preset == SecondaryAttackPreset.Burst && configuredValue < 0)
-        {
-            return Mathf.Max(1, projectileCount);
         }
 
         return configuredValue < 0 ? 1 : Mathf.Max(0, configuredValue);

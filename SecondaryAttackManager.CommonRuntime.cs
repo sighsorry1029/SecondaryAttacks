@@ -67,6 +67,11 @@ internal static partial class SecondaryAttackManager
         }
     }
 
+    internal static void ConsumePersistedReloadedWeaponState(Player player, ItemDrop.ItemData weapon)
+    {
+        SetPersistedReloadState(player, weapon, loaded: false);
+    }
+
     internal static ReloadStateConsumptionScope BeginReloadStateConsumption(Attack attack)
     {
         if (attack?.m_character == null || attack.m_weapon == null || !attack.m_requiresReload)

@@ -73,6 +73,10 @@ internal sealed class ActiveSecondaryAttack
 
     public bool ProjectileTriggered { get; set; }
 
+    public bool BurstTriggerHandled { get; set; }
+
+    public bool BurstRuntimeStarted { get; set; }
+
     public float NextHoldRepeatTime { get; set; }
 }
 

@@ -343,6 +343,18 @@ internal static class SecondaryAttackRuntimeFacade
             return true;
         }
 
+        bool isBurstTrigger =
+            activeAttack.Definition.Behavior is ProjectileSecondaryBehavior { Preset: SecondaryAttackPreset.Burst };
+        if (isBurstTrigger)
+        {
+            if (activeAttack.BurstTriggerHandled)
+            {
+                return true;
+            }
+
+            activeAttack.BurstTriggerHandled = true;
+        }
+
         if (!TriggerConfiguredAttack(attack, activeAttack))
         {
             attack.Stop();
@@ -476,6 +488,40 @@ internal static class SecondaryAttackRuntimeFacade
         {
             attack.Stop();
         }
+    }
+
+    internal static bool TryBeginBurstFireRepeat(Attack attack)
+    {
+        if (!SecondaryAttackRuntimeContext.TryGetActiveAttack(attack, out ActiveSecondaryAttack? activeAttack) ||
+            activeAttack == null ||
+            !activeAttack.BurstRuntimeStarted ||
+            activeAttack.Definition.Behavior is not ProjectileSecondaryBehavior
+            {
+                Preset: SecondaryAttackPreset.Burst
+            } ||
+            !ProjectileRuntimeSystem.IsBurstFireControllerActive(attack))
+        {
+            return false;
+        }
+
+        if (TryPrepareConfiguredAttack(
+                attack,
+                activeAttack,
+                out ConfiguredAmmoContext ammoContext))
+        {
+            CommitConfiguredAmmo(attack, ammoContext);
+            attack.ProjectileAttackTriggered();
+            activeAttack.ProjectileTriggered = true;
+            return true;
+        }
+
+        attack.Stop();
+        return false;
+    }
+
+    internal static void CompleteBurstFireRepeat(Attack attack)
+    {
+        ApplyAttackTriggerSideEffects(attack);
     }
 
     private static bool TriggerConfiguredAttack(Attack attack, ActiveSecondaryAttack activeAttack)
@@ -627,6 +673,7 @@ internal static class SecondaryAttackRuntimeFacade
     private static bool IsHoldRepeatProjectileAttack(Attack attack, ActiveSecondaryAttack activeAttack)
     {
         return activeAttack.Definition.BehaviorType == SecondaryAttackBehaviorType.Projectile &&
+               activeAttack.Definition.Behavior is not ProjectileSecondaryBehavior { Preset: SecondaryAttackPreset.Burst } &&
                attack.m_attackType == Attack.AttackType.Projectile &&
                attack.m_loopingAttack &&
                string.Equals(attack.m_attackAnimation, StaffRapidFireAnimation, StringComparison.Ordinal);
@@ -767,6 +814,12 @@ internal static class SecondaryAttackRuntimeFacade
         }
 
         bool burstFireControllerActive = ProjectileRuntimeSystem.IsBurstFireControllerActive(attack);
+        bool isBurstPreset = projectileBehavior.Preset == SecondaryAttackPreset.Burst;
+        if (isBurstPreset && activeAttack.BurstRuntimeStarted)
+        {
+            return true;
+        }
+
         if (!RangedSecondaryCooldownSystem.CanUse(attack, projectileBehavior))
         {
             if (!burstFireControllerActive)
@@ -795,6 +848,11 @@ internal static class SecondaryAttackRuntimeFacade
         bool handled = ProjectileRuntimeSystem.TryHandleBurstPreset(attack, activeAttack.Definition, projectileBehavior.Preset);
         if (handled)
         {
+            if (isBurstPreset)
+            {
+                activeAttack.BurstRuntimeStarted = true;
+            }
+
             RangedSecondaryCooldownSystem.StartCooldown(attack, projectileBehavior);
         }
         else if (!burstFireControllerActive)

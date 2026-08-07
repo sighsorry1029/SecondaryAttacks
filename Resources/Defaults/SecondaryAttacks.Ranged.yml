@@ -15,7 +15,7 @@
 # cooldown: base seconds after the secondary actually fires. cooldownReductionFactor applies `cooldown * (1 - skillLevel / 100 * cooldownReductionFactor)`.
 # durabilityFactor: weapon useDurabilityDrain multiplier.
 # resourceMultiplier: copied raw attack cost multiplier; reload weapons multiply vanilla reload cost.
-# ammoConsumption: ammo/item count consumed. `-1` uses the preset/runtime default.
+# ammoConsumption: ammo/item count consumed. Burst applies it per repeated shot; `-1` uses the preset/runtime default (1 per Burst shot).
 # count: projectile/shot count, depending on the preset.
 # interval: 0 fires immediately; values above 0 schedule one preset shot/projectile per interval.
 # projectileSpeedFactor: source projectile speed multiplier where the preset exposes it.
