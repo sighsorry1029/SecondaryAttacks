@@ -25,6 +25,7 @@ internal static class SecondaryAttackMagicSummonNormalizer
             MagicSummonOverrideConfig raw = weaponConfig.Summon;
             string normalizedEntryId = entryId.Trim();
             MagicSummonQualityPreset qualityPreset = NormalizeMagicSummonQualityPreset(raw.QualityPreset, normalizedEntryId);
+            int? lifetimeSeconds = NormalizeLifetimeSeconds(raw.LifetimeSeconds, normalizedEntryId);
 
             List<MagicSummonCloneConfig> rawSpawnChoices = raw.SpawnChoices?
                 .Where(summon => summon != null)
@@ -74,7 +75,7 @@ internal static class SecondaryAttackMagicSummonNormalizer
 
             if (normalizedSummons.Count == 0)
             {
-                if (qualityPreset == MagicSummonQualityPreset.None)
+                if (qualityPreset == MagicSummonQualityPreset.None && !lifetimeSeconds.HasValue)
                 {
                     continue;
                 }
@@ -85,6 +86,7 @@ internal static class SecondaryAttackMagicSummonNormalizer
                 EntryId = normalizedEntryId,
                 QualityPreset = qualityPreset,
                 MaxQuality = ClampInt(raw.MaxQuality ?? 4, 1, 10),
+                LifetimeSeconds = lifetimeSeconds,
                 Summons = normalizedSummons
             };
         }
@@ -125,6 +127,23 @@ internal static class SecondaryAttackMagicSummonNormalizer
         SecondaryAttacksPlugin.ModLogger.LogWarning(
             $"Ignoring invalid qualityPreset '{preset}' in summon override '{entryId}' from {SecondaryAttackYamlDomainRegistry.BloodMagicYamlFileName}. Valid values are countByQuality or levelByQuality.");
         return MagicSummonQualityPreset.None;
+    }
+
+    private static int? NormalizeLifetimeSeconds(int? rawLifetimeSeconds, string entryId)
+    {
+        if (!rawLifetimeSeconds.HasValue)
+        {
+            return null;
+        }
+
+        if (rawLifetimeSeconds.Value > 0)
+        {
+            return rawLifetimeSeconds.Value;
+        }
+
+        SecondaryAttacksPlugin.ModLogger.LogWarning(
+            $"Ignoring invalid lifetimeSeconds '{rawLifetimeSeconds.Value}' in summon override '{entryId}' from {SecondaryAttackYamlDomainRegistry.BloodMagicYamlFileName}. The value must be a positive integer; the global Blood Magic summon lifetime will be used instead.");
+        return null;
     }
 
     private static int ClampInt(int value, int min, int max)

@@ -913,7 +913,7 @@ internal static partial class ProjectileRuntimeSystem
             return false;
         }
 
-        int shotCount = Mathf.Max(1, projectileBehavior.ProjectileCount);
+        int shotCount = Mathf.Clamp(projectileBehavior.ProjectileCount, 1, MaxBurstShotCount);
         if (!FireSingleBurstFireShot(attack, definition))
         {
             return false;
@@ -951,6 +951,17 @@ internal static partial class ProjectileRuntimeSystem
 
     private static bool FireSingleBurstFireShot(Attack attack, SecondaryAttackDefinition definition)
     {
+        return FireSingleBurstFireShot(attack, definition, out _, out _);
+    }
+
+    private static bool FireSingleBurstFireShot(
+        Attack attack,
+        SecondaryAttackDefinition definition,
+        out Vector3 spawnPoint,
+        out Vector3 rawAimDirection)
+    {
+        spawnPoint = Vector3.zero;
+        rawAimDirection = Vector3.zero;
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
         {
@@ -958,7 +969,8 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         PrepareCustomProjectileBurst(attack);
-        attack.GetProjectileSpawnPoint(out Vector3 spawnPoint, out Vector3 aimDirection);
+        attack.GetProjectileSpawnPoint(out spawnPoint, out rawAimDirection);
+        Vector3 aimDirection = rawAimDirection;
         aimDirection = ApplyLaunchAngle(attack, aimDirection);
         OrientCharacterBodyToProjectileAim(attack, aimDirection);
         if (attack.m_burstEffect.HasEffects())
@@ -1898,6 +1910,7 @@ internal static partial class ProjectileRuntimeSystem
         private Character? _owner;
         private float _interval;
         private float _nextShotAt;
+        private float _nextObserverPresentationAt;
         private int _remainingShots;
         private bool _reloadConsumed;
 
@@ -1911,6 +1924,7 @@ internal static partial class ProjectileRuntimeSystem
                 ? Mathf.Max(0.01f, projectileBehavior.Interval)
                 : 0.2f;
             _nextShotAt = Time.time + _interval;
+            _nextObserverPresentationAt = Time.unscaledTime;
             ActiveBurstFireControllers.Add(_attack);
         }
 
@@ -1944,16 +1958,34 @@ internal static partial class ProjectileRuntimeSystem
             }
 
             _nextShotAt = Time.time + _interval;
-            _remainingShots--;
-            ReplayFireAnimation();
             if (!SecondaryAttackRuntimeFacade.TryBeginBurstFireRepeat(_attack))
             {
                 Destroy(gameObject);
                 return;
             }
 
-            bool shotFired = FireSingleBurstFireShot(_attack, _definition);
+            bool shotFired = FireSingleBurstFireShot(
+                _attack,
+                _definition,
+                out Vector3 spawnPoint,
+                out Vector3 rawAimDirection);
             SecondaryAttackRuntimeFacade.CompleteBurstFireRepeat(_attack);
+            if (shotFired)
+            {
+                _remainingShots--;
+                int animationTriggerHash = BurstObserverPresentationSystem.PlayLocalRepeatAnimation(_attack);
+                if (Time.unscaledTime >= _nextObserverPresentationAt)
+                {
+                    _nextObserverPresentationAt = Time.unscaledTime + BurstObserverPresentationSystem.MinPresentationInterval;
+                    BurstObserverPresentationSystem.Broadcast(
+                        _attack,
+                        _definition,
+                        animationTriggerHash,
+                        spawnPoint,
+                        rawAimDirection);
+                }
+            }
+
             if (!shotFired || _remainingShots <= 0)
             {
                 Destroy(gameObject);
@@ -1982,16 +2014,6 @@ internal static partial class ProjectileRuntimeSystem
             }
 
             return ReferenceEquals(humanoid.m_currentAttack, _attack);
-        }
-
-        private void ReplayFireAnimation()
-        {
-            if (_owner == null || string.IsNullOrWhiteSpace(_attack.m_attackAnimation))
-            {
-                return;
-            }
-
-            _owner.GetZAnim()?.SetTrigger(_attack.m_attackAnimation);
         }
 
         private void ConsumeReloadIfNeeded()

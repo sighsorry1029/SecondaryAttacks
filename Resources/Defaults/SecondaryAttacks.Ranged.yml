@@ -16,7 +16,7 @@
 # durabilityFactor: weapon useDurabilityDrain multiplier.
 # resourceMultiplier: copied raw attack cost multiplier; reload weapons multiply vanilla reload cost.
 # ammoConsumption: ammo/item count consumed. Burst applies it per repeated shot; `-1` uses the preset/runtime default (1 per Burst shot).
-# count: projectile/shot count, depending on the preset.
+# count: projectile/shot count, depending on the preset. Burst is limited to 32 total shots.
 # interval: 0 fires immediately; values above 0 schedule one preset shot/projectile per interval.
 # projectileSpeedFactor: source projectile speed multiplier where the preset exposes it.
 # projectileScaleFactor: spawned projectile object and Projectile.m_rayRadius multiplier.
@@ -134,7 +134,7 @@ Global:
     durabilityFactor: 2
     resourceMultiplier: 2
     ammoConsumption: 1
-    count: 3 # Repeated firing animations.
+    count: 3 # Repeated firing animations (maximum 32).
     interval: 0.45 # Delay between repeated firing animations.
     damageFactor: 0.7
 

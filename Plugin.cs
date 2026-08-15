@@ -26,7 +26,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.1.9";
+    internal const string ModVersion = "1.1.10";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -40,12 +40,15 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         MinimumRequiredVersion = ModVersion
     };
     internal static PluginSettings Settings { get; } = new();
-    internal static ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor => Settings.General.BloodMagicHealthCostSkillRaiseFactor;
-    internal static ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth => Settings.General.BloodMagicHealthCostUsesMaxHealth;
-    internal static ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset => Settings.General.MagicSummonQualityPreset;
+    internal static ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor => Settings.BloodMagic.BloodMagicHealthCostSkillRaiseFactor;
+    internal static ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth => Settings.BloodMagic.BloodMagicHealthCostUsesMaxHealth;
+    internal static ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset => Settings.BloodMagic.MagicSummonQualityPreset;
+    internal static ConfigEntry<int> BloodMagicSummonLifetimeSeconds => Settings.BloodMagic.BloodMagicSummonLifetimeSeconds;
+    internal static ConfigEntry<float> BloodMagicSummonLifetimeSkill100Multiplier => Settings.BloodMagic.BloodMagicSummonLifetimeSkill100Multiplier;
     internal static ConfigEntry<float> BackstabSneakSkillRaiseAmount => Settings.General.BackstabSneakSkillRaiseAmount;
     internal static ConfigEntry<float> SneakVisibilitySkillEffectFactor => Settings.General.SneakVisibilitySkillEffectFactor;
     internal static ConfigEntry<float> SneakMovementSpeedSkillFactor => Settings.General.SneakMovementSpeedSkillFactor;
+    internal static ConfigEntry<Toggle> KeepCrouchingDuringElementalDamageOverTime => Settings.General.KeepCrouchingDuringElementalDamageOverTime;
     internal static ConfigEntry<RangedPresetSelection> FireballStaffPreset => Settings.Ranged.FireballStaffPreset;
     internal static ConfigEntry<RangedPresetSelection> RapidStaffPreset => Settings.Ranged.RapidStaffPreset;
     internal static ConfigEntry<RangedPresetSelection> LightningStaffPreset => Settings.Ranged.LightningStaffPreset;
@@ -56,7 +59,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<Toggle> SecondaryAttackTooltipsEnabled => Settings.Ui.SecondaryAttackTooltipsEnabled;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionX => Settings.Ui.SecondaryCooldownHudPositionX;
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
-    internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.Admin.AdminNoPresetCooldowns;
+    internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.General.AdminNoPresetCooldowns;
     internal static ConfigEntry<Toggle> QuickstepEnabled => Settings.General.QuickstepEnabled;
     private FileSystemWatcher? _watcher;
     private SecondaryAttackReloadDebouncer? _configReloadDebouncer;
@@ -109,7 +112,6 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             Settings.Bind(this);
             QuickstepSystem.Initialize();
             SummonQualityHudCompatibility.Initialize();
-            RemoveLegacyConfigEntries();
             RegisterWorldApplySettingHandlers();
             _serverConfigLocked = Settings.General.LockConfiguration;
             _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
@@ -279,25 +281,6 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         }
     }
 
-    private void RemoveLegacyConfigEntries()
-    {
-        RemoveLegacyConfigEntry("3 - UI", "Secondary Cooldown HUD Scale", 2f);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Quickstep Enabled", Toggle.Off);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Dash Force", 50f);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Dash Time", 0.25f);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Invincibility Time With Shield", 0.15f);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Quickstep Cooldown", 0.5f);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Stamina Usage Multiplier", 0.6f);
-        RemoveLegacyConfigEntry("5 - Quickstep", "Dodge On Double Click", Toggle.On);
-    }
-
-    private void RemoveLegacyConfigEntry<T>(string group, string name, T defaultValue)
-    {
-        ConfigDefinition definition = new(group, name);
-        _ = Config.Bind(definition, defaultValue, new ConfigDescription("Legacy configuration entry."));
-        Config.Remove(definition);
-    }
-
     private void RegisterWorldApplySettingHandlers()
     {
         FireballStaffPreset.SettingChanged += OnWorldApplySettingChanged;
@@ -334,43 +317,60 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     {
         internal GeneralSettings General { get; } = new();
 
+        internal BloodMagicSettings BloodMagic { get; } = new();
+
         internal RangedSettings Ranged { get; } = new();
 
         internal UiSettings Ui { get; } = new();
 
-        internal AdminSettings Admin { get; } = new();
-
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
             General.Bind(plugin);
+            BloodMagic.Bind(plugin);
             Ranged.Bind(plugin);
             Ui.Bind(plugin);
-            Admin.Bind(plugin);
         }
     }
 
     internal sealed class GeneralSettings
     {
         internal ConfigEntry<Toggle> LockConfiguration = null!;
-        internal ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor = null!;
-        internal ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth = null!;
-        internal ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset = null!;
         internal ConfigEntry<float> BackstabSneakSkillRaiseAmount = null!;
         internal ConfigEntry<float> SneakVisibilitySkillEffectFactor = null!;
         internal ConfigEntry<float> SneakMovementSpeedSkillFactor = null!;
         internal ConfigEntry<Toggle> QuickstepEnabled = null!;
+        internal ConfigEntry<Toggle> AdminNoPresetCooldowns = null!;
+        internal ConfigEntry<Toggle> KeepCrouchingDuringElementalDamageOverTime = null!;
 
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
             const string group = "1 - General";
             LockConfiguration = plugin.config(group, "Lock Configuration", Toggle.On, new ConfigDescription("If on, the configuration is locked and can be changed by server admins only.", null, new ConfigurationManagerAttributes { Order = 700 }));
-            SneakMovementSpeedSkillFactor = plugin.config(group, "Sneak Movement Speed Skill Factor", 1.0f, new ConfigDescription("Sneak movement speed multiplier at Sneak skill 100 while crouching. 1.0 keeps vanilla; 2.0 doubles crouched movement speed at Sneak 100, with lower Sneak levels linearly interpolated.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: true);
-            SneakVisibilitySkillEffectFactor = plugin.config(group, "Sneak Visibility Skill Effect Factor", 1.0f, new ConfigDescription("Multiplier for the visibility reduction gained from Sneak skill while crouching. 1.0 keeps vanilla; 2.0 doubles only the skill-based reduction. Visibility is clamped to a fixed minimum of 0.1. At factor 1.0, Sneak 0 is 0.5 in darkness and 1.0 in bright light; Sneak 100 is 0.2 in darkness and 0.6 in bright light.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
+            AdminNoPresetCooldowns = plugin.config(group, "Admin No Preset Cooldowns", Toggle.Off, new ConfigDescription("Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.", null, new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: false);
+            QuickstepEnabled = plugin.config(group, "Quickstep Enabled", Toggle.Off, new ConfigDescription("Enables the fixed quickstep for equipped Knives and Unarmed weapons. Bare fists are excluded. Quickstep uses 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep and its double-press dodge handoff each consume 60% of the current dodge stamina cost.", null, new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
             BackstabSneakSkillRaiseAmount = plugin.config(group, "Backstab Sneak Skill Raise Amount", 1.0f, new ConfigDescription("Sneak skill raise amount awarded whenever any attack successfully triggers backstab damage. 0 disables this reward.", new AcceptableValueRange<float>(0f, 10f), new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
-            MagicSummonQualityPreset = plugin.config(group, "Magic Summon Quality Preset", MagicSummonQualityPresetSelection.LevelByQuality, new ConfigDescription("Global quality preset for BloodMagic summon items whose primary or secondary projectile resolves to a SpawnAbility. Explicit summon blocks in SecondaryAttacks.BloodMagic.yml override this. Off disables automatic quality scaling; CountByQuality makes item quality raise active summon count; LevelByQuality makes item quality raise summoned creature level.", null, new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
-            BloodMagicHealthCostUsesMaxHealth = plugin.config(group, "Blood Magic Health Cost Uses Max Health", Toggle.On, new ConfigDescription("If on, Blood Magic attack health percentage costs are calculated from max health at cast time instead of current health. Flat health cost and Blood Magic skill cost reduction are unchanged.", null, new ConfigurationManagerAttributes { Order = 650 }), synchronizedSetting: true);
-            BloodMagicHealthCostSkillRaiseFactor = plugin.config(group, "Blood Magic Health Cost Skill Raise Factor", 0.01f, new ConfigDescription("Additional Blood Magic skill raise amount per actual consumed health. Vanilla Blood Magic skill gain always remains active. 0 disables only this custom health-cost skill gain. Example: consuming 160 health and 0.01 factor awards 1.6 extra raise amount.", new AcceptableValueRange<float>(0f, 0.1f), new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
-            QuickstepEnabled = plugin.config(group, "Quickstep Enabled", Toggle.Off, new ConfigDescription("Enables the fixed quickstep for equipped Knives and Unarmed weapons. Bare fists are excluded. Quickstep uses 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep and its double-press dodge handoff each consume 60% of the current dodge stamina cost.", null, new ConfigurationManagerAttributes { Order = 630 }), synchronizedSetting: true);
+            SneakVisibilitySkillEffectFactor = plugin.config(group, "Sneak Visibility Skill Effect Factor", 1.0f, new ConfigDescription("Multiplier for the visibility reduction gained from Sneak skill while crouching. 1.0 keeps vanilla; 2.0 doubles only the skill-based reduction. Visibility is clamped to a fixed minimum of 0.1. At factor 1.0, Sneak 0 is 0.5 in darkness and 1.0 in bright light; Sneak 100 is 0.2 in darkness and 0.6 in bright light.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
+            SneakMovementSpeedSkillFactor = plugin.config(group, "Sneak Movement Speed Skill Factor", 1.0f, new ConfigDescription("Sneak movement speed multiplier at Sneak skill 100 while crouching. 1.0 keeps vanilla; 2.0 doubles crouched movement speed at Sneak 100, with lower Sneak levels linearly interpolated.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 650 }), synchronizedSetting: true);
+            KeepCrouchingDuringElementalDamageOverTime = plugin.config(group, "Keep Crouching During Elemental Damage Over Time", Toggle.Off, new ConfigDescription("If on, periodic Fire, Spirit, and Poison damage-over-time ticks do not cancel the player's crouch toggle. Direct hits, lethal damage, stagger, and knockback retain vanilla behavior.", null, new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
+        }
+    }
+
+    internal sealed class BloodMagicSettings
+    {
+        internal ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor = null!;
+        internal ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth = null!;
+        internal ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset = null!;
+        internal ConfigEntry<int> BloodMagicSummonLifetimeSeconds = null!;
+        internal ConfigEntry<float> BloodMagicSummonLifetimeSkill100Multiplier = null!;
+
+        internal void Bind(SecondaryAttacksPlugin plugin)
+        {
+            const string group = "2 - Blood Magic";
+            MagicSummonQualityPreset = plugin.config(group, "Magic Summon Quality Preset", MagicSummonQualityPresetSelection.LevelByQuality, new ConfigDescription("Global quality preset for BloodMagic summon items whose primary or secondary projectile resolves to a SpawnAbility. Explicit summon.qualityPreset values in SecondaryAttacks.BloodMagic.yml override this. Off disables automatic quality scaling; CountByQuality makes item quality raise active summon count; LevelByQuality makes item quality raise summoned creature level.", null, new ConfigurationManagerAttributes { Order = 700 }), synchronizedSetting: true);
+            BloodMagicSummonLifetimeSeconds = plugin.config(group, "Blood Magic Summon Lifetime Seconds", 1200, new ConfigDescription("Base lifetime in whole seconds for creatures summoned by player-used Blood Magic staves. Values below 1 are clamped to 1. Changes apply only to summons created after this setting changes; existing summons keep their assigned lifetime.", new AcceptablePositiveInt(), new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: true);
+            BloodMagicSummonLifetimeSkill100Multiplier = plugin.config(group, "Blood Magic Summon Lifetime Multiplier At Skill 100", 2.0f, new ConfigDescription("Multiplier applied to the base summon lifetime at Blood Magic skill 100. Skill 0 uses the base lifetime, with intermediate skill levels interpolated linearly.", new AcceptableValueRange<float>(1f, 10f), new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
+            BloodMagicHealthCostUsesMaxHealth = plugin.config(group, "Blood Magic Health Cost Uses Max Health", Toggle.On, new ConfigDescription("If on, Blood Magic attack health percentage costs are calculated from max health at cast time instead of current health. Flat health cost and Blood Magic skill cost reduction are unchanged.", null, new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
+            BloodMagicHealthCostSkillRaiseFactor = plugin.config(group, "Blood Magic Health Cost Skill Raise Factor", 0.01f, new ConfigDescription("Additional Blood Magic skill raise amount per actual consumed health. Vanilla Blood Magic skill gain always remains active. 0 disables only this custom health-cost skill gain. Example: consuming 160 health and 0.01 factor awards 1.6 extra raise amount.", new AcceptableValueRange<float>(0f, 0.1f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
         }
     }
 
@@ -385,7 +385,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
-            const string group = "2 - Ranged";
+            const string group = "3 - Ranged";
             const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic assignment for this group.";
             FireballStaffPreset = plugin.config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_fireball. {descriptionSuffix}", synchronizedSetting: true);
             RapidStaffPreset = plugin.config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_rapidfire. {descriptionSuffix}", synchronizedSetting: true);
@@ -405,27 +405,11 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
         internal void Bind(SecondaryAttacksPlugin plugin)
         {
-            const string group = "3 - UI";
+            const string group = "4 - UI";
             SecondaryCooldownHudEnabled = plugin.config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns and charge progress are shown in a dedicated HUD block. Off hides this display without changing cooldown behavior.", synchronizedSetting: false);
             SecondaryAttackTooltipsEnabled = plugin.config(group, "Secondary Attack Tooltips Enabled", Toggle.On, "If on, weapons with an applied SecondaryAttacks preset show its localized name and description in item tooltips. Off hides only this client-side tooltip section.", synchronizedSetting: false);
             SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.615f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
             SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
-        }
-    }
-
-    internal sealed class AdminSettings
-    {
-        internal ConfigEntry<Toggle> AdminNoPresetCooldowns = null!;
-
-        internal void Bind(SecondaryAttacksPlugin plugin)
-        {
-            const string group = "4 - Admin";
-            AdminNoPresetCooldowns = plugin.config(
-                group,
-                "Admin No Preset Cooldowns",
-                Toggle.Off,
-                "Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.",
-                synchronizedSetting: false);
         }
     }
 
@@ -448,6 +432,28 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     private ConfigEntry<T> config<T>(string group, string name, T value, string description, bool synchronizedSetting = true)
     {
         return config(group, name, value, new ConfigDescription(description), synchronizedSetting);
+    }
+
+    private sealed class AcceptablePositiveInt : AcceptableValueBase
+    {
+        internal AcceptablePositiveInt() : base(typeof(int))
+        {
+        }
+
+        public override object Clamp(object value)
+        {
+            return Math.Max(1, (int)value);
+        }
+
+        public override bool IsValid(object value)
+        {
+            return value is int intValue && intValue >= 1;
+        }
+
+        public override string ToDescriptionString()
+        {
+            return "# Acceptable values: Positive whole numbers (1 or greater)";
+        }
     }
 
     private class ConfigurationManagerAttributes

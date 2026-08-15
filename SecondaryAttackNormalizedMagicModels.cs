@@ -17,6 +17,8 @@ internal sealed class NormalizedMagicSummonOverrideConfig
 
     public int MaxQuality { get; set; } = 4;
 
+    public int? LifetimeSeconds { get; set; }
+
     public bool HasQualityPreset => QualityPreset != MagicSummonQualityPreset.None;
 
     public List<NormalizedMagicSummonCloneConfig> Summons { get; set; } = new();

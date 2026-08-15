@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.10
+
+- Added owner-authoritative lifetimes for player-cast Blood Magic summons, using a 1200-second server-synchronized base, linear Blood Magic skill scaling, a configurable skill-100 multiplier, and optional per-staff `summon.lifetimeSeconds` overrides; existing summons keep their assigned deadlines.
+- Added a synchronized summon countdown beside the health bar on the active star row, including CreatureManager, Creature Level & Loot Control, StarLevelSystem, and SecondaryAttacks star HUD layouts.
+- Replicated ranged Burst follow-up animations and local-only VFX/SFX to other clients, including dedicated-server observers, with bounded presentation traffic, network-effect filtering, and a 32-shot Burst limit.
+- Added the server-synchronized `Keep Crouching During Elemental Damage Over Time` option so nonlethal Fire, Spirit, and Poison ticks can preserve crouching without changing direct-hit, stagger, knockback, or lethal-damage behavior.
+- Reorganized generated config groups into `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`, moved the admin cooldown convenience into General, and intentionally omitted legacy migration; existing custom values under old groups must be entered again.
+
 ## 1.1.9
 
 - Fixed the final shot of the ranged Burst preset losing its weapon and attack trigger VFX/SFX, while preserving per-shot ammunition, durability, and post-trigger side effects.

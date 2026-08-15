@@ -4,6 +4,8 @@ namespace SecondaryAttacks;
 
 internal static partial class ProjectileRuntimeSystem
 {
+    internal const int MaxBurstShotCount = 32;
+
     internal static string GetPresetName(SecondaryAttackPreset preset)
     {
         return SecondaryAttackPresetCatalog.GetKey(preset);

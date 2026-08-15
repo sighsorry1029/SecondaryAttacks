@@ -27,7 +27,15 @@ internal static partial class SecondaryAttackManager
             return false;
         }
 
-        int projectileCount = Mathf.Max(1, projectileConfig.Count);
+        int projectileCount = preset == SecondaryAttackPreset.Burst
+            ? Mathf.Clamp(projectileConfig.Count, 1, ProjectileRuntimeSystem.MaxBurstShotCount)
+            : Mathf.Max(1, projectileConfig.Count);
+        if (preset == SecondaryAttackPreset.Burst && projectileConfig.Count > ProjectileRuntimeSystem.MaxBurstShotCount)
+        {
+            SecondaryAttackWarningLog.WarnOnce(
+                $"burst_count_clamped:{prefabName}:{projectileConfig.Count}",
+                $"Clamping {prefabName} Burst count from {projectileConfig.Count} to {ProjectileRuntimeSystem.MaxBurstShotCount}.");
+        }
         int ammoConsumption = ResolveAmmoConsumption(projectileConfig.AmmoConsumption, usesAmmo, preset);
         string resolvedAttackAnimation = GetNormalizedAttackAnimation(weaponConfig);
         bool hasCustomAttackAnimation = !string.IsNullOrWhiteSpace(resolvedAttackAnimation);

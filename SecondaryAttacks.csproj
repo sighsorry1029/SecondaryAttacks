@@ -460,6 +460,7 @@
         <Compile Include="AftershockSystem.cs" />
         <Compile Include="BackstabSkillGainSystem.cs" />
         <Compile Include="BloodMagicSkillGainSystem.cs" />
+        <Compile Include="BurstObserverPresentationSystem.cs" />
         <Compile Include="BowSecondaryKeyHintSystem.cs" />
         <Compile Include="CopiedThrowProjectileVisualSystem.cs" />
         <Compile Include="CleavingThrustSystem.cs" />

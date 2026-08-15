@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 using UnityEngine;
 
@@ -174,5 +175,214 @@ internal static class CharacterUpdateWalkingSneakMovementPatch
     private static void Finalizer(ref SneakVisibilitySystem.CrouchSpeedState __state)
     {
         SneakVisibilitySystem.RestoreCrouchSpeed(ref __state);
+    }
+}
+
+internal static class SneakCrouchPreservationSystem
+{
+    [ThreadStatic] private static DotDamageKind _activeDamageKind;
+    [ThreadStatic] private static Player? _activePlayer;
+
+    internal static DotDamageScope Begin(StatusEffect statusEffect, DotDamageKind damageKind)
+    {
+        Player? player = statusEffect?.m_character as Player;
+        bool shouldTrack =
+            SecondaryAttacksPlugin.KeepCrouchingDuringElementalDamageOverTime?.Value == SecondaryAttacksPlugin.Toggle.On &&
+            player != null &&
+            player.m_nview != null &&
+            player.m_nview.IsValid() &&
+            player.m_nview.IsOwner();
+
+        if (!shouldTrack && _activeDamageKind == DotDamageKind.None)
+        {
+            return default;
+        }
+
+        DotDamageScope scope = new(_activeDamageKind, _activePlayer, active: true);
+        _activeDamageKind = shouldTrack ? damageKind : DotDamageKind.None;
+        _activePlayer = shouldTrack ? player : null;
+        return scope;
+    }
+
+    internal static void End(ref DotDamageScope scope)
+    {
+        if (!scope.Active)
+        {
+            return;
+        }
+
+        _activeDamageKind = scope.PreviousDamageKind;
+        _activePlayer = scope.PreviousPlayer;
+        scope = default;
+    }
+
+    internal static CrouchRestoreState Capture(Humanoid humanoid, HitData hit)
+    {
+        if (humanoid is not Player player ||
+            !ReferenceEquals(_activePlayer, player) ||
+            !player.m_crouchToggled ||
+            !IsExpectedDamageOverTimeHit(hit, _activeDamageKind))
+        {
+            return default;
+        }
+
+        return new CrouchRestoreState(player);
+    }
+
+    internal static void Restore(ref CrouchRestoreState state)
+    {
+        Player? player = state.Player;
+        state = default;
+        if (player == null ||
+            player.GetHealth() <= 0f ||
+            player.IsDead() ||
+            player.IsStaggering() ||
+            player.IsKnockedBack())
+        {
+            return;
+        }
+
+        player.SetCrouch(crouch: true);
+    }
+
+    private static bool IsExpectedDamageOverTimeHit(HitData? hit, DotDamageKind damageKind)
+    {
+        if (hit == null || hit.HaveAttacker())
+        {
+            return false;
+        }
+
+        HitData.DamageTypes damage = hit.m_damage;
+        return damageKind switch
+        {
+            DotDamageKind.Burning =>
+                hit.m_hitType == HitData.HitType.Burning &&
+                (damage.m_fire > 0f || damage.m_spirit > 0f) &&
+                HasOnlyBurningDamage(damage),
+            DotDamageKind.Poisoned =>
+                hit.m_hitType == HitData.HitType.Poisoned &&
+                damage.m_poison > 0f &&
+                HasOnlyPoisonDamage(damage),
+            _ => false
+        };
+    }
+
+    private static bool HasOnlyBurningDamage(HitData.DamageTypes damage)
+    {
+        return damage.m_damage <= 0f &&
+               damage.m_blunt <= 0f &&
+               damage.m_slash <= 0f &&
+               damage.m_pierce <= 0f &&
+               damage.m_chop <= 0f &&
+               damage.m_pickaxe <= 0f &&
+               damage.m_frost <= 0f &&
+               damage.m_lightning <= 0f &&
+               damage.m_poison <= 0f;
+    }
+
+    private static bool HasOnlyPoisonDamage(HitData.DamageTypes damage)
+    {
+        return damage.m_damage <= 0f &&
+               damage.m_blunt <= 0f &&
+               damage.m_slash <= 0f &&
+               damage.m_pierce <= 0f &&
+               damage.m_chop <= 0f &&
+               damage.m_pickaxe <= 0f &&
+               damage.m_fire <= 0f &&
+               damage.m_frost <= 0f &&
+               damage.m_lightning <= 0f &&
+               damage.m_spirit <= 0f;
+    }
+
+    internal enum DotDamageKind
+    {
+        None,
+        Burning,
+        Poisoned
+    }
+
+    internal struct DotDamageScope(DotDamageKind previousDamageKind, Player? previousPlayer, bool active)
+    {
+        internal readonly DotDamageKind PreviousDamageKind = previousDamageKind;
+        internal readonly Player? PreviousPlayer = previousPlayer;
+        internal bool Active = active;
+    }
+
+    internal struct CrouchRestoreState(Player? player)
+    {
+        internal readonly Player? Player = player;
+    }
+}
+
+[HarmonyPatch(typeof(SE_Burning), nameof(SE_Burning.UpdateStatusEffect), typeof(float))]
+internal static class SEBurningUpdateStatusEffectCrouchPreservationPatch
+{
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix(SE_Burning __instance, out SneakCrouchPreservationSystem.DotDamageScope __state)
+    {
+        __state = SneakCrouchPreservationSystem.Begin(
+            __instance,
+            SneakCrouchPreservationSystem.DotDamageKind.Burning);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(ref SneakCrouchPreservationSystem.DotDamageScope __state)
+    {
+        SneakCrouchPreservationSystem.End(ref __state);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Finalizer(ref SneakCrouchPreservationSystem.DotDamageScope __state)
+    {
+        SneakCrouchPreservationSystem.End(ref __state);
+    }
+}
+
+[HarmonyPatch(typeof(SE_Poison), nameof(SE_Poison.UpdateStatusEffect), typeof(float))]
+internal static class SEPoisonUpdateStatusEffectCrouchPreservationPatch
+{
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix(SE_Poison __instance, out SneakCrouchPreservationSystem.DotDamageScope __state)
+    {
+        __state = SneakCrouchPreservationSystem.Begin(
+            __instance,
+            SneakCrouchPreservationSystem.DotDamageKind.Poisoned);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(ref SneakCrouchPreservationSystem.DotDamageScope __state)
+    {
+        SneakCrouchPreservationSystem.End(ref __state);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Finalizer(ref SneakCrouchPreservationSystem.DotDamageScope __state)
+    {
+        SneakCrouchPreservationSystem.End(ref __state);
+    }
+}
+
+[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.OnDamaged), typeof(HitData))]
+internal static class HumanoidOnDamagedCrouchPreservationPatch
+{
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix(
+        Humanoid __instance,
+        HitData hit,
+        out SneakCrouchPreservationSystem.CrouchRestoreState __state)
+    {
+        __state = SneakCrouchPreservationSystem.Capture(__instance, hit);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(ref SneakCrouchPreservationSystem.CrouchRestoreState __state)
+    {
+        SneakCrouchPreservationSystem.Restore(ref __state);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Finalizer(ref SneakCrouchPreservationSystem.CrouchRestoreState __state)
+    {
+        SneakCrouchPreservationSystem.Restore(ref __state);
     }
 }

@@ -198,6 +198,8 @@ Summon Empower buffs nearby summons with configurable duration, a factor for non
 
 Blood Magic summon quality can scale in two ways: `levelByQuality` increases summon level by staff quality, while `countByQuality` increases the number of active summons.
 
+Blood Magic summons use the global lifetime configured in `2 - Blood Magic` by default. A staff entry can set a positive integer `summon.lifetimeSeconds` in `SecondaryAttacks.BloodMagic.yml` to override that base lifetime. Staff YAML takes precedence over the global config, and Blood Magic skill scaling is applied after the base lifetime is selected. Omitting the YAML value keeps the global fallback.
+
 ## Configuration
 
 The mod creates these files in `BepInEx/config/SecondaryAttacks/`:
@@ -209,7 +211,9 @@ The mod creates these files in `BepInEx/config/SecondaryAttacks/`:
 
 Use `SecondaryAttacks_AnimationReferences.txt` when choosing values for YAML `animation` fields.
 
-Ranged automatic assignment is controlled by the `2 - Ranged` config options. Select `Off` for a weapon group to disable its automatic preset. Ranged `Global` blocks only define preset default values; prefab entries are used for exact per-prefab overrides.
+The generated `.cfg` options are grouped as `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`. General lists configuration locking first, followed by the admin cooldown convenience and player movement, backstab, and Sneak adjustments. `Keep Crouching During Elemental Damage Over Time` can preserve crouching through periodic Fire, Spirit, and Poison ticks while leaving direct, lethal, stagger, and knockback damage unchanged.
+
+Ranged automatic assignment is controlled by the `3 - Ranged` config options. Select `Off` for a weapon group to disable its automatic preset. Ranged `Global` blocks only define preset default values; prefab entries are used for exact per-prefab overrides.
 
 Melee and Blood Magic presets use `Global` blocks for shared defaults and prefab entries for overrides. Use `preset: none` to opt out a specific prefab and keep its original secondary behavior. Disabled examples can remain in the YAML with `enabled: false`, so you can enable one sample at a time without rebuilding the whole entry.
 
@@ -218,7 +222,7 @@ Melee and Blood Magic presets use `Global` blocks for shared defaults and prefab
 - Preserves loaded weapon state for crossbows and other reload-based weapons, so secondary handling does not unnecessarily lose a loaded shot.
 - Replaces heavier MagicPlugin projectile compatibility work with lighter runtime hooks for ElementalMagic projectile tuning.
 - Adds General config tweaks for Sneak scaling, including sneak movement speed, visibility reduction, and backstab skill gain tuning.
-- Adds General config tweaks for Blood Magic health-cost behavior, including max-health based costs and Blood Magic skill gain from health-cost abilities.
+- Adds Blood Magic config tweaks for summon lifetime and health-cost behavior, including max-health based costs and Blood Magic skill gain from health-cost abilities.
 
 ## Github
 https://github.com/sighsorry1029?tab=repositories

@@ -33,12 +33,15 @@ Global:
 # Add a `summon` block under the item prefab whose primary/secondary summon projectile should be modified.
 # The config option "Magic Summon Quality Preset" globally applies levelByQuality by default;
 # entries below override that global preset for individual item prefabs.
+# Optional `lifetimeSeconds` must be a positive integer. It overrides the global Blood Magic summon
+# lifetime for this staff; omitted values use the global config before Blood Magic skill scaling.
 
 StaffRedTroll:
   enabled: false
   summon:
     qualityPreset: countByQuality # Quality 1/2/3/4 keeps 1/2/3/4 active summons at level 1.
     maxQuality: 4
+    lifetimeSeconds: 900 # Optional staff-specific base lifetime before Blood Magic skill scaling.
 
 StaffSkeleton:
   enabled: false

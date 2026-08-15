@@ -497,6 +497,8 @@ internal sealed class MagicSummonOverrideConfig
 
     public int? MaxQuality { get; set; }
 
+    public int? LifetimeSeconds { get; set; }
+
     public List<MagicSummonCloneConfig>? SpawnChoices { get; set; }
 }
 

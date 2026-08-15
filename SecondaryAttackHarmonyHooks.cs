@@ -9,6 +9,7 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
 {
     private Character _character = null!;
     private ZNetView? _nview;
+    private float _nextBurstPresentationAt;
 
     private void Awake()
     {
@@ -27,6 +28,7 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         _nview.Register<int, string>(SweepObserverVisualSystem.RpcName, RPC_SweepVisual);
         _nview.Register<Vector3, Vector3, string>(RiftTrailSystem.ObserverFallbackVisualRpcName, RPC_RiftTrailVisual);
         _nview.Register<uint, float, double, double>(GreatSwordSkillScalingSystem.CleavingThrustVisualSessionRpcName, RPC_CleavingThrustVisualSession);
+        _nview.Register<int, int, Vector3, Vector3>(BurstObserverPresentationSystem.RpcName, RPC_BurstPresentation);
         _nview.Register(StaffRuntimeSystem.StaffTargetEffectRpcName, RPC_SpawnStaffTargetEffect);
     }
 
@@ -100,6 +102,24 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
     private void RPC_SpawnStaffTargetEffect(long sender)
     {
         StaffRuntimeSystem.CreateStaffTargetEffect(_character);
+    }
+
+    private void RPC_BurstPresentation(
+        long sender,
+        int weaponPrefabHash,
+        int animationTriggerHash,
+        Vector3 spawnPoint,
+        Vector3 aimDirection)
+    {
+        BurstObserverPresentationSystem.HandleRpc(
+            _character,
+            _nview,
+            sender,
+            weaponPrefabHash,
+            animationTriggerHash,
+            spawnPoint,
+            aimDirection,
+            ref _nextBurstPresentationAt);
     }
 }
 
