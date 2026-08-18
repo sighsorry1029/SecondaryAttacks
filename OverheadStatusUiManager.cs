@@ -47,7 +47,12 @@ internal static class OverheadStatusUiManager
                 continue;
             }
 
-            TextMeshProUGUI statusText = GetOrCreateStatusText(enemyHud, instanceId);
+            TextMeshProUGUI? statusText = GetOrCreateStatusText(enemyHud, character, instanceId);
+            if (statusText == null)
+            {
+                continue;
+            }
+
             string text = GetOrCreateStatusState(instanceId).ResolveText(snapshot);
             UpdateStatusText(enemyHud, character, statusText, text, snapshot.LineCount);
         }
@@ -70,18 +75,49 @@ internal static class OverheadStatusUiManager
         return snapshot.HasText;
     }
 
-    private static TextMeshProUGUI GetOrCreateStatusText(EnemyHud enemyHud, int characterInstanceId)
+    private static TextMeshProUGUI? GetOrCreateStatusText(
+        EnemyHud enemyHud,
+        Character character,
+        int characterInstanceId)
     {
         if (ActiveTexts.TryGetValue(characterInstanceId, out TextMeshProUGUI? existing) && existing != null)
         {
-            return existing;
+            if (existing.font != null)
+            {
+                return existing;
+            }
+
+            Object.Destroy(existing.gameObject);
+            ActiveTexts.Remove(characterInstanceId);
+        }
+
+        TextMeshProUGUI? sourceText = null;
+        if (enemyHud.m_huds.TryGetValue(character, out EnemyHud.HudData? hudData) &&
+            hudData != null &&
+            hudData.m_name != null &&
+            hudData.m_name.font != null)
+        {
+            sourceText = hudData.m_name;
+        }
+
+        if (sourceText == null && enemyHud.m_baseHudPlayer != null)
+        {
+            Transform? nameTransform = enemyHud.m_baseHudPlayer.transform.Find("Name");
+            if (nameTransform != null)
+            {
+                sourceText = nameTransform.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        if (sourceText == null || sourceText.font == null)
+        {
+            return null;
         }
 
         GameObject textObject = new($"{CharacterHudTextName}_{characterInstanceId}");
         textObject.SetActive(false);
         textObject.transform.SetParent(enemyHud.m_hudRoot.transform, false);
         TextMeshProUGUI statusText = textObject.AddComponent<TextMeshProUGUI>();
-        TextMeshProUGUI sourceText = enemyHud.m_baseHudPlayer.transform.Find("Name").GetComponent<TextMeshProUGUI>();
         statusText.font = sourceText.font;
         statusText.fontSharedMaterial = sourceText.fontSharedMaterial;
         statusText.fontSize = sourceText.fontSize * 0.72f;

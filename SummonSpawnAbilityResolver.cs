@@ -5,6 +5,20 @@ namespace SecondaryAttacks;
 internal static class SummonSpawnAbilityResolver
 {
     internal static bool TryResolve(
+        ZNetScene? scene,
+        string? itemPrefabName,
+        out ItemDrop? itemDrop,
+        out SpawnAbility? spawnAbility,
+        out string targetName)
+    {
+        itemDrop = ResolveItemDrop(scene, itemPrefabName);
+        spawnAbility = null;
+        targetName = "";
+        return itemDrop?.m_itemData?.m_shared != null &&
+               TryResolve(itemDrop, out spawnAbility, out targetName);
+    }
+
+    internal static bool TryResolve(
         ItemDrop? itemDrop,
         out SpawnAbility? spawnAbility,
         out string targetName)
@@ -73,5 +87,23 @@ internal static class SummonSpawnAbilityResolver
 
         targetName = prefab != null ? prefab.name : "";
         return false;
+    }
+
+    private static ItemDrop? ResolveItemDrop(ZNetScene? scene, string? itemPrefabName)
+    {
+        if (string.IsNullOrWhiteSpace(itemPrefabName))
+        {
+            return null;
+        }
+
+        GameObject? itemPrefab = ObjectDB.instance != null
+            ? ObjectDB.instance.GetItemPrefab(itemPrefabName)
+            : null;
+        if (itemPrefab == null)
+        {
+            itemPrefab = scene != null ? scene.GetPrefab(itemPrefabName) : null;
+        }
+
+        return itemPrefab != null ? itemPrefab.GetComponent<ItemDrop>() : null;
     }
 }

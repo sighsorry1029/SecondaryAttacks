@@ -9,7 +9,6 @@ internal static class MeleeProjectileHitCascadeSystem
 {
     private const int MaxImpactBurstColliders = 96;
     private const float MinPositiveImpactBurstDamage = 0.1f;
-    private const string SpearRainPresetName = "spearRain";
     private const float SpearRainVelocityLeadFactor = 0.75f;
     private const float SpearRainMaxVelocityLeadDistance = 3f;
 
@@ -21,8 +20,6 @@ internal static class MeleeProjectileHitCascadeSystem
     private static readonly HashSet<int> ImpactBurstTargetIds = new();
     private static int _characterMask;
     private static int _impactBurstMask;
-
-    internal static bool IsApplyingImpactBurstDamage { get; private set; }
 
     internal static void RegisterOnProjectileHitSource(Projectile projectile, Attack attack, ItemDrop.ItemData weapon)
     {
@@ -107,7 +104,7 @@ internal static class MeleeProjectileHitCascadeSystem
                 baseHitData,
                 baseAdrenaline));
         projectile.m_adrenaline = 0f;
-        if (IsSpearRainPreset(config.Preset))
+        if (config.Preset == MeleeSpecialPreset.SpearRain)
         {
             RegisterPendingSpearRain(projectile, owner);
         }
@@ -175,17 +172,22 @@ internal static class MeleeProjectileHitCascadeSystem
 
         Vector3 targetPoint = target != null ? target.GetCenterPoint() : hitPoint;
         GameObject? directHitObject = Projectile.FindHitObject(collider);
-        if (state.Config.Preset.Equals("impactBurst", System.StringComparison.OrdinalIgnoreCase))
+        if (state.Config.Preset == MeleeSpecialPreset.ImpactBurst)
         {
             TryGrantOnProjectileHitAdrenaline(state, target);
             TriggerImpactBurst(state, targetPoint, ResolveImpactBurstVfxPoint(hitPoint, targetPoint), target, directHitObject, normal);
             return;
         }
 
+        if (state.Config.Preset != MeleeSpecialPreset.SpearRain)
+        {
+            return;
+        }
+
         if (!MeleePresetCooldownSystem.TryConsume(
                 state.Owner,
                 state.Weapon,
-                SpearRainPresetName,
+                SecondaryAttackPresetCatalog.GetKey(MeleeSpecialPreset.SpearRain)!,
                 state.Config.PresetCooldown))
         {
             return;
@@ -241,14 +243,7 @@ internal static class MeleeProjectileHitCascadeSystem
             return false;
         }
 
-        if (BaseAI.IsEnemy(owner, target))
-        {
-            return true;
-        }
-
-        return owner.IsPlayer() &&
-               target.GetBaseAI() != null &&
-               target.GetBaseAI().IsAggravatable();
+        return SecondaryAttackManager.IsEnemyOrAggravatableTarget(owner, target);
     }
 
     private static void TriggerImpactBurst(
@@ -448,19 +443,13 @@ internal static class MeleeProjectileHitCascadeSystem
         hitData.m_hitCollider = target.Collider;
         hitData.SetAttacker(state.Owner);
 
-        bool wasApplyingImpactBurstDamage = IsApplyingImpactBurstDamage;
-        IsApplyingImpactBurstDamage = true;
-        try
+        using (SecondaryAttackRuntimeContext.BeginGeneratedDamage())
         {
             target.Destructible.Damage(hitData);
             if (target.Character != null && BaseAI.IsEnemy(state.Owner, target.Character))
             {
                 TryGrantOnProjectileHitAdrenaline(state, target.Character);
             }
-        }
-        finally
-        {
-            IsApplyingImpactBurstDamage = wasApplyingImpactBurstDamage;
         }
     }
 
@@ -668,7 +657,7 @@ internal static class MeleeProjectileHitCascadeSystem
         }
 
         RegisterSpearRainFollowupProjectile(projectile);
-        SuppressProjectileItemDrops(projectile);
+        ProjectileAccess.SuppressItemDrops(projectile);
         HitData hitData = BuildFollowupHitData(state);
         projectileInterface.Setup(
             state.Owner,
@@ -678,7 +667,7 @@ internal static class MeleeProjectileHitCascadeSystem
             state.Weapon,
             state.Ammo);
         projectile.m_adrenaline = 0f;
-        SuppressProjectileItemDrops(projectile);
+        ProjectileAccess.SuppressItemDrops(projectile);
 
         if (targetMarker != null)
         {
@@ -741,16 +730,6 @@ internal static class MeleeProjectileHitCascadeSystem
         hitData.SetAttacker(state.Owner);
         return hitData;
     }
-
-    private static void SuppressProjectileItemDrops(Projectile projectile)
-    {
-        projectile.m_respawnItemOnHit = false;
-        projectile.m_spawnItem = null;
-        projectile.m_spawnOnTtl = false;
-    }
-
-    private static bool IsSpearRainPreset(string preset) =>
-        preset.Equals(SpearRainPresetName, System.StringComparison.OrdinalIgnoreCase);
 
     private static void RegisterPendingSpearRain(Projectile projectile, Character owner)
     {
@@ -871,8 +850,6 @@ internal static class MeleeProjectileHitCascadeSystem
         public Collider Collider { get; }
 
         public Vector3 Point { get; }
-
-        public float Distance => Mathf.Sqrt(DistanceSqr);
 
         public float DistanceSqr { get; }
     }

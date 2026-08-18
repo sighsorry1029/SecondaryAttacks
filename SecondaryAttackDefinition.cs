@@ -67,11 +67,11 @@ internal sealed class SecondaryAttackDefinition
 
 internal sealed class MeleeOnProjectileHitDefinition
 {
-    public string Preset { get; set; } = "";
+    public MeleeSpecialPreset Preset { get; set; }
 
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
     public string ProjectileSpinAxis { get; set; } = "none";
 
@@ -97,17 +97,12 @@ internal sealed class MeleeOnProjectileHitDefinition
 
     public bool IncludeDestructibles { get; set; }
 
-    public bool TriggerOnCharactersOnly { get; set; } = true;
+    public bool TriggerOnCharactersOnly { get; set; }
 }
 
 internal sealed class BoomerangDefinition
 {
-    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new()
-    {
-        Cooldown = 6f,
-        CooldownSkill = "weapon",
-        CooldownReductionFactor = 0.5f
-    };
+    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
     public string Side { get; set; } = "right";
 
@@ -115,23 +110,23 @@ internal sealed class BoomerangDefinition
 
     public Vector3 ProjectileVisualRotationOffset { get; set; } = Vector3.zero;
 
-    public float MaxDistance { get; set; } = 20f;
+    public float MaxDistance { get; set; }
 
-    public float CurveFactor { get; set; } = 0.5f;
+    public float CurveFactor { get; set; }
 
-    public float DespawnDistance { get; set; } = 0.8f;
+    public float DespawnDistance { get; set; }
 
-    public float CatchRadius { get; set; } = 1.2f;
+    public float CatchRadius { get; set; }
 
-    public float CatchDelay { get; set; } = 0.25f;
+    public float CatchDelay { get; set; }
 
-    public bool AutoEquipOnCatch { get; set; } = true;
+    public bool AutoEquipOnCatch { get; set; }
 
-    public float DamageFactor { get; set; } = 1f;
+    public float DamageFactor { get; set; }
 
-    public float PushFactor { get; set; } = 1f;
+    public float PushFactor { get; set; }
 
-    public float HitDamageDecay { get; set; } = 0.2f;
+    public float HitDamageDecay { get; set; }
 
     public bool IncludeDestructibles { get; set; }
 
@@ -139,50 +134,40 @@ internal sealed class BoomerangDefinition
 
 internal sealed class SneakAmbushDefinition
 {
-    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new()
-    {
-        Cooldown = 30f,
-        CooldownSkill = "weapon",
-        CooldownReductionFactor = 0.5f
-    };
+    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float ChargeMaxSeconds { get; set; } = 8f;
+    public float ChargeMaxSeconds { get; set; }
 
-    public float ChargeSkillFactor { get; set; } = 2f;
+    public float ChargeSkillFactor { get; set; }
 
-    public float AggroResetRangePerChargeSecond { get; set; } = 1f;
+    public float AggroResetRangePerChargeSecond { get; set; }
 
-    public float SenseBlockDurationPerChargeSecond { get; set; } = 0.25f;
+    public float SenseBlockDurationPerChargeSecond { get; set; }
 
-    public float BackstabResetSecondsPerChargeSecond { get; set; } = 35f;
+    public float BackstabResetSecondsPerChargeSecond { get; set; }
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 }
 
 internal sealed class SpinningSweepDefinition
 {
-    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new()
-    {
-        Cooldown = 8f,
-        CooldownSkill = "weapon",
-        CooldownReductionFactor = 0.5f
-    };
+    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
-    public float DamageFactor { get; set; } = 0.75f;
+    public float DamageFactor { get; set; }
 
-    public float PushFactor { get; set; } = 0.5f;
+    public float PushFactor { get; set; }
 
-    public float LoopStart { get; set; } = 0.4f;
+    public float LoopStart { get; set; }
 
-    public float LoopEnd { get; set; } = 0.6f;
+    public float LoopEnd { get; set; }
 
-    public float AnimationSpeed { get; set; } = 1f;
+    public float AnimationSpeed { get; set; }
 
-    public float MoveSpeedFactor { get; set; } = 0.75f;
+    public float MoveSpeedFactor { get; set; }
 
-    public float SkillRaiseFactor { get; set; } = 0.25f;
+    public float SkillRaiseFactor { get; set; }
 
 }
 
@@ -190,15 +175,15 @@ internal sealed class CleavingThrustDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
-    public float RangeFactor { get; set; } = 3f;
+    public float RangeFactor { get; set; }
 
-    public float Angle { get; set; } = 90f;
+    public float Angle { get; set; }
 
-    public float DamageFactor { get; set; } = 1f;
+    public float DamageFactor { get; set; }
 
-    public float PushFactor { get; set; } = 6f;
+    public float PushFactor { get; set; }
 
 }
 
@@ -206,37 +191,37 @@ internal sealed class LaunchSlamDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
-    public float LaunchHeight { get; set; } = 4f;
+    public float LaunchHeight { get; set; }
 
-    public float DamageFactor { get; set; } = 1f;
+    public float DamageFactor { get; set; }
 }
 
 internal sealed class KnockbackChainDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
-    public float PushFactor { get; set; } = 8f;
+    public float PushFactor { get; set; }
 
-    public float ChainDecay { get; set; } = 0.75f;
+    public float ChainDecay { get; set; }
 }
 
 internal sealed class AftershockDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public int Waves { get; set; } = 3;
+    public int Waves { get; set; }
 
-    public float Interval { get; set; } = 0.5f;
+    public float Interval { get; set; }
 
-    public float WaveDecay { get; set; } = 0.2f;
+    public float WaveDecay { get; set; }
 
-    public float ForwardStep { get; set; } = 3f;
+    public float ForwardStep { get; set; }
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
 }
 
@@ -244,11 +229,11 @@ internal sealed class RiftTrailDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float Duration { get; set; } = 2f;
+    public float Duration { get; set; }
 
-    public float TickInterval { get; set; } = 0.5f;
+    public float TickInterval { get; set; }
 
-    public float DamageFactor { get; set; } = 0.25f;
+    public float DamageFactor { get; set; }
 
     public float PushFactor { get; set; }
 
@@ -258,32 +243,32 @@ internal sealed class RiftTrailDefinition
 
     public float Width { get; set; }
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
-    public float VisualScaleFactor { get; set; } = 1.5f;
+    public float VisualScaleFactor { get; set; }
 
-    public float VisualForwardOffset { get; set; } = 1.5f;
+    public float VisualForwardOffset { get; set; }
 
     public string VisualTint { get; set; } = "#ffffff";
 
-    public float VisualAlphaFactor { get; set; } = 1f;
+    public float VisualAlphaFactor { get; set; }
 }
 
 internal sealed class FractureLineDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float Range { get; set; } = 5f;
+    public float Range { get; set; }
 
-    public float HitSpacing { get; set; } = 0.75f;
+    public float HitSpacing { get; set; }
 
-    public float Duration { get; set; } = 1.2f;
+    public float Duration { get; set; }
 
-    public float TickInterval { get; set; } = 0.3f;
+    public float TickInterval { get; set; }
 
-    public float DamageFactor { get; set; } = 0.35f;
+    public float DamageFactor { get; set; }
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 }
 
 internal sealed class MeleePresetCooldownDefinition
@@ -315,15 +300,15 @@ internal sealed class HarvestSweepDefinition
 {
     public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new();
 
-    public float DurabilityFactor { get; set; } = 1f;
+    public float DurabilityFactor { get; set; }
 
-    public float LoopStart { get; set; } = 0.4f;
+    public float LoopStart { get; set; }
 
-    public float LoopEnd { get; set; } = 0.6f;
+    public float LoopEnd { get; set; }
 
-    public float AnimationSpeed { get; set; } = 1f;
+    public float AnimationSpeed { get; set; }
 
-    public float MoveSpeedFactor { get; set; } = 0.75f;
+    public float MoveSpeedFactor { get; set; }
 
-    public float SkillRaiseFactor { get; set; } = 0.25f;
+    public float SkillRaiseFactor { get; set; }
 }

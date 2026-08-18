@@ -7,7 +7,6 @@ namespace SecondaryAttacks;
 internal static class RiftTrailSystem
 {
     internal const string ObserverFallbackVisualRpcName = "SecondaryAttacks_RiftTrailVisual";
-    private const bool HitThroughWalls = false;
     private const int MaxTrailSamples = 64;
     private const float MinTrailSampleDistance = 0.025f;
     private const int MaxTrailSubdivisions = 8;
@@ -249,7 +248,7 @@ internal static class RiftTrailSystem
         GameObject hitObject = Projectile.FindHitObject(collider);
         if (hitObject == null || hitObject == attacker.gameObject)
         {
-            blocked = !HitThroughWalls && IsEnvironmentBlocker(collider);
+            blocked = IsEnvironmentBlocker(collider);
             return false;
         }
 
@@ -257,7 +256,7 @@ internal static class RiftTrailSystem
         Character? character = destructible as Character;
         if (destructible == null || character == null)
         {
-            blocked = !HitThroughWalls && (IsEnvironmentBlocker(collider) || destructible != null);
+            blocked = IsEnvironmentBlocker(collider) || destructible != null;
             return false;
         }
 
@@ -326,7 +325,7 @@ internal static class RiftTrailSystem
     private static bool IsValidCharacterTarget(Attack attack, Character target, out bool isEnemy)
     {
         Character attacker = attack.m_character;
-        isEnemy = IsEnemy(attacker, target);
+        isEnemy = SecondaryAttackManager.IsEnemyOrAggravatableTarget(attacker, target);
         if (!isEnemy)
         {
             return false;
@@ -350,12 +349,6 @@ internal static class RiftTrailSystem
         }
 
         return true;
-    }
-
-    private static bool IsEnemy(Character attacker, Character target)
-    {
-        return BaseAI.IsEnemy(attacker, target) ||
-               (target.GetBaseAI() != null && target.GetBaseAI().IsAggravatable() && attacker.IsPlayer());
     }
 
     private static Vector3 ResolveHitDirection(RiftTrailController controller, Vector3 hitPoint)
@@ -799,9 +792,204 @@ internal static class RiftTrailSystem
         public float[]? Sizes { get; }
     }
 
+    private static Material CreateRibbonMaterial(Material baseMaterial)
+    {
+        Material material = new(baseMaterial);
+        if (material.HasProperty("_Cull"))
+        {
+            material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+        }
+
+        return material;
+    }
+
+    private static RiftTrailRibbonVisual CreateRibbonMesh(
+        GameObject visualObject,
+        string objectName,
+        Material material,
+        Vector3[] vertices,
+        Vector2[] uvs,
+        Color[] colors,
+        Color baseMaterialColor)
+    {
+        GameObject ribbonObject = new(objectName);
+        ribbonObject.transform.SetParent(visualObject.transform, worldPositionStays: false);
+        MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
+        meshRenderer.material = material;
+
+        Mesh mesh = new()
+        {
+            vertices = vertices,
+            uv = uvs,
+            colors = colors,
+            triangles = BuildRibbonStripTriangles(vertices.Length / 2)
+        };
+        mesh.RecalculateBounds();
+        meshFilter.sharedMesh = mesh;
+        return new RiftTrailRibbonVisual(mesh, material, colors, baseMaterialColor);
+    }
+
+    private static RiftTrailRibbonVisual CreateFallbackRibbon(
+        GameObject visualObject,
+        string objectName,
+        Material baseMaterial,
+        Vector3 origin,
+        Vector3 forward,
+        float range,
+        float angle,
+        float width,
+        float visualScale,
+        Vector3 visualOffset,
+        Color visualTint,
+        float visualAlphaFactor)
+    {
+        int sampleCount = Mathf.Clamp(Mathf.CeilToInt(angle / 8f) + 2, 4, 24);
+        float halfAngle = angle * 0.5f;
+        float outerRadius = Mathf.Max(0.4f, range);
+        float bandWidth = Mathf.Clamp(
+            Mathf.Max(0.25f, width * 1.25f) * visualScale,
+            0.2f,
+            outerRadius * 0.75f);
+        float innerRadius = Mathf.Max(0.1f, outerRadius - bandWidth);
+        Color baseColor = ApplyVisualTint(
+            new Color(0.9f, 0.95f, 1f, 0.65f),
+            visualTint,
+            visualAlphaFactor);
+
+        Material material = CreateRibbonMaterial(baseMaterial);
+        if (material.HasProperty("_Color"))
+        {
+            material.color = baseColor;
+        }
+
+        Vector3[] vertices = new Vector3[sampleCount * 2];
+        Vector2[] uvs = new Vector2[sampleCount * 2];
+        Color[] colors = new Color[sampleCount * 2];
+        for (int i = 0; i < sampleCount; i++)
+        {
+            float t = sampleCount <= 1 ? 0f : i / (float)(sampleCount - 1);
+            float sampleAngle = Mathf.Lerp(-halfAngle, halfAngle, t);
+            Vector3 direction = (Quaternion.AngleAxis(sampleAngle, Vector3.up) * forward).normalized;
+            vertices[i * 2] = origin + visualOffset + direction * innerRadius;
+            vertices[i * 2 + 1] = origin + visualOffset + direction * outerRadius;
+            Color color = baseColor;
+            color.a *= Mathf.Lerp(0.35f, 1f, Mathf.Sin(t * Mathf.PI));
+            colors[i * 2] = color;
+            colors[i * 2 + 1] = color;
+            uvs[i * 2] = new Vector2(t, 0f);
+            uvs[i * 2 + 1] = new Vector2(t, 1f);
+        }
+
+        return CreateRibbonMesh(
+            visualObject,
+            objectName,
+            material,
+            vertices,
+            uvs,
+            colors,
+            baseColor);
+    }
+
+    private static int[] BuildRibbonStripTriangles(int sampleCount)
+    {
+        int[] triangles = new int[(sampleCount - 1) * 6];
+        int triangleIndex = 0;
+        for (int i = 1; i < sampleCount; i++)
+        {
+            triangles[triangleIndex++] = i * 2 - 2;
+            triangles[triangleIndex++] = i * 2 - 1;
+            triangles[triangleIndex++] = i * 2;
+            triangles[triangleIndex++] = i * 2 + 1;
+            triangles[triangleIndex++] = i * 2;
+            triangles[triangleIndex++] = i * 2 - 1;
+        }
+
+        return triangles;
+    }
+
+    private static void UpdateRibbonFade(
+        List<RiftTrailRibbonVisual> ribbons,
+        float endTime,
+        float visualEndTime)
+    {
+        if (ribbons.Count == 0)
+        {
+            return;
+        }
+
+        float alpha = Time.time <= endTime
+            ? 1f
+            : Mathf.Clamp01((visualEndTime - Time.time) / VisualFadeSeconds);
+        for (int ribbonIndex = 0; ribbonIndex < ribbons.Count; ribbonIndex++)
+        {
+            RiftTrailRibbonVisual ribbon = ribbons[ribbonIndex];
+            if (ribbon.Mesh == null || ribbon.Material == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < ribbon.WorkingColors.Length; i++)
+            {
+                Color color = ribbon.BaseColors[i];
+                color.a *= alpha;
+                ribbon.WorkingColors[i] = color;
+            }
+
+            ribbon.Mesh.colors = ribbon.WorkingColors;
+            if (ribbon.Material.HasProperty("_Color"))
+            {
+                Color materialColor = ribbon.BaseMaterialColor;
+                materialColor.a *= alpha;
+                ribbon.Material.color = materialColor;
+            }
+        }
+    }
+
+    private static void DestroyRibbonVisuals(List<RiftTrailRibbonVisual> ribbons)
+    {
+        for (int i = 0; i < ribbons.Count; i++)
+        {
+            RiftTrailRibbonVisual ribbon = ribbons[i];
+            if (ribbon.Material != null)
+            {
+                UnityEngine.Object.Destroy(ribbon.Material);
+            }
+
+            if (ribbon.Mesh != null)
+            {
+                UnityEngine.Object.Destroy(ribbon.Mesh);
+            }
+        }
+
+        ribbons.Clear();
+    }
+
+    private sealed class RiftTrailRibbonVisual
+    {
+        public RiftTrailRibbonVisual(Mesh mesh, Material material, Color[] baseColors, Color baseMaterialColor)
+        {
+            Mesh = mesh;
+            Material = material;
+            BaseColors = baseColors;
+            WorkingColors = new Color[baseColors.Length];
+            BaseMaterialColor = baseMaterialColor;
+        }
+
+        public Mesh Mesh { get; }
+
+        public Material Material { get; }
+
+        public Color[] BaseColors { get; }
+
+        public Color[] WorkingColors { get; }
+
+        public Color BaseMaterialColor { get; }
+    }
+
     private sealed class RiftTrailObserverFallbackController : MonoBehaviour
     {
-        private readonly List<ObserverRibbonVisual> _visualRibbons = new();
+        private readonly List<RiftTrailRibbonVisual> _visualRibbons = new();
         private GameObject? _visualObject;
         private float _endTime;
         private float _visualEndTime;
@@ -892,23 +1080,11 @@ internal static class RiftTrailSystem
                 return;
             }
 
-            GameObject ribbonObject = new("RiftTrailObserverSampledRibbon");
-            ribbonObject.transform.SetParent(_visualObject.transform, worldPositionStays: false);
-            MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
-            MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
-            Material material = new(baseMaterial);
-            if (material.HasProperty("_Cull"))
-            {
-                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            }
-
-            meshRenderer.material = material;
-
+            Material material = CreateRibbonMaterial(baseMaterial);
             int sampleCount = ribbon.Samples.Count;
             Vector3[] vertices = new Vector3[sampleCount * 2];
             Vector2[] uvs = new Vector2[sampleCount * 2];
             Color[] colors = new Color[sampleCount * 2];
-            int[] triangles = new int[(sampleCount - 1) * 6];
             float visualScale = Mathf.Max(0.01f, data.VisualScaleFactor);
             Color visualTint = ResolveVisualTint(data.VisualTint);
             float visualAlphaFactor = Mathf.Max(0f, data.VisualAlphaFactor);
@@ -927,26 +1103,6 @@ internal static class RiftTrailSystem
                 uvs[i * 2 + 1] = new Vector2(u, 1f);
             }
 
-            int triangleIndex = 0;
-            for (int i = 1; i < sampleCount; i++)
-            {
-                triangles[triangleIndex++] = i * 2 - 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 + 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-            }
-
-            Mesh mesh = new()
-            {
-                vertices = vertices,
-                uv = uvs,
-                colors = colors,
-                triangles = triangles
-            };
-            mesh.RecalculateBounds();
-            meshFilter.sharedMesh = mesh;
             Color materialColor = material.HasProperty("_Color") ? material.color : Color.white;
             materialColor = ApplyVisualTint(materialColor, visualTint, visualAlphaFactor);
             if (material.HasProperty("_Color"))
@@ -954,7 +1110,14 @@ internal static class RiftTrailSystem
                 material.color = materialColor;
             }
 
-            _visualRibbons.Add(new ObserverRibbonVisual(mesh, material, colors, materialColor));
+            _visualRibbons.Add(CreateRibbonMesh(
+                _visualObject,
+                "RiftTrailObserverSampledRibbon",
+                material,
+                vertices,
+                uvs,
+                colors,
+                materialColor));
         }
 
         private void CreateFallbackRibbonVisual(Material baseMaterial, Vector3 origin, Vector3 forward, RiftTrailObserverVisualData data)
@@ -964,72 +1127,21 @@ internal static class RiftTrailSystem
                 return;
             }
 
-            int sampleCount = Mathf.Clamp(Mathf.CeilToInt(data.Angle / 8f) + 2, 4, 24);
-            float halfAngle = data.Angle * 0.5f;
             Vector3 visualOffset = forward * data.VisualForwardOffset;
-            float outerRadius = Mathf.Max(0.4f, data.Range);
-            float bandWidth = Mathf.Clamp(Mathf.Max(0.25f, data.Width * 1.25f) * data.VisualScaleFactor, 0.2f, outerRadius * 0.75f);
-            float innerRadius = Mathf.Max(0.1f, outerRadius - bandWidth);
             Color visualTint = ResolveVisualTint(data.VisualTint);
-            Color baseColor = ApplyVisualTint(new Color(0.9f, 0.95f, 1f, 0.65f), visualTint, data.VisualAlphaFactor);
-
-            GameObject ribbonObject = new("RiftTrailObserverFallbackRibbon");
-            ribbonObject.transform.SetParent(_visualObject.transform, worldPositionStays: false);
-            MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
-            MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
-            Material material = new(baseMaterial);
-            if (material.HasProperty("_Cull"))
-            {
-                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            }
-
-            if (material.HasProperty("_Color"))
-            {
-                material.color = baseColor;
-            }
-
-            meshRenderer.material = material;
-
-            Vector3[] vertices = new Vector3[sampleCount * 2];
-            Vector2[] uvs = new Vector2[sampleCount * 2];
-            Color[] colors = new Color[sampleCount * 2];
-            int[] triangles = new int[(sampleCount - 1) * 6];
-            for (int i = 0; i < sampleCount; i++)
-            {
-                float t = sampleCount <= 1 ? 0f : i / (float)(sampleCount - 1);
-                float angle = Mathf.Lerp(-halfAngle, halfAngle, t);
-                Vector3 direction = (Quaternion.AngleAxis(angle, Vector3.up) * forward).normalized;
-                vertices[i * 2] = origin + visualOffset + direction * innerRadius;
-                vertices[i * 2 + 1] = origin + visualOffset + direction * outerRadius;
-                Color color = baseColor;
-                color.a *= Mathf.Lerp(0.35f, 1f, Mathf.Sin(t * Mathf.PI));
-                colors[i * 2] = color;
-                colors[i * 2 + 1] = color;
-                uvs[i * 2] = new Vector2(t, 0f);
-                uvs[i * 2 + 1] = new Vector2(t, 1f);
-            }
-
-            int triangleIndex = 0;
-            for (int i = 1; i < sampleCount; i++)
-            {
-                triangles[triangleIndex++] = i * 2 - 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 + 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-            }
-
-            Mesh mesh = new()
-            {
-                vertices = vertices,
-                uv = uvs,
-                colors = colors,
-                triangles = triangles
-            };
-            mesh.RecalculateBounds();
-            meshFilter.sharedMesh = mesh;
-            _visualRibbons.Add(new ObserverRibbonVisual(mesh, material, colors, baseColor));
+            _visualRibbons.Add(CreateFallbackRibbon(
+                _visualObject,
+                "RiftTrailObserverFallbackRibbon",
+                baseMaterial,
+                origin,
+                forward,
+                data.Range,
+                data.Angle,
+                data.Width,
+                data.VisualScaleFactor,
+                visualOffset,
+                visualTint,
+                data.VisualAlphaFactor));
         }
 
         private void Update()
@@ -1043,36 +1155,7 @@ internal static class RiftTrailSystem
 
         private void UpdateVisualFade()
         {
-            if (_visualRibbons.Count == 0)
-            {
-                return;
-            }
-
-            float alpha = Time.time <= _endTime
-                ? 1f
-                : Mathf.Clamp01((_visualEndTime - Time.time) / VisualFadeSeconds);
-            foreach (ObserverRibbonVisual ribbon in _visualRibbons)
-            {
-                if (ribbon.Mesh == null || ribbon.Material == null)
-                {
-                    continue;
-                }
-
-                for (int i = 0; i < ribbon.WorkingColors.Length; i++)
-                {
-                    Color color = ribbon.BaseColors[i];
-                    color.a *= alpha;
-                    ribbon.WorkingColors[i] = color;
-                }
-
-                ribbon.Mesh.colors = ribbon.WorkingColors;
-                if (ribbon.Material.HasProperty("_Color"))
-                {
-                    Color materialColor = ribbon.BaseMaterialColor;
-                    materialColor.a *= alpha;
-                    ribbon.Material.color = materialColor;
-                }
-            }
+            UpdateRibbonFade(_visualRibbons, _endTime, _visualEndTime);
         }
 
         private void OnDestroy()
@@ -1088,42 +1171,7 @@ internal static class RiftTrailSystem
                 _visualObject = null;
             }
 
-            foreach (ObserverRibbonVisual ribbon in _visualRibbons)
-            {
-                if (ribbon.Material != null)
-                {
-                    Destroy(ribbon.Material);
-                }
-
-                if (ribbon.Mesh != null)
-                {
-                    Destroy(ribbon.Mesh);
-                }
-            }
-
-            _visualRibbons.Clear();
-        }
-
-        private sealed class ObserverRibbonVisual
-        {
-            public ObserverRibbonVisual(Mesh mesh, Material material, Color[] baseColors, Color baseMaterialColor)
-            {
-                Mesh = mesh;
-                Material = material;
-                BaseColors = baseColors;
-                WorkingColors = new Color[baseColors.Length];
-                BaseMaterialColor = baseMaterialColor;
-            }
-
-            public Mesh Mesh { get; }
-
-            public Material Material { get; }
-
-            public Color[] BaseColors { get; }
-
-            public Color[] WorkingColors { get; }
-
-            public Color BaseMaterialColor { get; }
+            DestroyRibbonVisuals(_visualRibbons);
         }
     }
 
@@ -1172,7 +1220,7 @@ internal static class RiftTrailSystem
         private float _visualCaptureUntil;
         private GameObject? _visualObject;
         private readonly List<TrailSampler> _trailSamplers = new();
-        private readonly List<RibbonVisual> _visualRibbons = new();
+        private readonly List<RiftTrailRibbonVisual> _visualRibbons = new();
 
         internal Attack Attack { get; private set; } = null!;
 
@@ -1475,73 +1523,22 @@ internal static class RiftTrailSystem
                 return;
             }
 
-            int sampleCount = Mathf.Clamp(Mathf.CeilToInt(Angle / 8f) + 2, 4, 24);
-            float halfAngle = Angle * 0.5f;
             float visualScale = Mathf.Max(0.01f, RiftTrail.VisualScaleFactor);
             Vector3 visualOffset = VisualOffset;
-            float outerRadius = Mathf.Max(0.4f, Range);
-            float bandWidth = Mathf.Clamp(Mathf.Max(0.25f, Width * 1.25f) * visualScale, 0.2f, outerRadius * 0.75f);
-            float innerRadius = Mathf.Max(0.1f, outerRadius - bandWidth);
             Color visualTint = ResolveVisualTint(RiftTrail);
-            Color baseColor = ApplyVisualTint(new Color(0.9f, 0.95f, 1f, 0.65f), visualTint, Mathf.Max(0f, RiftTrail.VisualAlphaFactor));
-
-            GameObject ribbonObject = new("RiftTrailFallbackRibbon");
-            ribbonObject.transform.SetParent(_visualObject.transform, worldPositionStays: false);
-            MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
-            MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
-            Material material = new(baseMaterial);
-            if (material.HasProperty("_Cull"))
-            {
-                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            }
-
-            if (material.HasProperty("_Color"))
-            {
-                material.color = baseColor;
-            }
-
-            meshRenderer.material = material;
-
-            Vector3[] vertices = new Vector3[sampleCount * 2];
-            Vector2[] uvs = new Vector2[sampleCount * 2];
-            Color[] colors = new Color[sampleCount * 2];
-            int[] triangles = new int[(sampleCount - 1) * 6];
-            for (int i = 0; i < sampleCount; i++)
-            {
-                float t = sampleCount <= 1 ? 0f : i / (float)(sampleCount - 1);
-                float angle = Mathf.Lerp(-halfAngle, halfAngle, t);
-                Vector3 direction = (Quaternion.AngleAxis(angle, Vector3.up) * Forward).normalized;
-                vertices[i * 2] = Origin + visualOffset + direction * innerRadius;
-                vertices[i * 2 + 1] = Origin + visualOffset + direction * outerRadius;
-                Color color = baseColor;
-                color.a *= Mathf.Lerp(0.35f, 1f, Mathf.Sin(t * Mathf.PI));
-                colors[i * 2] = color;
-                colors[i * 2 + 1] = color;
-                uvs[i * 2] = new Vector2(t, 0f);
-                uvs[i * 2 + 1] = new Vector2(t, 1f);
-            }
-
-            int triangleIndex = 0;
-            for (int i = 1; i < sampleCount; i++)
-            {
-                triangles[triangleIndex++] = i * 2 - 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 + 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-            }
-
-            Mesh mesh = new()
-            {
-                vertices = vertices,
-                uv = uvs,
-                colors = colors,
-                triangles = triangles
-            };
-            mesh.RecalculateBounds();
-            meshFilter.sharedMesh = mesh;
-            _visualRibbons.Add(new RibbonVisual(mesh, material, colors, baseColor));
+            _visualRibbons.Add(CreateFallbackRibbon(
+                _visualObject,
+                "RiftTrailFallbackRibbon",
+                baseMaterial,
+                Origin,
+                Forward,
+                Range,
+                Angle,
+                Width,
+                visualScale,
+                visualOffset,
+                visualTint,
+                Mathf.Max(0f, RiftTrail.VisualAlphaFactor)));
         }
 
         private bool HasEnoughTrailSamples()
@@ -1613,22 +1610,10 @@ internal static class RiftTrailSystem
                 return;
             }
 
-            GameObject ribbonObject = new("RiftTrailRibbon");
-            ribbonObject.transform.SetParent(_visualObject.transform, worldPositionStays: false);
-            MeshFilter meshFilter = ribbonObject.AddComponent<MeshFilter>();
-            MeshRenderer meshRenderer = ribbonObject.AddComponent<MeshRenderer>();
-            Material material = new(baseMaterial);
-            if (material.HasProperty("_Cull"))
-            {
-                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            }
-
-            meshRenderer.material = material;
-
+            Material material = CreateRibbonMaterial(baseMaterial);
             Vector3[] vertices = new Vector3[sampleCount * 2];
             Vector2[] uvs = new Vector2[sampleCount * 2];
             Color[] colors = new Color[sampleCount * 2];
-            int[] triangles = new int[(sampleCount - 1) * 6];
             float visualScale = Mathf.Max(0.01f, RiftTrail.VisualScaleFactor);
             Vector3 visualOffset = VisualOffset;
             Color visualTint = ResolveVisualTint(RiftTrail);
@@ -1653,26 +1638,6 @@ internal static class RiftTrailSystem
                 uvs[i * 2 + 1] = new Vector2(u, 1f);
             }
 
-            int triangleIndex = 0;
-            for (int i = 1; i < sampleCount; i++)
-            {
-                triangles[triangleIndex++] = i * 2 - 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 + 1;
-                triangles[triangleIndex++] = i * 2;
-                triangles[triangleIndex++] = i * 2 - 1;
-            }
-
-            Mesh mesh = new()
-            {
-                vertices = vertices,
-                uv = uvs,
-                colors = colors,
-                triangles = triangles
-            };
-            mesh.RecalculateBounds();
-            meshFilter.sharedMesh = mesh;
             Color materialColor = material.HasProperty("_Color") ? material.color : Color.white;
             materialColor = ApplyVisualTint(materialColor, visualTint, visualAlphaFactor);
             if (material.HasProperty("_Color"))
@@ -1680,7 +1645,14 @@ internal static class RiftTrailSystem
                 material.color = materialColor;
             }
 
-            _visualRibbons.Add(new RibbonVisual(mesh, material, colors, materialColor));
+            _visualRibbons.Add(CreateRibbonMesh(
+                _visualObject,
+                "RiftTrailRibbon",
+                material,
+                vertices,
+                uvs,
+                colors,
+                materialColor));
         }
 
         private static List<TrailSample> BuildSmoothSamples(IReadOnlyList<TrailSample> samples, int subdivisions)
@@ -1725,36 +1697,7 @@ internal static class RiftTrailSystem
 
         private void UpdateVisualFade()
         {
-            if (_visualRibbons.Count == 0)
-            {
-                return;
-            }
-
-            float alpha = Time.time <= _endTime
-                ? 1f
-                : Mathf.Clamp01((_visualEndTime - Time.time) / VisualFadeSeconds);
-            foreach (RibbonVisual ribbon in _visualRibbons)
-            {
-                if (ribbon.Mesh == null || ribbon.Material == null)
-                {
-                    continue;
-                }
-
-                for (int i = 0; i < ribbon.WorkingColors.Length; i++)
-                {
-                    Color color = ribbon.BaseColors[i];
-                    color.a *= alpha;
-                    ribbon.WorkingColors[i] = color;
-                }
-
-                ribbon.Mesh.colors = ribbon.WorkingColors;
-                if (ribbon.Material.HasProperty("_Color"))
-                {
-                    Color materialColor = ribbon.BaseMaterialColor;
-                    materialColor.a *= alpha;
-                    ribbon.Material.color = materialColor;
-                }
-            }
+            UpdateRibbonFade(_visualRibbons, _endTime, _visualEndTime);
         }
 
         private void Finish()
@@ -1789,20 +1732,7 @@ internal static class RiftTrailSystem
 
         private void DestroyVisualRibbons()
         {
-            foreach (RibbonVisual ribbon in _visualRibbons)
-            {
-                if (ribbon.Material != null)
-                {
-                    Destroy(ribbon.Material);
-                }
-
-                if (ribbon.Mesh != null)
-                {
-                    Destroy(ribbon.Mesh);
-                }
-            }
-
-            _visualRibbons.Clear();
+            DestroyRibbonVisuals(_visualRibbons);
         }
 
         private sealed class TrailSampler
@@ -1887,26 +1817,5 @@ internal static class RiftTrailSystem
             public float Time { get; }
         }
 
-        private sealed class RibbonVisual
-        {
-            public RibbonVisual(Mesh mesh, Material material, Color[] baseColors, Color baseMaterialColor)
-            {
-                Mesh = mesh;
-                Material = material;
-                BaseColors = baseColors;
-                WorkingColors = new Color[baseColors.Length];
-                BaseMaterialColor = baseMaterialColor;
-            }
-
-            public Mesh Mesh { get; }
-
-            public Material Material { get; }
-
-            public Color[] BaseColors { get; }
-
-            public Color[] WorkingColors { get; }
-
-            public Color BaseMaterialColor { get; }
-        }
     }
 }

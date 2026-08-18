@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -19,7 +17,6 @@ internal static class SneakAmbushSystem
     private static readonly Dictionary<Character, SmokeSenseBlockState> SenseBlocks = new();
     private static readonly List<PendingSmokeEffect> PendingSmokeEffects = new();
     private static readonly List<Character> SenseBlockRemoveBuffer = new();
-    private static readonly AccessTools.FieldRef<Character, float>? CharacterBackstabTimeField = TryCreateFloatFieldRef<Character>("m_backstabTime");
     private static GameObject? _updaterObject;
 
     internal static void TryTriggerForSecondaryHit(
@@ -334,64 +331,7 @@ internal static class SneakAmbushSystem
             }
         }
 
-        if (backstabResetSeconds > 0f &&
-            TryGetFloatField(CharacterBackstabTimeField, character, out float currentBackstabTime))
-        {
-            SetFloatField(CharacterBackstabTimeField, character, currentBackstabTime - backstabResetSeconds);
-        }
-    }
-
-    private static AccessTools.FieldRef<T, float>? TryCreateFloatFieldRef<T>(string fieldName)
-    {
-        if (!HasInstanceField(typeof(T), fieldName))
-        {
-            return null;
-        }
-
-        try
-        {
-            return AccessTools.FieldRefAccess<T, float>(fieldName);
-        }
-        catch (Exception)
-        {
-            return null;
-        }
-    }
-
-    private static bool HasInstanceField(Type type, string fieldName)
-    {
-        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        for (Type? current = type; current != null; current = current.BaseType)
-        {
-            if (current.GetField(fieldName, Flags) != null)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static void SetFloatField<T>(AccessTools.FieldRef<T, float>? field, T target, float value)
-    {
-        if (field == null)
-        {
-            return;
-        }
-
-        field(target) = value;
-    }
-
-    private static bool TryGetFloatField<T>(AccessTools.FieldRef<T, float>? field, T target, out float value)
-    {
-        if (field == null)
-        {
-            value = 0f;
-            return false;
-        }
-
-        value = field(target);
-        return true;
+        BackstabSkillGainSystem.TryReduceBackstabTime(character, backstabResetSeconds);
     }
 
     private static void EnsureUpdater()
@@ -508,5 +448,65 @@ internal static class SneakAmbushSystem
         public Player HiddenPlayer { get; set; }
 
         public float Until { get; set; }
+    }
+}
+
+[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanSenseTarget), typeof(Character))]
+internal static class BaseAICanSenseTargetSneakAmbushPatch
+{
+    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
+    {
+        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
+        {
+            return true;
+        }
+
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanSenseTarget), typeof(Character), typeof(bool))]
+internal static class BaseAICanSenseTargetPassiveSneakAmbushPatch
+{
+    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
+    {
+        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
+        {
+            return true;
+        }
+
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanSeeTarget), typeof(Character))]
+internal static class BaseAICanSeeTargetSneakAmbushPatch
+{
+    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
+    {
+        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
+        {
+            return true;
+        }
+
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanHearTarget), typeof(Character))]
+internal static class BaseAICanHearTargetSneakAmbushPatch
+{
+    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
+    {
+        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
+        {
+            return true;
+        }
+
+        __result = false;
+        return false;
     }
 }

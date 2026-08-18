@@ -39,11 +39,11 @@ internal sealed class NormalizedMagicSummonCloneConfig
 
 internal sealed class NormalizedSummonEmpowerSecondaryConfig
 {
-    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new()
-    {
-        Cooldown = 30f,
-        CooldownSkill = "bloodMagic"
-    };
+    public float Cooldown { get; set; } = 30f;
+
+    public string CooldownSkill { get; set; } = "bloodMagic";
+
+    public float CooldownReductionFactor { get; set; } = 0.5f;
 
     public float Radius { get; set; } = 10f;
 
@@ -56,11 +56,11 @@ internal sealed class NormalizedSummonEmpowerSecondaryConfig
 
 internal sealed class NormalizedShieldConvertSecondaryConfig
 {
-    public MeleePresetCooldownDefinition PresetCooldown { get; set; } = new()
-    {
-        Cooldown = 30f,
-        CooldownSkill = "bloodMagic"
-    };
+    public float Cooldown { get; set; } = 30f;
+
+    public string CooldownSkill { get; set; } = "bloodMagic";
+
+    public float CooldownReductionFactor { get; set; } = 0.5f;
 
     public float Radius { get; set; } = 7f;
 

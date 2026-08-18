@@ -9,6 +9,8 @@ namespace SecondaryAttacks;
 
 internal static partial class SecondaryAttackManager
 {
+    private const string ReloadLoadedCustomDataKey = "SecondaryAttacks.ReloadLoaded";
+
     private static readonly Dictionary<Humanoid, ItemDrop.ItemData> ReloadConsumptionWeapons = new();
 
     internal static int GetRuntimeWeaponAppliedWorldRevision(ItemDrop.ItemData weapon)
@@ -30,7 +32,7 @@ internal static partial class SecondaryAttackManager
             return;
         }
 
-        if (player.m_weaponLoaded == weapon || !weapon.m_customData.TryGetValue(SecondaryAttackRuntimeFacade.ReloadLoadedCustomDataKey, out string value) || value != "1")
+        if (player.m_weaponLoaded == weapon || !weapon.m_customData.TryGetValue(ReloadLoadedCustomDataKey, out string value) || value != "1")
         {
             return;
         }
@@ -70,6 +72,97 @@ internal static partial class SecondaryAttackManager
     internal static void ConsumePersistedReloadedWeaponState(Player player, ItemDrop.ItemData weapon)
     {
         SetPersistedReloadState(player, weapon, loaded: false);
+    }
+
+    internal static bool TryPrepareReloadSecondaryResourceCost(
+        Humanoid humanoid,
+        ItemDrop.ItemData weapon,
+        out ReloadSecondaryResourceCostContext context)
+    {
+        context = ReloadSecondaryResourceCostContext.Empty;
+        if (weapon == null || !SecondaryAttackRuntimeFacade.TryGetDefinition(weapon, out SecondaryAttackDefinition definition))
+        {
+            return true;
+        }
+
+        if (definition.BehaviorType != SecondaryAttackBehaviorType.Projectile)
+        {
+            return true;
+        }
+
+        Attack primaryAttack = weapon.m_shared.m_attack;
+        if (!primaryAttack.m_requiresReload || !IsCurrentReloadWeaponLoaded(humanoid, weapon))
+        {
+            return true;
+        }
+
+        float multiplierDelta = Mathf.Max(0f, definition.ResourceMultiplier) - 1f;
+        if (Mathf.Approximately(multiplierDelta, 0f))
+        {
+            return true;
+        }
+
+        float reloadTime = Mathf.Max(0f, weapon.GetWeaponLoadingTime());
+        if (reloadTime <= 0f)
+        {
+            return true;
+        }
+
+        float staminaDelta = Mathf.Max(0f, primaryAttack.m_reloadStaminaDrain) * reloadTime * multiplierDelta;
+        float eitrDelta = Mathf.Max(0f, primaryAttack.m_reloadEitrDrain) * reloadTime * multiplierDelta;
+        if (staminaDelta > 0f && !humanoid.HaveStamina(staminaDelta))
+        {
+            if (humanoid.IsPlayer())
+            {
+                Hud.instance?.StaminaBarEmptyFlash();
+            }
+
+            return false;
+        }
+
+        if (eitrDelta > 0f && !humanoid.TryUseEitr(eitrDelta))
+        {
+            return false;
+        }
+
+        context = new ReloadSecondaryResourceCostContext(staminaDelta, eitrDelta);
+        return true;
+    }
+
+    private static bool IsCurrentReloadWeaponLoaded(Humanoid humanoid, ItemDrop.ItemData weapon)
+    {
+        if (humanoid is Player player)
+        {
+            return player.m_weaponLoaded == weapon;
+        }
+
+        return humanoid.IsWeaponLoaded();
+    }
+
+    internal static void ApplyReloadSecondaryResourceCost(Humanoid humanoid, ReloadSecondaryResourceCostContext? context)
+    {
+        if (context == null || !context.HasDelta)
+        {
+            return;
+        }
+
+        if (context.StaminaDelta > 0f)
+        {
+            humanoid.UseStamina(context.StaminaDelta);
+        }
+        else if (context.StaminaDelta < 0f)
+        {
+            humanoid.AddStamina(-context.StaminaDelta);
+        }
+
+        if (context.EitrDelta > 0f)
+        {
+            humanoid.UseEitr(context.EitrDelta);
+        }
+        else if (context.EitrDelta < 0f)
+        {
+            humanoid.AddEitr(-context.EitrDelta);
+        }
     }
 
     internal static ReloadStateConsumptionScope BeginReloadStateConsumption(Attack attack)
@@ -153,12 +246,12 @@ internal static partial class SecondaryAttackManager
         bool changed;
         if (loaded)
         {
-            changed = !weapon.m_customData.TryGetValue(SecondaryAttackRuntimeFacade.ReloadLoadedCustomDataKey, out string value) || value != "1";
-            weapon.m_customData[SecondaryAttackRuntimeFacade.ReloadLoadedCustomDataKey] = "1";
+            changed = !weapon.m_customData.TryGetValue(ReloadLoadedCustomDataKey, out string value) || value != "1";
+            weapon.m_customData[ReloadLoadedCustomDataKey] = "1";
         }
         else
         {
-            changed = weapon.m_customData.Remove(SecondaryAttackRuntimeFacade.ReloadLoadedCustomDataKey);
+            changed = weapon.m_customData.Remove(ReloadLoadedCustomDataKey);
         }
 
         if (changed)
@@ -382,6 +475,12 @@ internal static partial class SecondaryAttackManager
         }
 
         return collider.ClosestPoint(origin);
+    }
+
+    internal static bool IsEnemyOrAggravatableTarget(Character attacker, Character target)
+    {
+        return BaseAI.IsEnemy(attacker, target) ||
+               (target.GetBaseAI() != null && target.GetBaseAI().IsAggravatable() && attacker.IsPlayer());
     }
 
     private sealed class BowSecondaryState

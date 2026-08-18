@@ -490,10 +490,7 @@ internal static class SecondaryAttackWorldApplySystem
             ResourceMultiplier = 1f,
             OutputMultiplier = source?.OutputMultiplier ?? 1f,
             DurabilityFactor = source?.DurabilityFactor ?? 1f,
-            CopyFrom = source?.CopyFrom ?? "",
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            CopyFrom = source?.CopyFrom ?? ""
         };
     }
 
@@ -506,10 +503,7 @@ internal static class SecondaryAttackWorldApplySystem
             ResourceMultiplier = 1f,
             OutputMultiplier = source?.OutputMultiplier ?? 1f,
             DurabilityFactor = source?.DurabilityFactor ?? 1f,
-            CopyFrom = source?.CopyFrom ?? "",
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            CopyFrom = source?.CopyFrom ?? ""
         };
     }
 
@@ -525,10 +519,7 @@ internal static class SecondaryAttackWorldApplySystem
             OutputMultiplier = source?.OutputMultiplier ?? 1f,
             DurabilityFactor = source?.DurabilityFactor ?? spearRain.DurabilityFactor,
             CopyFrom = source?.CopyFrom ?? "",
-            OnProjectileHit = spearRain.Clone(),
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            OnProjectileHit = spearRain.Clone()
         };
     }
 
@@ -541,10 +532,7 @@ internal static class SecondaryAttackWorldApplySystem
             ResourceMultiplier = harvestSweep?.ResourceMultiplier ?? 1f,
             OutputMultiplier = 1f,
             DurabilityFactor = harvestSweep?.DurabilityFactor ?? 1f,
-            CopyFrom = "AtgeirIron",
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            CopyFrom = "AtgeirIron"
         };
     }
 

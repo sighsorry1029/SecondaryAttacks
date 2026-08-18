@@ -231,13 +231,19 @@ internal static class AftershockSystem
             }
 
             hitDirection.Normalize();
-            HitData hitData = CreateHitData(attack, collider, hitPoint, hitDirection, skillDamageFactor, damageScale, pushScale);
+            HitData hitData = SecondaryAttackHitDataFactory.CreateMeleeHit(
+                attack,
+                collider,
+                hitPoint,
+                hitDirection,
+                skillDamageFactor,
+                damageScale,
+                pushScale);
             Character? character = destructible as Character;
             bool isEnemy = false;
             if (character != null)
             {
-                isEnemy = BaseAI.IsEnemy(attacker, character) ||
-                          (character.GetBaseAI() != null && character.GetBaseAI().IsAggravatable() && attacker.IsPlayer());
+                isEnemy = SecondaryAttackManager.IsEnemyOrAggravatableTarget(attacker, character);
                 if (((!attack.m_hitFriendly || attacker.IsTamed()) && !attacker.IsPlayer() && !isEnemy) ||
                     (!weapon.m_shared.m_tamedOnly && attacker.IsPlayer() && !attacker.IsPVPEnabled() && !isEnemy) ||
                     (weapon.m_shared.m_tamedOnly && !character.IsTamed()))
@@ -276,25 +282,6 @@ internal static class AftershockSystem
             hitCount++;
             averageHitPoint += hitPoint;
         }
-    }
-
-    private static HitData CreateHitData(
-        Attack attack,
-        Collider collider,
-        Vector3 hitPoint,
-        Vector3 hitDirection,
-        float skillDamageFactor,
-        float damageScale,
-        float pushScale)
-    {
-        return SecondaryAttackHitDataFactory.CreateMeleeHit(
-            attack,
-            collider,
-            hitPoint,
-            hitDirection,
-            skillDamageFactor,
-            damageScale,
-            pushScale);
     }
 
     private static void TrySpawnOnHit(Attack attack, GameObject hitObject)
@@ -356,7 +343,7 @@ internal static class AftershockSystem
                 continue;
             }
 
-            ScaleParticleSystems(instance, clampedVisualScale);
+            SecondaryAttackNamedEffectSystem.ScaleParticleSystems(instance, clampedVisualScale);
 
             foreach (ZSFX sfx in instance.GetComponentsInChildren<ZSFX>(true))
             {
@@ -371,72 +358,6 @@ internal static class AftershockSystem
                 }
             }
         }
-    }
-
-    private static void ScaleParticleSystems(GameObject instance, float visualScale)
-    {
-        if (Mathf.Approximately(visualScale, 1f))
-        {
-            return;
-        }
-
-        foreach (ParticleSystem particleSystem in instance.GetComponentsInChildren<ParticleSystem>(true))
-        {
-            ParticleSystem.MainModule main = particleSystem.main;
-            if (main.startSize3D)
-            {
-                main.startSizeX = ScaleCurve(main.startSizeX, visualScale);
-                main.startSizeY = ScaleCurve(main.startSizeY, visualScale);
-                main.startSizeZ = ScaleCurve(main.startSizeZ, visualScale);
-            }
-            else
-            {
-                main.startSize = ScaleCurve(main.startSize, visualScale);
-            }
-
-            main.startSpeed = ScaleCurve(main.startSpeed, visualScale);
-
-            ParticleSystem.ShapeModule shape = particleSystem.shape;
-            if (shape.enabled)
-            {
-                shape.radius *= visualScale;
-                shape.scale *= visualScale;
-                shape.position *= visualScale;
-            }
-
-            ParticleSystem.TrailModule trails = particleSystem.trails;
-            if (trails.enabled)
-            {
-                trails.widthOverTrail = ScaleCurve(trails.widthOverTrail, visualScale);
-            }
-
-            ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
-            if (renderer != null)
-            {
-                renderer.lengthScale *= visualScale;
-                renderer.velocityScale *= visualScale;
-            }
-        }
-    }
-
-    private static ParticleSystem.MinMaxCurve ScaleCurve(ParticleSystem.MinMaxCurve curve, float scale)
-    {
-        switch (curve.mode)
-        {
-            case ParticleSystemCurveMode.Constant:
-                curve.constant *= scale;
-                break;
-            case ParticleSystemCurveMode.TwoConstants:
-                curve.constantMin *= scale;
-                curve.constantMax *= scale;
-                break;
-            case ParticleSystemCurveMode.Curve:
-            case ParticleSystemCurveMode.TwoCurves:
-                curve.curveMultiplier *= scale;
-                break;
-        }
-
-        return curve;
     }
 
     private static int GetAttackMask()

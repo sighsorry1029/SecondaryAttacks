@@ -161,8 +161,16 @@ internal static class SummonPrefabOverrideSystem
         targetName = "";
 
         string itemPrefabName = summonOverride.EntryId.Trim();
-        GameObject? itemPrefab = ResolveItemPrefab(scene, itemPrefabName);
-        ItemDrop? itemDrop = itemPrefab != null ? itemPrefab.GetComponent<ItemDrop>() : null;
+        if (SummonSpawnAbilityResolver.TryResolve(
+                scene,
+                itemPrefabName,
+                out ItemDrop? itemDrop,
+                out spawnAbility,
+                out targetName))
+        {
+            return true;
+        }
+
         if (itemDrop?.m_itemData?.m_shared == null)
         {
             WarnOnce(emitMissingWarnings, $"missing_item:{summonOverride.EntryId}:{itemPrefabName}",
@@ -170,25 +178,9 @@ internal static class SummonPrefabOverrideSystem
             return false;
         }
 
-        if (SummonSpawnAbilityResolver.TryResolve(itemDrop, out spawnAbility, out targetName))
-        {
-            return true;
-        }
-
         WarnOnce(emitMissingWarnings, $"missing_item_spawnability:{summonOverride.EntryId}:{itemPrefabName}",
             $"Summon override '{summonOverride.EntryId}' skipped: item prefab '{itemPrefabName}' has no attack projectile with a SpawnAbility payload.");
         return false;
-    }
-
-    private static GameObject? ResolveItemPrefab(ZNetScene scene, string itemPrefabName)
-    {
-        if (string.IsNullOrWhiteSpace(itemPrefabName))
-        {
-            return null;
-        }
-
-        GameObject? itemPrefab = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(itemPrefabName) : null;
-        return itemPrefab != null ? itemPrefab : scene.GetPrefab(itemPrefabName);
     }
 
     private static GameObject? CreateOrUpdateClonePrefab(

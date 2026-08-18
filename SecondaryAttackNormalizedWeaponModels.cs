@@ -69,13 +69,13 @@ internal sealed class NormalizedSecondaryModeConfig
 
     public float DurabilityFactor { get; set; } = 1f;
 
-    public NormalizedProjectileSecondaryConfig Projectile { get; set; } = new();
+    public NormalizedProjectileSecondaryConfig? Projectile { get; set; }
 
     public string CopyFrom { get; set; } = "";
 
     public NormalizedMeleeOnProjectileHitConfig? OnProjectileHit { get; set; }
 
-    public NormalizedSummonEmpowerSecondaryConfig SummonEmpower { get; set; } = new();
+    public NormalizedSummonEmpowerSecondaryConfig? SummonEmpower { get; set; }
 
-    public NormalizedShieldConvertSecondaryConfig ShieldConvert { get; set; } = new();
+    public NormalizedShieldConvertSecondaryConfig? ShieldConvert { get; set; }
 }

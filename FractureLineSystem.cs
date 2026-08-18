@@ -19,7 +19,6 @@ internal static class FractureLineSystem
     private static readonly List<FractureLineHitTarget> HitTargets = new();
     private static Material? _fractureMaterial;
     private static int _attackMask;
-    private static int _environmentMask;
     private static int _groundMask;
 
     internal static bool CanHandle(Attack attack, SecondaryAttackDefinition definition)
@@ -232,8 +231,7 @@ internal static class FractureLineSystem
     private static bool IsValidCharacterTarget(Attack attack, Character target, out bool isEnemy)
     {
         Character attacker = attack.m_character;
-        isEnemy = BaseAI.IsEnemy(attacker, target) ||
-                  (target.GetBaseAI() != null && target.GetBaseAI().IsAggravatable() && attacker.IsPlayer());
+        isEnemy = SecondaryAttackManager.IsEnemyOrAggravatableTarget(attacker, target);
         if (!isEnemy)
         {
             return false;
@@ -303,41 +301,6 @@ internal static class FractureLineSystem
         }
 
         return direction.normalized;
-    }
-
-    private static bool IsBlockedByEnvironment(Vector3 origin, Vector3 targetPoint, IDestructible allowedTarget)
-    {
-        if (_environmentMask == 0)
-        {
-            _environmentMask = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain");
-        }
-
-        Vector3 direction = targetPoint - origin;
-        float distance = direction.magnitude;
-        if (distance <= 0.01f)
-        {
-            return false;
-        }
-
-        RaycastHit[] hits = Physics.RaycastAll(origin, direction / distance, distance, _environmentMask, QueryTriggerInteraction.Ignore);
-        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.collider == null)
-            {
-                continue;
-            }
-
-            GameObject hitObject = Projectile.FindHitObject(hit.collider);
-            if (hitObject != null && hitObject.GetComponent<IDestructible>() == allowedTarget)
-            {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
     }
 
     private static int GetAttackMask()

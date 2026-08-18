@@ -13,8 +13,6 @@ internal static class LaunchSlamSystem
     private const string LandingSfx = "sfx_sledge_hit";
     private static readonly Vector3 LandingVfxRotationOffset = new(90f, 0f, 0f);
 
-    internal static bool IsApplyingLandingDamage { get; private set; }
-
     public static void TryApplyForSecondaryHit(
         Player attacker,
         Character target,
@@ -121,18 +119,12 @@ internal static class LaunchSlamSystem
         SecondaryAttackNamedEffectSystem.Create(LandingVfx, impactOrigin, vfxRotation, "launch_slam_landing_vfx_missing");
         SecondaryAttackNamedEffectSystem.Create(LandingSfx, impactOrigin, effectRotation, "launch_slam_landing_sfx_missing");
 
-        bool wasApplyingLandingDamage = IsApplyingLandingDamage;
-        IsApplyingLandingDamage = true;
-        try
+        using (SecondaryAttackRuntimeContext.BeginGeneratedDamage())
         {
             foreach (Character landingTarget in targets)
             {
                 ApplyLandingHit(landingTarget, attacker, sourceHit, landingDamage, impactOrigin);
             }
-        }
-        finally
-        {
-            IsApplyingLandingDamage = wasApplyingLandingDamage;
         }
     }
 
@@ -170,10 +162,7 @@ internal static class LaunchSlamSystem
             return false;
         }
 
-        return BaseAI.IsEnemy(attacker, candidate) ||
-               attacker.IsPlayer() &&
-               candidate.GetBaseAI() != null &&
-               candidate.GetBaseAI().IsAggravatable();
+        return SecondaryAttackManager.IsEnemyOrAggravatableTarget(attacker, candidate);
     }
 
     private static void AddLandingAreaTarget(Character target, List<Character> targets, HashSet<Character> seen)

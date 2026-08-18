@@ -82,18 +82,6 @@ internal static class SecondaryAttackConfigLoader
         out SecondaryAttackCompiledSnapshot? snapshot)
     {
         snapshot = null;
-        if (!TryParseYamlTexts(yamlTexts, out SecondaryAttackParsedYaml? parsedYaml))
-        {
-            return false;
-        }
-
-        snapshot = SecondaryAttackConfigCompiler.Compile(snapshotId, parsedYaml!);
-        return true;
-    }
-
-    private static bool TryParseYamlTexts(SecondaryAttackYamlTexts yamlTexts, out SecondaryAttackParsedYaml? parsedYaml)
-    {
-        parsedYaml = null;
         if (!TryParseDictionary<RangedWeaponConfig>(
                 SecondaryAttackYamlDomainId.Ranged,
                 yamlTexts.Get(SecondaryAttackYamlDomainId.Ranged),
@@ -118,12 +106,15 @@ internal static class SecondaryAttackConfigLoader
             return false;
         }
 
-        parsedYaml = new SecondaryAttackParsedYaml
-        {
-            Ranged = ranged!,
-            Melee = melee!,
-            BloodMagic = bloodMagic!
-        };
+        SecondaryAttackWeaponNormalizationResult weaponNormalization =
+            SecondaryAttackWeaponConfigNormalizer.Normalize(ranged!, melee!, bloodMagic!);
+        snapshot = new SecondaryAttackCompiledSnapshot(
+            snapshotId,
+            weaponNormalization.Weapons,
+            weaponNormalization.GlobalRangedPresets,
+            weaponNormalization.GlobalBloodMagicPresets,
+            weaponNormalization.GlobalMeleeFallback,
+            SecondaryAttackMagicSummonNormalizer.Normalize(bloodMagic!));
         return true;
     }
 

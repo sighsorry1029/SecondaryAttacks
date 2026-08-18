@@ -11,9 +11,7 @@ internal static class DirectWeaponHitContextSystem
     private static bool ShouldHandleDirectWeaponHit =>
         _directHitDepth > 0 &&
         _characterDamageDepth == 1 &&
-        !LaunchSlamSystem.IsApplyingLandingDamage &&
-        !KnockbackChainSystem.IsApplyingChainDamage &&
-        !MeleeProjectileHitCascadeSystem.IsApplyingImpactBurstDamage;
+        !SecondaryAttackRuntimeContext.IsGeneratedDamageActive;
 
     internal static void ApplyDirectWeaponHitEffects(Character target, ref HitData hit)
     {

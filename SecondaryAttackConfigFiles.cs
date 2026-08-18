@@ -191,16 +191,3 @@ internal sealed class SecondaryAttackYamlTexts
         return true;
     }
 }
-
-internal sealed class SecondaryAttackParsedYaml
-{
-    public IReadOnlyDictionary<string, RangedWeaponConfig> Ranged { get; set; } =
-        new Dictionary<string, RangedWeaponConfig>(StringComparer.OrdinalIgnoreCase);
-
-    public IReadOnlyDictionary<string, MeleeWeaponConfig> Melee { get; set; } =
-        new Dictionary<string, MeleeWeaponConfig>(StringComparer.OrdinalIgnoreCase);
-
-    public IReadOnlyDictionary<string, BloodMagicWeaponConfig> BloodMagic { get; set; } =
-        new Dictionary<string, BloodMagicWeaponConfig>(StringComparer.OrdinalIgnoreCase);
-
-}

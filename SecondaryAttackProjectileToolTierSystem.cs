@@ -1,3 +1,4 @@
+using HarmonyLib;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -7,8 +8,8 @@ internal static class SecondaryAttackProjectileToolTierSystem
     internal static void ApplyCurrentProjectileHitToolTierIfNeeded(HitData? hit)
     {
         if (hit == null ||
-            !SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext? context) ||
-            context?.Projectile == null ||
+            !SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext context) ||
+            context.Projectile == null ||
             !ShouldApplyToProjectile(context.Attribution))
         {
             return;
@@ -88,5 +89,59 @@ internal static class SecondaryAttackProjectileToolTierSystem
         }
 
         return itemWorldLevel;
+    }
+}
+
+[HarmonyPatch(typeof(Destructible), nameof(Destructible.Damage))]
+internal static class DestructibleDamageProjectileToolTierPatch
+{
+    private static void Prefix(HitData hit)
+    {
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
+    }
+}
+
+[HarmonyPatch(typeof(MineRock), nameof(MineRock.Damage))]
+internal static class MineRockDamageProjectileToolTierPatch
+{
+    private static void Prefix(HitData hit)
+    {
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
+    }
+}
+
+[HarmonyPatch(typeof(MineRock5), nameof(MineRock5.Damage))]
+internal static class MineRock5DamageProjectileToolTierPatch
+{
+    private static void Prefix(HitData hit)
+    {
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
+    }
+}
+
+[HarmonyPatch(typeof(TreeBase), nameof(TreeBase.Damage))]
+internal static class TreeBaseDamageProjectileToolTierPatch
+{
+    private static void Prefix(HitData hit)
+    {
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
+    }
+}
+
+[HarmonyPatch(typeof(TreeLog), nameof(TreeLog.Damage))]
+internal static class TreeLogDamageProjectileToolTierPatch
+{
+    private static void Prefix(HitData hit)
+    {
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
+    }
+}
+
+[HarmonyPatch(typeof(WearNTear), nameof(WearNTear.Damage))]
+internal static class WearNTearDamageProjectileToolTierPatch
+{
+    private static void Prefix(HitData hit)
+    {
+        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
     }
 }

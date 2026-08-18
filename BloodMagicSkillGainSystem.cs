@@ -1,3 +1,4 @@
+using HarmonyLib;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -69,5 +70,31 @@ internal static class BloodMagicSkillGainSystem
         }
 
         player.RaiseSkill(Skills.SkillType.BloodMagic, raiseAmount);
+    }
+}
+
+[HarmonyPatch(typeof(Character), nameof(Character.UseHealth))]
+internal static class CharacterUseHealthBloodMagicSkillGainPatch
+{
+    private static void Prefix(Character __instance, out float __state)
+    {
+        __state = __instance != null ? __instance.GetHealth() : 0f;
+    }
+
+    private static void Postfix(Character __instance, float __state)
+    {
+        if (__instance != null)
+        {
+            BloodMagicSkillGainSystem.TryGrantForHealthUse(__instance, __state);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Attack), nameof(Attack.GetAttackHealth))]
+internal static class AttackGetAttackHealthBloodMagicCostPatch
+{
+    private static void Postfix(Attack __instance, ref float __result)
+    {
+        BloodMagicSkillGainSystem.ApplyMaxHealthPercentageCost(__instance, ref __result);
     }
 }

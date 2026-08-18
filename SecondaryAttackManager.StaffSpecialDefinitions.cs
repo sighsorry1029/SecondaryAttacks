@@ -38,9 +38,9 @@ internal static partial class SecondaryAttackManager
             {
                 SummonSourcePrefabs = summonSourcePrefabs,
                 PresetCooldown = CreatePresetCooldown(
-                    summonEmpowerConfig.PresetCooldown.Cooldown,
-                    summonEmpowerConfig.PresetCooldown.CooldownReductionFactor,
-                    ResolveBloodMagicCooldownSkill(summonEmpowerConfig.PresetCooldown)),
+                    summonEmpowerConfig.Cooldown,
+                    summonEmpowerConfig.CooldownReductionFactor,
+                    ResolveBloodMagicCooldownSkill(summonEmpowerConfig.CooldownSkill)),
                 Radius = Mathf.Max(0f, summonEmpowerConfig.Radius),
                 Duration = Mathf.Max(0.1f, summonEmpowerConfig.Duration),
                 MoveSpeedFactor = Mathf.Max(0.05f, summonEmpowerMoveSpeedFactor),
@@ -86,9 +86,9 @@ internal static partial class SecondaryAttackManager
             {
                 ShieldStatusEffectHash = shieldStatusEffectHash,
                 PresetCooldown = CreatePresetCooldown(
-                    shieldConvertConfig.PresetCooldown.Cooldown,
-                    shieldConvertConfig.PresetCooldown.CooldownReductionFactor,
-                    ResolveBloodMagicCooldownSkill(shieldConvertConfig.PresetCooldown)),
+                    shieldConvertConfig.Cooldown,
+                    shieldConvertConfig.CooldownReductionFactor,
+                    ResolveBloodMagicCooldownSkill(shieldConvertConfig.CooldownSkill)),
                 Radius = Mathf.Max(0f, shieldConvertConfig.Radius),
                 HealFactor = Mathf.Max(0f, shieldConvertConfig.HealFactor)
             },
@@ -102,11 +102,11 @@ internal static partial class SecondaryAttackManager
         return true;
     }
 
-    private static string ResolveBloodMagicCooldownSkill(MeleePresetCooldownDefinition presetCooldown)
+    private static string ResolveBloodMagicCooldownSkill(string cooldownSkill)
     {
-        return string.IsNullOrWhiteSpace(presetCooldown.CooldownSkill)
+        return string.IsNullOrWhiteSpace(cooldownSkill)
             ? "bloodMagic"
-            : presetCooldown.CooldownSkill.Trim();
+            : cooldownSkill.Trim();
     }
 
     private static bool TryResolveSummonSourcePrefabs(Attack primaryAttack, out List<string> summonSourcePrefabs)

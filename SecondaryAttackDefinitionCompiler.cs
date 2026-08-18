@@ -57,7 +57,7 @@ internal static class SecondaryAttackDefinitionCompiler
         }
 
         return string.Equals(secondary.Type, "projectile", StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(secondary.Projectile.Preset, "none", StringComparison.OrdinalIgnoreCase);
+               string.Equals(secondary.Projectile?.Preset, "none", StringComparison.OrdinalIgnoreCase);
     }
 
     private readonly struct DefinitionFeatures

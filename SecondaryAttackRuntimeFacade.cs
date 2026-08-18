@@ -6,8 +6,6 @@ namespace SecondaryAttacks;
 
 internal static class SecondaryAttackRuntimeFacade
 {
-    internal const string ReloadLoadedCustomDataKey = "SecondaryAttacks.ReloadLoaded";
-
     private const string StaffRapidFireAnimation = "staff_rapidfire";
     private const float FallbackHoldRepeatInterval = 0.2f;
 
@@ -62,19 +60,20 @@ internal static class SecondaryAttackRuntimeFacade
 
         string ammoType = weapon.m_shared.m_ammoType;
         Inventory? inventory = humanoid.GetInventory();
-        ItemDrop.ItemData? ammoItem = null;
-        if (!string.IsNullOrWhiteSpace(ammoType))
+        ConfiguredAmmoContext ammoContext = default;
+        if (!string.IsNullOrWhiteSpace(ammoType) &&
+            !TrySelectConfiguredAmmo(
+                humanoid,
+                weapon,
+                inventory,
+                ammoType,
+                projectileBehavior.AmmoConsumption,
+                out ammoContext))
         {
-            ammoItem = FindConfiguredAmmo(humanoid, weapon, inventory, ammoType);
-            if (ammoItem == null ||
-                (projectileBehavior.AmmoConsumption > 0 &&
-                 (inventory == null ||
-                  CountAmmo(inventory, ammoItem) < projectileBehavior.AmmoConsumption)))
-            {
-                humanoid.Message(MessageHud.MessageType.Center, "$msg_outof " + ammoType);
-                return false;
-            }
+            return false;
         }
+
+        ItemDrop.ItemData? ammoItem = ammoContext.AmmoItem;
 
         Attack? configuredAttack = weapon.m_shared.m_secondaryAttack;
         if (configuredAttack == null)
@@ -89,7 +88,7 @@ internal static class SecondaryAttackRuntimeFacade
             ammoItem);
     }
 
-    internal static bool BeginProjectileHitContext(Projectile projectile, Collider collider, UnityEngine.Vector3 hitPoint, bool water, UnityEngine.Vector3 normal)
+    internal static bool BeginProjectileHitContext(Projectile projectile, Collider collider)
     {
         if (projectile == null || collider == null)
         {
@@ -98,7 +97,7 @@ internal static class SecondaryAttackRuntimeFacade
 
         ProjectileAttackAttribution? attribution = null;
         SecondaryAttackRuntimeContext.TryGetProjectileAttackAttribution(projectile, out attribution);
-        SecondaryAttackRuntimeContext.PushProjectileHitContext(new ProjectileHitContext(projectile, collider, hitPoint, water, normal, attribution));
+        SecondaryAttackRuntimeContext.PushProjectileHitContext(new ProjectileHitContext(projectile, attribution));
         return true;
     }
 
@@ -123,7 +122,7 @@ internal static class SecondaryAttackRuntimeFacade
         definition = null;
         disableCurrentAttackFallback = false;
 
-        if (!SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext? context) || context == null)
+        if (!SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext context))
         {
             return false;
         }
@@ -259,7 +258,7 @@ internal static class SecondaryAttackRuntimeFacade
         SecondaryAttackAdrenalineSystem.Reset(attack);
         if (definition.CleavingThrust != null)
         {
-            GreatSwordSkillScalingSystem.BeginCleavingThrustVisualSession(attack, definition);
+            CleavingThrustTrailVisualSystem.BeginCleavingThrustVisualSession(attack, definition);
         }
 
         if (definition.RiftTrail != null)
@@ -509,6 +508,12 @@ internal static class SecondaryAttackRuntimeFacade
                 activeAttack,
                 out ConfiguredAmmoContext ammoContext))
         {
+            if (!ConsumePerBurstResourcesIfNeeded(attack))
+            {
+                return false;
+            }
+
+            ProjectileRuntimeSystem.OrientPlayerBodyToCurrentAim(attack);
             CommitConfiguredAmmo(attack, ammoContext);
             attack.ProjectileAttackTriggered();
             activeAttack.ProjectileTriggered = true;
@@ -593,6 +598,15 @@ internal static class SecondaryAttackRuntimeFacade
         ActiveSecondaryAttack activeAttack,
         ConfiguredAmmoContext ammoContext)
     {
+        if (attack.m_attackType == Attack.AttackType.Projectile &&
+            activeAttack.Definition.Behavior is ProjectileSecondaryBehavior
+            {
+                Preset: SecondaryAttackPreset.Burst
+            })
+        {
+            ProjectileRuntimeSystem.OrientPlayerBodyToCurrentAim(attack);
+        }
+
         CommitConfiguredAmmo(attack, ammoContext);
         switch (attack.m_attackType)
         {
@@ -877,31 +891,38 @@ internal static class SecondaryAttackRuntimeFacade
         }
 
         Inventory? inventory = attack.m_character.GetInventory();
+        return TrySelectConfiguredAmmo(
+            attack.m_character,
+            attack.m_weapon,
+            inventory,
+            ammoType,
+            projectileBehavior?.AmmoConsumption ?? 0,
+            out context);
+    }
+
+    private static bool TrySelectConfiguredAmmo(
+        Humanoid character,
+        ItemDrop.ItemData weapon,
+        Inventory? inventory,
+        string ammoType,
+        int configuredRemovalCount,
+        out ConfiguredAmmoContext context)
+    {
+        context = default;
         ItemDrop.ItemData? ammoItem =
-            FindConfiguredAmmo(attack.m_character, attack.m_weapon, inventory, ammoType);
-
-        if (ammoItem == null)
-        {
-            attack.m_character.Message(
-                MessageHud.MessageType.Center,
-                "$msg_outof " + ammoType);
-            return false;
-        }
-
-        int removalCount = Mathf.Max(0, projectileBehavior?.AmmoConsumption ?? 0);
-        if (removalCount > 0 &&
+            FindConfiguredAmmo(character, weapon, inventory, ammoType);
+        int removalCount = Mathf.Max(0, configuredRemovalCount);
+        if (ammoItem == null ||
+            removalCount > 0 &&
             (inventory == null || CountAmmo(inventory, ammoItem) < removalCount))
         {
-            attack.m_character.Message(
+            character.Message(
                 MessageHud.MessageType.Center,
                 "$msg_outof " + ammoType);
             return false;
         }
 
-        context = new ConfiguredAmmoContext(
-            inventory,
-            ammoItem,
-            removalCount);
+        context = new ConfiguredAmmoContext(inventory, ammoItem, removalCount);
         return true;
     }
 

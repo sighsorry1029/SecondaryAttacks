@@ -20,9 +20,8 @@ internal static partial class ProjectileRuntimeSystem
     private static readonly ConditionalWeakTable<Projectile, ScatterRicochetState> ScatterRicochetProjectiles = new();
     private static readonly ConditionalWeakTable<Projectile, ScatterRicochetSplitState> ScatterRicochetSplitProjectiles = new();
 
-    internal static bool TryGetProjectilePayload(Attack attack, SecondaryAttackDefinition definition, ProjectileLaunchData launchData, out Projectile projectilePrefab)
+    internal static bool TryValidateProjectilePayload(Attack attack, SecondaryAttackDefinition definition, ProjectileLaunchData launchData)
     {
-        projectilePrefab = null!;
         ProjectileSecondaryBehavior? projectileBehavior = definition.Behavior as ProjectileSecondaryBehavior;
         if (projectileBehavior == null)
         {
@@ -34,13 +33,12 @@ internal static partial class ProjectileRuntimeSystem
             return false;
         }
 
-        if (!TryValidatePayloadPrefab(definition.PrefabName, launchData.ProjectilePrefab!, projectileBehavior.Preset, out string reason))
+        if (!TryValidatePayloadPrefab(launchData.ProjectilePrefab!, projectileBehavior.Preset, out string reason))
         {
             ReportCompatibilityIssue(attack, definition, reason);
             return false;
         }
 
-        projectilePrefab = launchData.ProjectilePrefab!.GetComponent<Projectile>()!;
         return true;
     }
 
@@ -58,7 +56,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireBarrage(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -119,7 +117,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireVolley(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -175,7 +173,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FirePiercingShot(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -323,7 +321,7 @@ internal static partial class ProjectileRuntimeSystem
             hitData.SetAttacker(owner);
         }
 
-        bool contextActive = SecondaryAttackRuntimeFacade.BeginProjectileHitContext(projectile, collider, hitPoint, water: false, normal);
+        bool contextActive = SecondaryAttackRuntimeFacade.BeginProjectileHitContext(projectile, collider);
         try
         {
             SecondaryAttackProjectileToolTierSystem.ApplyToHitData(
@@ -372,8 +370,7 @@ internal static partial class ProjectileRuntimeSystem
             return false;
         }
 
-        bool isEnemy = BaseAI.IsEnemy(owner, target) ||
-                       (target.GetBaseAI() != null && target.GetBaseAI().IsAggravatable() && owner.IsPlayer());
+        bool isEnemy = SecondaryAttackManager.IsEnemyOrAggravatableTarget(owner, target);
         if (owner.IsPlayer() && !owner.IsPVPEnabled() && !isEnemy)
         {
             return false;
@@ -406,7 +403,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireScatterRicochet(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -697,7 +694,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireSpiralBurst(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -749,7 +746,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireSentinel(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -808,7 +805,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireMeteor(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -941,6 +938,20 @@ internal static partial class ProjectileRuntimeSystem
         return attack != null && ActiveBurstFireControllers.Contains(attack);
     }
 
+    internal static bool ShouldTrackBurstAim(Player? player)
+    {
+        Attack? attack = player?.m_currentAttack;
+        return player != null &&
+               attack != null &&
+               player.InAttack() &&
+               SecondaryAttackManager.HasCharacterAuthority(player) &&
+               SecondaryAttackRuntimeContext.TryGetActiveAttack(attack, out ActiveSecondaryAttack? activeAttack) &&
+               activeAttack?.Definition.Behavior is ProjectileSecondaryBehavior
+               {
+                   Preset: SecondaryAttackPreset.Burst
+               };
+    }
+
     private static void ClearDeferredBurstFireReloadReset(Attack attack)
     {
         if (attack != null)
@@ -963,16 +974,17 @@ internal static partial class ProjectileRuntimeSystem
         spawnPoint = Vector3.zero;
         rawAimDirection = Vector3.zero;
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
 
         PrepareCustomProjectileBurst(attack);
+        OrientPlayerBodyToCurrentAim(attack);
         attack.GetProjectileSpawnPoint(out spawnPoint, out rawAimDirection);
         Vector3 aimDirection = rawAimDirection;
         aimDirection = ApplyLaunchAngle(attack, aimDirection);
-        OrientCharacterBodyToProjectileAim(attack, aimDirection);
+        OrientNonPlayerCharacterBodyToProjectileAim(attack, aimDirection);
         if (attack.m_burstEffect.HasEffects())
         {
             attack.m_burstEffect.Create(spawnPoint, Quaternion.LookRotation(aimDirection));
@@ -982,10 +994,31 @@ internal static partial class ProjectileRuntimeSystem
         return true;
     }
 
-    private static void OrientCharacterBodyToProjectileAim(Attack attack, Vector3 aimDirection)
+    internal static void OrientPlayerBodyToCurrentAim(Attack attack)
     {
         Character? character = attack.m_character;
-        if (character == null || !SecondaryAttackManager.HasCharacterAuthority(character))
+        if (character is not Player || !SecondaryAttackManager.HasCharacterAuthority(character))
+        {
+            return;
+        }
+
+        ApplyCharacterBodyRotation(attack, character, character.GetLookYaw());
+
+        attack.GetProjectileSpawnPoint(out _, out Vector3 aimDirection);
+        Vector3 horizontalForward = Vector3.ProjectOnPlane(aimDirection, Vector3.up);
+        if (horizontalForward.sqrMagnitude < 0.001f)
+        {
+            return;
+        }
+
+        Quaternion bodyRotation = Quaternion.LookRotation(horizontalForward.normalized, Vector3.up);
+        ApplyCharacterBodyRotation(attack, character, bodyRotation);
+    }
+
+    private static void OrientNonPlayerCharacterBodyToProjectileAim(Attack attack, Vector3 aimDirection)
+    {
+        Character? character = attack.m_character;
+        if (character == null || character is Player || !SecondaryAttackManager.HasCharacterAuthority(character))
         {
             return;
         }
@@ -997,6 +1030,18 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         character.transform.rotation = Quaternion.LookRotation(horizontalForward.normalized, Vector3.up);
+    }
+
+    private static void ApplyCharacterBodyRotation(
+        Attack attack,
+        Character character,
+        Quaternion bodyRotation)
+    {
+        character.transform.rotation = bodyRotation;
+        if (attack.m_body != null)
+        {
+            attack.m_body.rotation = bodyRotation;
+        }
     }
 
     private static void SpawnPrimaryProjectileCluster(
@@ -1088,24 +1133,16 @@ internal static partial class ProjectileRuntimeSystem
             projectileAccuracy = Mathf.Lerp(projectileAccuracyMin, projectileAccuracy, skillFactor);
         }
 
-        ProjectileLaunchData launchData = new(projectilePrefab, ammoItem, projectileVelocity, projectileVelocityMin, projectileAccuracy, projectileAccuracyMin, attackHitNoise, damageFactor, configuredDamageFactor, configuredSkillRaiseFactor, configuredAdrenalineFactor, attack.m_randomVelocity && !attack.m_bowDraw);
+        ProjectileLaunchData launchData = new(projectilePrefab, ammoItem, projectileVelocity, projectileVelocityMin, projectileAccuracy, attackHitNoise, damageFactor, configuredDamageFactor, configuredSkillRaiseFactor, configuredAdrenalineFactor, attack.m_randomVelocity && !attack.m_bowDraw);
         return launchData;
     }
 
     private static Vector3 ApplyLaunchAngle(Attack attack, Vector3 aimDirection)
     {
-        if (attack.m_launchAngle == 0f)
-        {
-            return aimDirection;
-        }
-
-        Vector3 axis = Vector3.Cross(Vector3.up, aimDirection);
-        if (axis == Vector3.zero)
-        {
-            axis = attack.m_character.transform.right;
-        }
-
-        return Quaternion.AngleAxis(attack.m_launchAngle, axis) * aimDirection;
+        return ApplyLaunchAngle(
+            aimDirection,
+            attack.m_launchAngle,
+            attack.m_character.transform.right);
     }
 
     private static void ResolveHorizontalAxes(Attack attack, Vector3 aimDirection, out Vector3 horizontalForward, out Vector3 horizontalRight)
@@ -1763,7 +1800,7 @@ internal static partial class ProjectileRuntimeSystem
 
     internal readonly struct ProjectileLaunchData
     {
-        public static readonly ProjectileLaunchData Invalid = new(null, null, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, false);
+        public static readonly ProjectileLaunchData Invalid = new(null, null, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, false);
 
         public ProjectileLaunchData(
             GameObject? projectilePrefab,
@@ -1771,7 +1808,6 @@ internal static partial class ProjectileRuntimeSystem
             float projectileVelocity,
             float projectileVelocityMin,
             float projectileAccuracy,
-            float projectileAccuracyMin,
             float attackHitNoise,
             float damageFactor,
             float configuredDamageFactor,
@@ -1784,7 +1820,6 @@ internal static partial class ProjectileRuntimeSystem
             ProjectileVelocity = projectileVelocity;
             ProjectileVelocityMin = projectileVelocityMin;
             ProjectileAccuracy = projectileAccuracy;
-            ProjectileAccuracyMin = projectileAccuracyMin;
             AttackHitNoise = attackHitNoise;
             DamageFactor = damageFactor;
             ConfiguredDamageFactor = configuredDamageFactor;
@@ -1802,8 +1837,6 @@ internal static partial class ProjectileRuntimeSystem
         public float ProjectileVelocityMin { get; }
 
         public float ProjectileAccuracy { get; }
-
-        public float ProjectileAccuracyMin { get; }
 
         public float AttackHitNoise { get; }
 
@@ -2052,9 +2085,7 @@ internal static partial class ProjectileRuntimeSystem
     private sealed class ScheduledProjectileBurstController : MonoBehaviour
     {
         private Attack _attack = null!;
-        private Character? _owner;
         private ProjectileLaunchData _launchData;
-        private SecondaryAttackDefinition _definition = null!;
         private ProjectileSecondaryBehavior _behavior = null!;
         private ScheduledBurstMode _mode;
         private Vector3 _originPoint;
@@ -2078,9 +2109,7 @@ internal static partial class ProjectileRuntimeSystem
             Vector3 horizontalRight)
         {
             _attack = attack;
-            _owner = attack.m_character;
             _launchData = launchData;
-            _definition = definition;
             _behavior = (ProjectileSecondaryBehavior)definition.Behavior;
             _mode = mode;
             _originPoint = originPoint;

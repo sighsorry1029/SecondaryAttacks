@@ -461,13 +461,13 @@
         <Compile Include="BackstabSkillGainSystem.cs" />
         <Compile Include="BloodMagicSkillGainSystem.cs" />
         <Compile Include="BurstObserverPresentationSystem.cs" />
-        <Compile Include="BowSecondaryKeyHintSystem.cs" />
+        <Compile Include="SecondaryAttackKeyHintSystem.cs" />
         <Compile Include="CopiedThrowProjectileVisualSystem.cs" />
         <Compile Include="CleavingThrustSystem.cs" />
         <Compile Include="DirectWeaponHitContextSystem.cs" />
         <Compile Include="FractureLineSystem.cs" />
         <Compile Include="HarvestSweepSystem.cs" />
-        <Compile Include="GreatSwordSkillScalingSystem.cs" />
+        <Compile Include="CleavingThrustTrailVisualSystem.cs" />
         <Compile Include="KeyHintCell.cs" />
         <Compile Include="KnockbackChainSystem.cs" />
         <Compile Include="LaunchSlamSystem.cs" />
@@ -514,7 +514,6 @@
         <Compile Include="SecondaryAttackWeaponFamilyResolver.cs" />
         <Compile Include="SecondaryAttackWeaponConfigNormalizer.cs" />
         <Compile Include="SecondaryAttackFacade.cs" />
-        <Compile Include="SecondaryAttackConfigCompiler.cs" />
         <Compile Include="SecondaryAttackDefinitionCompiler.cs" />
         <Compile Include="SecondaryAttackNormalizedMagicModels.cs" />
         <Compile Include="SecondaryAttackNormalizedMeleeModels.cs" />

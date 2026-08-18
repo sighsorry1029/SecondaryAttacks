@@ -117,7 +117,12 @@ internal static class SecondaryAttackItemTooltipSystem
 
         if (definition.BehaviorType == SecondaryAttackBehaviorType.CopiedSecondary)
         {
-            AddPresetKey(presetKeys, seenPresetKeys, definition.OnProjectileHit?.Preset);
+            AddPresetKey(
+                presetKeys,
+                seenPresetKeys,
+                definition.OnProjectileHit == null
+                    ? null
+                    : SecondaryAttackPresetCatalog.GetKey(definition.OnProjectileHit.Preset));
             if (definition.Boomerang != null)
             {
                 AddPresetKey(presetKeys, seenPresetKeys, "boomerang");

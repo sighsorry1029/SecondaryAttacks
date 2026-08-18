@@ -11,7 +11,26 @@ internal static partial class ProjectileRuntimeSystem
         return SecondaryAttackPresetCatalog.GetKey(preset);
     }
 
-    internal static bool TryValidateConfiguredPayload(string weaponPrefabName, Attack primaryAttack, SecondaryAttackPreset preset, bool usesAmmo, out string reason)
+    internal static Vector3 ApplyLaunchAngle(
+        Vector3 aimDirection,
+        float launchAngle,
+        Vector3 fallbackRight)
+    {
+        if (launchAngle == 0f)
+        {
+            return aimDirection;
+        }
+
+        Vector3 axis = Vector3.Cross(Vector3.up, aimDirection);
+        if (axis == Vector3.zero)
+        {
+            axis = fallbackRight;
+        }
+
+        return Quaternion.AngleAxis(launchAngle, axis) * aimDirection;
+    }
+
+    internal static bool TryValidateConfiguredPayload(Attack primaryAttack, SecondaryAttackPreset preset, bool usesAmmo, out string reason)
     {
         reason = "";
         GameObject payloadPrefab = primaryAttack.m_attackProjectile;
@@ -31,7 +50,7 @@ internal static partial class ProjectileRuntimeSystem
             return true;
         }
 
-        return TryValidatePayloadPrefab(weaponPrefabName, payloadPrefab, preset, out reason);
+        return TryValidatePayloadPrefab(payloadPrefab, preset, out reason);
     }
 
     internal static bool TryValidateBurstPresetPayload(
@@ -59,12 +78,7 @@ internal static partial class ProjectileRuntimeSystem
             return false;
         }
 
-        string weaponPrefabName =
-            attack.m_weapon?.m_dropPrefab != null
-                ? attack.m_weapon.m_dropPrefab.name
-                : definition.PrefabName;
         if (TryValidatePayloadPrefab(
-                weaponPrefabName,
                 payloadPrefab,
                 preset,
                 out string reason))
@@ -141,7 +155,7 @@ internal static partial class ProjectileRuntimeSystem
             or SecondaryAttackPreset.OverchargedBomb;
     }
 
-    private static bool TryValidatePayloadPrefab(string weaponPrefabName, GameObject payloadPrefab, SecondaryAttackPreset preset, out string reason)
+    private static bool TryValidatePayloadPrefab(GameObject payloadPrefab, SecondaryAttackPreset preset, out string reason)
     {
         reason = "";
         string payloadName = payloadPrefab.name;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using HarmonyLib;
 using UnityEngine;
 
 namespace SecondaryAttacks;
@@ -393,5 +394,74 @@ internal static class StaffRuntimeSystem
 
         remaining = Mathf.Max(0f, zdo.GetFloat(ShieldRemainingDisplayZdoKey, 0f));
         return remaining > 0f;
+    }
+}
+
+[HarmonyPatch(typeof(SEMan), "Internal_AddStatusEffect")]
+internal static class SEManInternalAddStatusEffectShieldDisplayPatch
+{
+    private static void Postfix(SEMan __instance, int nameHash)
+    {
+        if (__instance.GetStatusEffect(nameHash) is not SE_Shield)
+        {
+            return;
+        }
+
+        Character? character = ShieldAccess.GetSeManCharacter(__instance);
+        if (character != null)
+        {
+            StaffRuntimeSystem.SyncShieldDisplayState(character);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(SEMan), nameof(SEMan.RemoveStatusEffect), new[] { typeof(int), typeof(bool) })]
+internal static class SEManRemoveStatusEffectShieldDisplayPatch
+{
+    private static void Prefix(SEMan __instance, int nameHash, out bool __state)
+    {
+        __state = __instance.GetStatusEffect(nameHash) is SE_Shield;
+    }
+
+    private static void Postfix(SEMan __instance, bool __result, bool __state)
+    {
+        if (!__result || !__state)
+        {
+            return;
+        }
+
+        Character? character = ShieldAccess.GetSeManCharacter(__instance);
+        if (character != null)
+        {
+            StaffRuntimeSystem.SyncShieldDisplayState(character);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(SE_Shield), nameof(SE_Shield.OnDamaged))]
+internal static class SEShieldOnDamagedShieldDisplayPatch
+{
+    private static void Postfix(SE_Shield __instance)
+    {
+        if (__instance.m_character == null)
+        {
+            return;
+        }
+
+        StaffRuntimeSystem.SyncShieldDisplayState(__instance.m_character);
+    }
+}
+
+[HarmonyPatch(typeof(SE_Shield), nameof(SE_Shield.IsDone))]
+internal static class SEShieldIsDoneShieldDisplayPatch
+{
+    private static void Postfix(SE_Shield __instance, bool __result)
+    {
+        if (!__result || __instance.m_character == null)
+        {
+            return;
+        }
+
+        StaffRuntimeSystem.SyncShieldDisplayState(__instance.m_character);
     }
 }

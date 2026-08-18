@@ -57,7 +57,7 @@ internal static class SecondaryCooldownGroupSystem
             return false;
         }
 
-        ClearCooldownState(state, key);
+        state.EntriesByGroup.Remove(key);
         float normalizedDuration = Mathf.Max(0f, duration);
         if (normalizedDuration <= 0f)
         {
@@ -190,7 +190,7 @@ internal static class SecondaryCooldownGroupSystem
             return true;
         }
 
-        ClearCooldownState(state, key);
+        state.EntriesByGroup.Remove(key);
         entry = default;
         return false;
     }
@@ -209,15 +209,10 @@ internal static class SecondaryCooldownGroupSystem
 
         foreach (string key in keys)
         {
-            ClearCooldownState(state, key);
+            state.EntriesByGroup.Remove(key);
         }
 
         keys.Clear();
-    }
-
-    private static void ClearCooldownState(CharacterCooldownState state, string key)
-    {
-        state.EntriesByGroup.Remove(key);
     }
 
     private static void EnsureCurrentApplyRevision(CharacterCooldownState state)

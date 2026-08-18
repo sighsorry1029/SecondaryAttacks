@@ -4,6 +4,17 @@
 
 After the YAML field layout is settled, make config validation predictable and consistent across all SecondaryAttacks YAML files.
 
+## Current Behavior
+
+The current parser deliberately recovers at different scopes depending on where an error occurs. This describes the implementation today, not the desired rules below:
+
+- Invalid document/root structure or a duplicate enabled root key rejects the new snapshot, leaving the previously applied configuration in place.
+- A ranged or Blood Magic root entry that cannot be deserialized is skipped while other root entries continue loading.
+- A melee child field or feature sub-block that cannot be deserialized is skipped while the remaining fields and feature blocks in that root continue loading.
+- Disabled non-Global root entries are ignored before duplicate-key checks.
+
+Do not collapse these recovery scopes as an incidental cleanup. Any policy change should be intentional and covered by configuration fixtures.
+
 ## Desired Rules
 
 - Missing field: inherit from the applicable parent/global fallback, then built-in default.

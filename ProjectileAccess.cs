@@ -40,4 +40,11 @@ internal static class ProjectileAccess
     {
         DidHitField?.SetValue(projectile, didHit);
     }
+
+    internal static void SuppressItemDrops(Projectile projectile)
+    {
+        projectile.m_respawnItemOnHit = false;
+        projectile.m_spawnItem = null;
+        projectile.m_spawnOnTtl = false;
+    }
 }

@@ -27,7 +27,7 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         _nview.Register<ZDOID, float, float, float>(SneakAmbushSystem.OwnerSmokeRpcName, RPC_ApplySneakAmbushSmoke);
         _nview.Register<int, string>(SweepObserverVisualSystem.RpcName, RPC_SweepVisual);
         _nview.Register<Vector3, Vector3, string>(RiftTrailSystem.ObserverFallbackVisualRpcName, RPC_RiftTrailVisual);
-        _nview.Register<uint, float, double, double>(GreatSwordSkillScalingSystem.CleavingThrustVisualSessionRpcName, RPC_CleavingThrustVisualSession);
+        _nview.Register<uint, float, double, double>(CleavingThrustTrailVisualSystem.CleavingThrustVisualSessionRpcName, RPC_CleavingThrustVisualSession);
         _nview.Register<int, int, Vector3, Vector3>(BurstObserverPresentationSystem.RpcName, RPC_BurstPresentation);
         _nview.Register(StaffRuntimeSystem.StaffTargetEffectRpcName, RPC_SpawnStaffTargetEffect);
     }
@@ -89,7 +89,7 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
         double startedAt,
         double expiresAt)
     {
-        GreatSwordSkillScalingSystem.HandleCleavingThrustVisualSessionRpc(
+        CleavingThrustTrailVisualSystem.HandleCleavingThrustVisualSessionRpc(
             _character,
             _nview,
             sender,
@@ -120,66 +120,6 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
             spawnPoint,
             aimDirection,
             ref _nextBurstPresentationAt);
-    }
-}
-
-[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanSenseTarget), typeof(Character))]
-internal static class BaseAICanSenseTargetSneakAmbushPatch
-{
-    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
-    {
-        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
-        {
-            return true;
-        }
-
-        __result = false;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanSenseTarget), typeof(Character), typeof(bool))]
-internal static class BaseAICanSenseTargetPassiveSneakAmbushPatch
-{
-    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
-    {
-        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
-        {
-            return true;
-        }
-
-        __result = false;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanSeeTarget), typeof(Character))]
-internal static class BaseAICanSeeTargetSneakAmbushPatch
-{
-    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
-    {
-        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
-        {
-            return true;
-        }
-
-        __result = false;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(BaseAI), nameof(BaseAI.CanHearTarget), typeof(Character))]
-internal static class BaseAICanHearTargetSneakAmbushPatch
-{
-    private static bool Prefix(BaseAI __instance, Character target, ref bool __result)
-    {
-        if (!SneakAmbushSystem.ShouldBlockSense(__instance, target))
-        {
-            return true;
-        }
-
-        __result = false;
-        return false;
     }
 }
 
@@ -269,60 +209,6 @@ internal static class ProjectileOnHitOverchargedBombPatch
     }
 }
 
-[HarmonyPatch(typeof(Destructible), nameof(Destructible.Damage))]
-internal static class DestructibleDamageProjectileToolTierPatch
-{
-    private static void Prefix(HitData hit)
-    {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
-    }
-}
-
-[HarmonyPatch(typeof(MineRock), nameof(MineRock.Damage))]
-internal static class MineRockDamageProjectileToolTierPatch
-{
-    private static void Prefix(HitData hit)
-    {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
-    }
-}
-
-[HarmonyPatch(typeof(MineRock5), nameof(MineRock5.Damage))]
-internal static class MineRock5DamageProjectileToolTierPatch
-{
-    private static void Prefix(HitData hit)
-    {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
-    }
-}
-
-[HarmonyPatch(typeof(TreeBase), nameof(TreeBase.Damage))]
-internal static class TreeBaseDamageProjectileToolTierPatch
-{
-    private static void Prefix(HitData hit)
-    {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
-    }
-}
-
-[HarmonyPatch(typeof(TreeLog), nameof(TreeLog.Damage))]
-internal static class TreeLogDamageProjectileToolTierPatch
-{
-    private static void Prefix(HitData hit)
-    {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
-    }
-}
-
-[HarmonyPatch(typeof(WearNTear), nameof(WearNTear.Damage))]
-internal static class WearNTearDamageProjectileToolTierPatch
-{
-    private static void Prefix(HitData hit)
-    {
-        SecondaryAttackProjectileToolTierSystem.ApplyCurrentProjectileHitToolTierIfNeeded(hit);
-    }
-}
-
 [HarmonyPatch(typeof(Character), "Awake")]
 internal static class CharacterAwakeSecondaryAttacksPatch
 {
@@ -336,6 +222,19 @@ internal static class CharacterAwakeSecondaryAttacksPatch
         if (__instance.GetComponent<SecondaryAttacksCharacterRpc>() == null)
         {
             __instance.gameObject.AddComponent<SecondaryAttacksCharacterRpc>();
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Player), nameof(Player.AlwaysRotateCamera))]
+internal static class PlayerAlwaysRotateCameraBurstAimPatch
+{
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(Player __instance, ref bool __result)
+    {
+        if (!__result && ProjectileRuntimeSystem.ShouldTrackBurstAim(__instance))
+        {
+            __result = true;
         }
     }
 }
@@ -356,130 +255,6 @@ internal static class PlayerUpdatePendingConfigPatch
     private static void Postfix(Player __instance, bool ___m_attackHold, bool ___m_secondaryAttackHold, ref bool ___m_blocking)
     {
         SecondaryAttackHarmonyDispatch.PlayerUpdatePostfix(__instance, ___m_attackHold, ___m_secondaryAttackHold, ref ___m_blocking);
-    }
-}
-
-[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.IsBlocking))]
-internal static class HumanoidIsBlockingStickyDetonatorPatch
-{
-    private static bool Prefix(Humanoid __instance, ref bool __result)
-    {
-        if (!StickyDetonatorSystem.ShouldSuppressBlock(__instance))
-        {
-            return true;
-        }
-
-        __result = false;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(SEMan), "Internal_AddStatusEffect")]
-internal static class SEManInternalAddStatusEffectShieldDisplayPatch
-{
-    private static void Postfix(SEMan __instance, int nameHash)
-    {
-        if (__instance.GetStatusEffect(nameHash) is not SE_Shield)
-        {
-            return;
-        }
-
-        Character? character = ShieldAccess.GetSeManCharacter(__instance);
-        if (character != null)
-        {
-            StaffRuntimeSystem.SyncShieldDisplayState(character);
-        }
-    }
-}
-
-[HarmonyPatch(typeof(SEMan), nameof(SEMan.RemoveStatusEffect), new[] { typeof(int), typeof(bool) })]
-internal static class SEManRemoveStatusEffectShieldDisplayPatch
-{
-    private static void Prefix(SEMan __instance, int nameHash, out bool __state)
-    {
-        __state = __instance.GetStatusEffect(nameHash) is SE_Shield;
-    }
-
-    private static void Postfix(SEMan __instance, bool __result, bool __state)
-    {
-        if (!__result || !__state)
-        {
-            return;
-        }
-
-        Character? character = ShieldAccess.GetSeManCharacter(__instance);
-        if (character != null)
-        {
-            StaffRuntimeSystem.SyncShieldDisplayState(character);
-        }
-    }
-}
-
-[HarmonyPatch(typeof(SE_Shield), nameof(SE_Shield.OnDamaged))]
-internal static class SEShieldOnDamagedShieldDisplayPatch
-{
-    private static void Postfix(SE_Shield __instance)
-    {
-        if (__instance.m_character == null)
-        {
-            return;
-        }
-
-        StaffRuntimeSystem.SyncShieldDisplayState(__instance.m_character);
-    }
-}
-
-[HarmonyPatch(typeof(SE_Shield), nameof(SE_Shield.IsDone))]
-internal static class SEShieldIsDoneShieldDisplayPatch
-{
-    private static void Postfix(SE_Shield __instance, bool __result)
-    {
-        if (!__result || __instance.m_character == null)
-        {
-            return;
-        }
-
-        StaffRuntimeSystem.SyncShieldDisplayState(__instance.m_character);
-    }
-}
-
-[HarmonyPatch(typeof(Character), nameof(Character.UseHealth))]
-internal static class CharacterUseHealthBloodMagicSkillGainPatch
-{
-    private static void Prefix(Character __instance, out float __state)
-    {
-        __state = __instance != null ? __instance.GetHealth() : 0f;
-    }
-
-    private static void Postfix(Character __instance, float __state)
-    {
-        if (__instance != null)
-        {
-            BloodMagicSkillGainSystem.TryGrantForHealthUse(__instance, __state);
-        }
-    }
-}
-
-[HarmonyPatch(typeof(Attack), nameof(Attack.GetAttackHealth))]
-internal static class AttackGetAttackHealthBloodMagicCostPatch
-{
-    private static void Postfix(Attack __instance, ref float __result)
-    {
-        BloodMagicSkillGainSystem.ApplyMaxHealthPercentageCost(__instance, ref __result);
-    }
-}
-
-[HarmonyPatch(typeof(Character), "RPC_Damage")]
-internal static class CharacterRpcDamageBackstabSkillGainPatch
-{
-    private static void Prefix(Character __instance, HitData hit, out BackstabSkillGainSystem.BackstabDamageState __state)
-    {
-        __state = BackstabSkillGainSystem.CaptureBackstabState(__instance, hit);
-    }
-
-    private static void Postfix(Character __instance, HitData hit, BackstabSkillGainSystem.BackstabDamageState __state)
-    {
-        BackstabSkillGainSystem.TryGrantForBackstab(__instance, hit, __state);
     }
 }
 

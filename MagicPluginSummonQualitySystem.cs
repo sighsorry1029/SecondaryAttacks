@@ -260,6 +260,11 @@ internal static class MagicSummonQualityPresetSystem
         out float remainingSeconds)
     {
         remainingSeconds = 0f;
+        if (!IsSummonLifetimeEnabled())
+        {
+            return false;
+        }
+
         ZNetView? view = character != null ? character.GetComponent<ZNetView>() : null;
         ZDO? zdo = view != null && view.IsValid() ? view.GetZDO() : null;
         long expiryTicks = zdo?.GetLong(SummonLifetimeExpiryZdoKey, 0L) ?? 0L;
@@ -275,6 +280,11 @@ internal static class MagicSummonQualityPresetSystem
 
     internal static void RegisterPersistedSummonLifetime(ZNetView? view)
     {
+        if (!IsSummonLifetimeEnabled())
+        {
+            return;
+        }
+
         ZDO? zdo = view != null && view.IsValid() ? view.GetZDO() : null;
         if (zdo == null || zdo.GetLong(SummonLifetimeExpiryZdoKey, 0L) <= 0L)
         {
@@ -284,8 +294,38 @@ internal static class MagicSummonQualityPresetSystem
         EnsureLifetimeController(view!.GetComponent<Character>());
     }
 
+    internal static void RefreshLoadedSummonLifetimeState()
+    {
+        bool enabled = IsSummonLifetimeEnabled();
+        foreach (Character character in Character.GetAllCharacters())
+        {
+            if (character == null)
+            {
+                continue;
+            }
+
+            if (enabled)
+            {
+                RegisterPersistedSummonLifetime(character.GetComponent<ZNetView>());
+                continue;
+            }
+
+            BloodMagicSummonLifetimeController? controller =
+                character.GetComponent<BloodMagicSummonLifetimeController>();
+            if (controller != null)
+            {
+                controller.enabled = false;
+            }
+        }
+    }
+
     internal static bool TryExpireSummon(Character? character)
     {
+        if (!IsSummonLifetimeEnabled())
+        {
+            return false;
+        }
+
         if (character == null || character.IsDead())
         {
             return true;
@@ -538,19 +578,30 @@ internal static class MagicSummonQualityPresetSystem
         Character? owner,
         ItemDrop.ItemData item)
     {
-        if (!IsBloodMagicSummonCast(spawnAbility, owner, item))
+        int globalLifetimeSeconds = GetConfiguredSummonLifetimeSeconds();
+        if (globalLifetimeSeconds <= 0 || !IsBloodMagicSummonCast(spawnAbility, owner, item))
         {
             return 0f;
         }
 
         int baseLifetimeSeconds = TryResolveLifetimeOverride(item, out int lifetimeOverrideSeconds)
             ? lifetimeOverrideSeconds
-            : Math.Max(1, SecondaryAttacksPlugin.BloodMagicSummonLifetimeSeconds?.Value ?? 1200);
+            : globalLifetimeSeconds;
         float skillFactor = Mathf.Clamp01(owner!.GetSkillFactor(Skills.SkillType.BloodMagic));
         float skill100Multiplier = Mathf.Max(
             1f,
             SecondaryAttacksPlugin.BloodMagicSummonLifetimeSkill100Multiplier?.Value ?? 2f);
         return baseLifetimeSeconds * Mathf.Lerp(1f, skill100Multiplier, skillFactor);
+    }
+
+    private static bool IsSummonLifetimeEnabled()
+    {
+        return GetConfiguredSummonLifetimeSeconds() > 0;
+    }
+
+    private static int GetConfiguredSummonLifetimeSeconds()
+    {
+        return Math.Max(0, SecondaryAttacksPlugin.BloodMagicSummonLifetimeSeconds?.Value ?? 0);
     }
 
     private static bool TryResolveLifetimeOverride(
@@ -680,25 +731,12 @@ internal static class MagicSummonQualityPresetSystem
         spawnAbility = null;
         targetName = "";
 
-        GameObject? itemPrefab = ResolveItemPrefab(scene, rule.ItemPrefabName);
-        ItemDrop? itemDrop = itemPrefab != null ? itemPrefab.GetComponent<ItemDrop>() : null;
-        if (itemDrop?.m_itemData?.m_shared == null)
-        {
-            return false;
-        }
-
-        return SummonSpawnAbilityResolver.TryResolve(itemDrop, out spawnAbility, out targetName);
-    }
-
-    private static GameObject? ResolveItemPrefab(ZNetScene scene, string itemPrefabName)
-    {
-        if (string.IsNullOrWhiteSpace(itemPrefabName))
-        {
-            return null;
-        }
-
-        GameObject? itemPrefab = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(itemPrefabName) : null;
-        return itemPrefab != null ? itemPrefab : scene.GetPrefab(itemPrefabName);
+        return SummonSpawnAbilityResolver.TryResolve(
+            scene,
+            rule.ItemPrefabName,
+            out _,
+            out spawnAbility,
+            out targetName);
     }
 
     private static void TagSpawnPrefabs(SpawnAbility spawnAbility, QualityRule rule, int maxInstances, int summonLevel)
@@ -763,7 +801,7 @@ internal static class MagicSummonQualityPresetSystem
         Character? character,
         SpawnAbilityRuntimeState state)
     {
-        if (character == null || !state.HasLifetime)
+        if (character == null || !state.HasLifetime || !IsSummonLifetimeEnabled())
         {
             return;
         }
@@ -788,10 +826,16 @@ internal static class MagicSummonQualityPresetSystem
 
     internal static void EnsureLifetimeController(Character? character)
     {
-        if (character == null ||
-            character.GetComponent<ZNetView>() == null ||
-            character.GetComponent<BloodMagicSummonLifetimeController>() != null)
+        if (!IsSummonLifetimeEnabled() || character == null || character.GetComponent<ZNetView>() == null)
         {
+            return;
+        }
+
+        BloodMagicSummonLifetimeController? controller =
+            character.GetComponent<BloodMagicSummonLifetimeController>();
+        if (controller != null)
+        {
+            controller.enabled = true;
             return;
         }
 

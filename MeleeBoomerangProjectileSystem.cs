@@ -416,14 +416,7 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
                 return false;
             }
 
-            if (BaseAI.IsEnemy(owner, character))
-            {
-                return true;
-            }
-
-            return owner.IsPlayer() &&
-                   character.GetBaseAI() != null &&
-                   character.GetBaseAI().IsAggravatable();
+            return SecondaryAttackManager.IsEnemyOrAggravatableTarget(owner, character);
         }
 
         if (!definition.IncludeDestructibles)
@@ -630,9 +623,7 @@ internal sealed class BoomerangProjectileController : MonoBehaviour
         }
 
         _complete = true;
-        _projectile.m_respawnItemOnHit = false;
-        _projectile.m_spawnItem = null;
-        _projectile.m_spawnOnTtl = false;
+        ProjectileAccess.SuppressItemDrops(_projectile);
         _projectile.m_gravity = _originalGravity;
         ProjectileAccess.SetVelocity(_projectile, Vector3.zero);
         if (_autoEquipOnCatch)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Allowed `Blood Magic Summon Lifetime Seconds` to disable lifetime assignment, restoration, expiration, and HUD timers with `0`, while keeping `1200` seconds as the fresh-configuration default and retaining positive per-staff `summon.lifetimeSeconds` overrides.
+- Made ranged Burst attacks keep the player's body aligned with the current aim throughout attack animations and immediately before trigger effects and projectile spawning.
+- Fixed Burst follow-up shots on weapons with `m_perBurstResourceUsage` so each successful shot consumes its stamina, eitr, and health costs, while resource-starved shots stop before consuming ammo, durability, or presentation effects.
+- Simplified config reload, YAML normalization, generated-damage, targeting, projectile, effect, HUD, and Rift visual paths; unsupported legacy-shaped melee YAML options now warn explicitly instead of being silently ignored.
+
 ## 1.1.10
 
 - Added owner-authoritative lifetimes for player-cast Blood Magic summons, using a 1200-second server-synchronized base, linear Blood Magic skill scaling, a configurable skill-100 multiplier, and optional per-staff `summon.lifetimeSeconds` overrides; existing summons keep their assigned deadlines.

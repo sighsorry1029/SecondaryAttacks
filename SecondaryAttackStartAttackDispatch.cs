@@ -192,14 +192,15 @@ internal static class SecondaryAttackStartAttackDispatch
         SecondaryAttackManager.EnsureRuntimeWeaponDefinitionApplied(attack.m_weapon);
         if (!TryResolveProjectilePresetCooldown(
                 attack.m_weapon,
-                out string presetName,
+                out MeleeSpecialPreset preset,
                 out MeleePresetCooldownDefinition? cooldown,
                 out SecondaryAttackDefinition? definition))
         {
             return true;
         }
 
-        if (IsSpearRainPreset(presetName))
+        string presetName = SecondaryAttackPresetCatalog.GetKey(preset)!;
+        if (preset == MeleeSpecialPreset.SpearRain)
         {
             bool cooldownReady = MeleePresetCooldownSystem.IsReady(
                 attack.m_character,
@@ -246,18 +247,19 @@ internal static class SecondaryAttackStartAttackDispatch
         runOriginal = true;
         if (!TryResolveProjectilePresetCooldown(
                 currentWeapon,
-                out string presetName,
+                out MeleeSpecialPreset preset,
                 out MeleePresetCooldownDefinition? cooldown,
                 out SecondaryAttackDefinition? definition))
         {
             return false;
         }
 
+        string presetName = SecondaryAttackPresetCatalog.GetKey(preset)!;
         bool cooldownReady = MeleePresetCooldownSystem.IsReady(
             humanoid,
             presetName,
             cooldown!);
-        bool spearRainPending = IsSpearRainPreset(presetName) &&
+        bool spearRainPending = preset == MeleeSpecialPreset.SpearRain &&
                                 MeleeProjectileHitCascadeSystem.HasPendingSpearRain(humanoid);
         bool ready = cooldownReady && !spearRainPending;
         if (ready)
@@ -362,11 +364,11 @@ internal static class SecondaryAttackStartAttackDispatch
 
     private static bool TryResolveProjectilePresetCooldown(
         ItemDrop.ItemData currentWeapon,
-        out string presetName,
+        out MeleeSpecialPreset preset,
         out MeleePresetCooldownDefinition? cooldown,
         out SecondaryAttackDefinition? definition)
     {
-        presetName = "";
+        preset = MeleeSpecialPreset.None;
         cooldown = null;
         definition = null;
         if (!SecondaryAttackRuntimeFacade.TryGetDefinition(currentWeapon, out SecondaryAttackDefinition resolvedDefinition) ||
@@ -378,25 +380,22 @@ internal static class SecondaryAttackStartAttackDispatch
         definition = resolvedDefinition;
         if (resolvedDefinition.Boomerang != null)
         {
-            presetName = "boomerang";
+            preset = MeleeSpecialPreset.Boomerang;
             cooldown = resolvedDefinition.Boomerang.PresetCooldown;
             return true;
         }
 
         if (resolvedDefinition.OnProjectileHit == null ||
-            (!resolvedDefinition.OnProjectileHit.Preset.Equals("impactBurst", System.StringComparison.OrdinalIgnoreCase) &&
-             !resolvedDefinition.OnProjectileHit.Preset.Equals("spearRain", System.StringComparison.OrdinalIgnoreCase)))
+            (resolvedDefinition.OnProjectileHit.Preset != MeleeSpecialPreset.ImpactBurst &&
+             resolvedDefinition.OnProjectileHit.Preset != MeleeSpecialPreset.SpearRain))
         {
             return false;
         }
 
-        presetName = resolvedDefinition.OnProjectileHit.Preset;
+        preset = resolvedDefinition.OnProjectileHit.Preset;
         cooldown = resolvedDefinition.OnProjectileHit.PresetCooldown;
         return true;
     }
-
-    private static bool IsSpearRainPreset(string presetName) =>
-        presetName.Equals("spearRain", System.StringComparison.OrdinalIgnoreCase);
 
     private static void MarkProjectilePresetCooldownConsumed(Attack attack)
     {

@@ -249,6 +249,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
 
     public static NormalizedWeaponConfig CreateGlobalMeleeFallback(MeleeWeaponConfig raw)
     {
+        WarnAboutIgnoredMeleeOptions(GlobalFallbackKey, raw);
         return new NormalizedWeaponConfig
         {
             Enabled = raw.Enabled ?? true,
@@ -277,6 +278,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         MeleeWeaponConfig raw,
         NormalizedWeaponConfig? fallback = null)
     {
+        WarnAboutIgnoredMeleeOptions(prefabName, raw);
         bool hasExplicitPreset = TryParseExplicitMeleePreset(prefabName, raw.Preset, out MeleeSpecialPreset selectedPreset);
         if (!hasExplicitPreset)
         {
@@ -374,6 +376,38 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             MeleePreset = selectedPreset,
             HasExplicitMeleePreset = hasExplicitPreset
         };
+    }
+
+    private static void WarnAboutIgnoredMeleeOptions(string prefabName, MeleeWeaponConfig raw)
+    {
+        string rootName = string.IsNullOrWhiteSpace(prefabName) ? "<unknown>" : prefabName.Trim();
+        if (raw.SpearRain?.TriggerOnCharactersOnly.HasValue == true)
+        {
+            SecondaryAttackWarningLog.WarnOnce(
+                $"ignored-melee-option:{rootName}:spearRain.triggerOnCharactersOnly",
+                $"Ignoring unsupported melee option '{rootName}.spearRain.triggerOnCharactersOnly': Spear Rain remains characters-only (triggerOnCharactersOnly is always true).");
+        }
+
+        if (raw.CleavingThrust?.HitThroughWalls.HasValue == true)
+        {
+            SecondaryAttackWarningLog.WarnOnce(
+                $"ignored-melee-option:{rootName}:cleavingThrust.hitThroughWalls",
+                $"Ignoring unsupported melee option '{rootName}.cleavingThrust.hitThroughWalls': Cleaving Thrust remains blocked by the environment (hitThroughWalls is always false).");
+        }
+
+        if (raw.RiftTrail?.HitThroughWalls.HasValue == true)
+        {
+            SecondaryAttackWarningLog.WarnOnce(
+                $"ignored-melee-option:{rootName}:riftTrail.hitThroughWalls",
+                $"Ignoring unsupported melee option '{rootName}.riftTrail.hitThroughWalls': Rift Trail remains blocked by the environment (hitThroughWalls is always false).");
+        }
+
+        if (raw.RiftTrail?.IncludeDestructibles.HasValue == true)
+        {
+            SecondaryAttackWarningLog.WarnOnce(
+                $"ignored-melee-option:{rootName}:riftTrail.includeDestructibles",
+                $"Ignoring unsupported melee option '{rootName}.riftTrail.includeDestructibles': Rift Trail remains characters-only (includeDestructibles is always false).");
+        }
     }
 
     public static NormalizedWeaponConfig FromBloodMagicRaw(BloodMagicWeaponConfig raw, NormalizedWeaponConfig? fallback = null)
@@ -655,7 +689,6 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             ResourceMultiplier = impactBurst.ResourceMultiplier,
             OutputMultiplier = 1f,
             DurabilityFactor = impactBurst.DurabilityFactor,
-            Projectile = new NormalizedProjectileSecondaryConfig(),
             CopyFrom = FixedThrowCarrierPrefab,
             OnProjectileHit = new NormalizedMeleeOnProjectileHitConfig
             {
@@ -673,9 +706,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                 IncludeDirectTarget = false,
                 IncludeDestructibles = true,
                 TriggerOnCharactersOnly = false
-            },
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            }
         };
     }
 
@@ -688,10 +719,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             ResourceMultiplier = boomerang.ResourceMultiplier,
             OutputMultiplier = 1f,
             DurabilityFactor = boomerang.DurabilityFactor,
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            CopyFrom = FixedThrowCarrierPrefab,
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            CopyFrom = FixedThrowCarrierPrefab
         };
     }
 
@@ -706,10 +734,7 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             ResourceMultiplier = spinningSweep.ResourceMultiplier,
             OutputMultiplier = 1f,
             DurabilityFactor = spinningSweep.DurabilityFactor,
-            Projectile = new NormalizedProjectileSecondaryConfig(),
-            CopyFrom = "",
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            CopyFrom = ""
         };
     }
 
@@ -719,8 +744,9 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         string? presetOverride = null)
     {
         NormalizedSecondaryModeConfig baseConfig = fallback ?? new NormalizedSecondaryModeConfig();
+        NormalizedProjectileSecondaryConfig projectileBase = fallback?.Projectile ?? new NormalizedProjectileSecondaryConfig();
         string preset = SecondaryAttackPresetCatalog.CanonicalizeKey(
-            presetOverride ?? rawRanged.Preset ?? baseConfig.Projectile.Preset);
+            presetOverride ?? rawRanged.Preset ?? projectileBase.Preset);
         bool isBombPreset = IsBombRangedPreset(preset);
         return new NormalizedSecondaryModeConfig
         {
@@ -733,10 +759,8 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             ResourceMultiplier = isBombPreset ? 1f : rawRanged.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
             DurabilityFactor = isBombPreset ? 1f : rawRanged.DurabilityFactor ?? baseConfig.DurabilityFactor,
             OutputMultiplier = 1f,
-            Projectile = NormalizeRangedProjectile(rawRanged, baseConfig.Projectile, preset),
-            CopyFrom = "",
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            Projectile = NormalizeRangedProjectile(rawRanged, projectileBase, preset),
+            CopyFrom = ""
         };
     }
 
@@ -754,11 +778,8 @@ internal static class SecondaryAttackWeaponConfigNormalizer
             ResourceMultiplier = rawMelee.ResourceMultiplier,
             OutputMultiplier = rawMelee.OutputMultiplier,
             DurabilityFactor = rawMelee.DurabilityFactor ?? 1f,
-            Projectile = new NormalizedProjectileSecondaryConfig(),
             CopyFrom = rawMelee.CopyFrom?.Trim() ?? "",
-            OnProjectileHit = NormalizeMeleeOnProjectileHit(rawOnProjectileHit, forceSpearRainPreset, fallbackOnProjectileHit),
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig(),
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig()
+            OnProjectileHit = NormalizeMeleeOnProjectileHit(rawOnProjectileHit, forceSpearRainPreset, fallbackOnProjectileHit)
         };
     }
 
@@ -1204,12 +1225,44 @@ internal static class SecondaryAttackWeaponConfigNormalizer
         string? presetOverride = null)
     {
         NormalizedSecondaryModeConfig baseConfig = fallback ?? new NormalizedSecondaryModeConfig();
-        NormalizedSummonEmpowerSecondaryConfig summonEmpowerBase = fallback?.SummonEmpower ?? new NormalizedSummonEmpowerSecondaryConfig();
-        NormalizedShieldConvertSecondaryConfig shieldConvertBase = fallback?.ShieldConvert ?? new NormalizedShieldConvertSecondaryConfig();
         string preset = SecondaryAttackPresetCatalog.CanonicalizeKey(
             presetOverride ?? rawBloodMagic.Preset ?? baseConfig.Type);
-        float summonEmpowerRadius = rawBloodMagic.Radius ?? summonEmpowerBase.Radius;
-        float shieldConvertRadius = rawBloodMagic.Radius ?? shieldConvertBase.Radius;
+
+        NormalizedSummonEmpowerSecondaryConfig? summonEmpower = null;
+        NormalizedShieldConvertSecondaryConfig? shieldConvert = null;
+        if (preset.Equals("summonEmpower", StringComparison.OrdinalIgnoreCase))
+        {
+            NormalizedSummonEmpowerSecondaryConfig summonEmpowerBase =
+                fallback?.SummonEmpower ?? new NormalizedSummonEmpowerSecondaryConfig();
+            summonEmpower = new NormalizedSummonEmpowerSecondaryConfig
+            {
+                Cooldown = rawBloodMagic.Cooldown ?? summonEmpowerBase.Cooldown,
+                CooldownSkill = string.IsNullOrWhiteSpace(summonEmpowerBase.CooldownSkill)
+                    ? "bloodMagic"
+                    : summonEmpowerBase.CooldownSkill.Trim(),
+                CooldownReductionFactor = rawBloodMagic.CooldownReductionFactor ?? summonEmpowerBase.CooldownReductionFactor,
+                Radius = rawBloodMagic.Radius ?? summonEmpowerBase.Radius,
+                Duration = rawBloodMagic.Duration ?? summonEmpowerBase.Duration,
+                MoveSpeedFactor = rawBloodMagic.MoveSpeedFactor ?? summonEmpowerBase.MoveSpeedFactor,
+                AttackSpeedFactor = rawBloodMagic.AttackSpeedFactor ?? summonEmpowerBase.AttackSpeedFactor
+            };
+        }
+        else if (preset.Equals("shieldConvert", StringComparison.OrdinalIgnoreCase))
+        {
+            NormalizedShieldConvertSecondaryConfig shieldConvertBase =
+                fallback?.ShieldConvert ?? new NormalizedShieldConvertSecondaryConfig();
+            shieldConvert = new NormalizedShieldConvertSecondaryConfig
+            {
+                Cooldown = rawBloodMagic.Cooldown ?? shieldConvertBase.Cooldown,
+                CooldownSkill = string.IsNullOrWhiteSpace(shieldConvertBase.CooldownSkill)
+                    ? "bloodMagic"
+                    : shieldConvertBase.CooldownSkill.Trim(),
+                CooldownReductionFactor = rawBloodMagic.CooldownReductionFactor ?? shieldConvertBase.CooldownReductionFactor,
+                Radius = rawBloodMagic.Radius ?? shieldConvertBase.Radius,
+                HealFactor = rawBloodMagic.HealFactor ?? shieldConvertBase.HealFactor
+            };
+        }
+
         return new NormalizedSecondaryModeConfig
         {
             Type = preset,
@@ -1218,36 +1271,9 @@ internal static class SecondaryAttackWeaponConfigNormalizer
                 : baseConfig.Animation,
             ResourceMultiplier = rawBloodMagic.ResourceMultiplier ?? baseConfig.ResourceMultiplier,
             DurabilityFactor = rawBloodMagic.DurabilityFactor ?? baseConfig.DurabilityFactor,
-            Projectile = new NormalizedProjectileSecondaryConfig(),
             CopyFrom = "",
-            SummonEmpower = new NormalizedSummonEmpowerSecondaryConfig
-            {
-                PresetCooldown = new MeleePresetCooldownDefinition
-                {
-                    Cooldown = rawBloodMagic.Cooldown ?? summonEmpowerBase.PresetCooldown.Cooldown,
-                    CooldownSkill = string.IsNullOrWhiteSpace(summonEmpowerBase.PresetCooldown.CooldownSkill)
-                        ? "bloodMagic"
-                        : summonEmpowerBase.PresetCooldown.CooldownSkill.Trim(),
-                    CooldownReductionFactor = rawBloodMagic.CooldownReductionFactor ?? summonEmpowerBase.PresetCooldown.CooldownReductionFactor
-                },
-                Radius = summonEmpowerRadius,
-                Duration = rawBloodMagic.Duration ?? summonEmpowerBase.Duration,
-                MoveSpeedFactor = rawBloodMagic.MoveSpeedFactor ?? summonEmpowerBase.MoveSpeedFactor,
-                AttackSpeedFactor = rawBloodMagic.AttackSpeedFactor ?? summonEmpowerBase.AttackSpeedFactor
-            },
-            ShieldConvert = new NormalizedShieldConvertSecondaryConfig
-            {
-                PresetCooldown = new MeleePresetCooldownDefinition
-                {
-                    Cooldown = rawBloodMagic.Cooldown ?? shieldConvertBase.PresetCooldown.Cooldown,
-                    CooldownSkill = string.IsNullOrWhiteSpace(shieldConvertBase.PresetCooldown.CooldownSkill)
-                        ? "bloodMagic"
-                        : shieldConvertBase.PresetCooldown.CooldownSkill.Trim(),
-                    CooldownReductionFactor = rawBloodMagic.CooldownReductionFactor ?? shieldConvertBase.PresetCooldown.CooldownReductionFactor
-                },
-                Radius = shieldConvertRadius,
-                HealFactor = rawBloodMagic.HealFactor ?? shieldConvertBase.HealFactor
-            }
+            SummonEmpower = summonEmpower,
+            ShieldConvert = shieldConvert
         };
     }
 

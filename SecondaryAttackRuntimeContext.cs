@@ -9,6 +9,23 @@ internal static class SecondaryAttackRuntimeContext
     private static readonly ConditionalWeakTable<Attack, ActiveSecondaryAttack> ActiveAttacks = new();
     private static readonly ConditionalWeakTable<Projectile, ProjectileAttackAttribution> ProjectileAttackAttributions = new();
     private static readonly List<ProjectileHitContext> ActiveProjectileHitContexts = new();
+    private static int _generatedDamageDepth;
+
+    internal static bool IsGeneratedDamageActive => _generatedDamageDepth > 0;
+
+    internal static GeneratedDamageScope BeginGeneratedDamage()
+    {
+        _generatedDamageDepth++;
+        return new GeneratedDamageScope(active: true);
+    }
+
+    private static void EndGeneratedDamage()
+    {
+        if (_generatedDamageDepth > 0)
+        {
+            _generatedDamageDepth--;
+        }
+    }
 
     internal static void SetActiveAttack(Attack attack, ActiveSecondaryAttack activeAttack)
     {
@@ -47,16 +64,37 @@ internal static class SecondaryAttackRuntimeContext
         ActiveProjectileHitContexts.RemoveAt(ActiveProjectileHitContexts.Count - 1);
     }
 
-    internal static bool TryPeekProjectileHitContext(out ProjectileHitContext? context)
+    internal static bool TryPeekProjectileHitContext(out ProjectileHitContext context)
     {
         if (ActiveProjectileHitContexts.Count == 0)
         {
-            context = null;
+            context = default;
             return false;
         }
 
         context = ActiveProjectileHitContexts[ActiveProjectileHitContexts.Count - 1];
         return true;
+    }
+
+    internal struct GeneratedDamageScope : System.IDisposable
+    {
+        private bool _active;
+
+        internal GeneratedDamageScope(bool active)
+        {
+            _active = active;
+        }
+
+        public void Dispose()
+        {
+            if (!_active)
+            {
+                return;
+            }
+
+            _active = false;
+            EndGeneratedDamage();
+        }
     }
 }
 
@@ -103,33 +141,17 @@ internal sealed class ProjectileAttackAttribution
     public bool DisableCurrentAttackFallback { get; }
 }
 
-internal sealed class ProjectileHitContext
+internal readonly struct ProjectileHitContext
 {
     public ProjectileHitContext(
         Projectile projectile,
-        Collider collider,
-        Vector3 hitPoint,
-        bool water,
-        Vector3 normal,
         ProjectileAttackAttribution? attribution)
     {
         Projectile = projectile;
-        Collider = collider;
-        HitPoint = hitPoint;
-        Water = water;
-        Normal = normal;
         Attribution = attribution;
     }
 
     public Projectile Projectile { get; }
-
-    public Collider Collider { get; }
-
-    public Vector3 HitPoint { get; }
-
-    public bool Water { get; }
-
-    public Vector3 Normal { get; }
 
     public ProjectileAttackAttribution? Attribution { get; }
 }

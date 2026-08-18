@@ -85,7 +85,7 @@ internal static class CleavingThrustSystem
 
         foreach (Character candidate in Character.GetAllCharacters())
         {
-            if (!TryResolveTarget(attack, candidate, origin, forward, shape, hitThroughWalls: false, out CleavingThrustHitTarget target))
+            if (!TryResolveTarget(attack, candidate, origin, forward, shape, out CleavingThrustHitTarget target))
             {
                 continue;
             }
@@ -93,7 +93,7 @@ internal static class CleavingThrustSystem
             HitTargets.Add(target);
         }
 
-        GatherDestructibleTargets(attack, origin, forward, shape, hitThroughWalls: false);
+        GatherDestructibleTargets(attack, origin, forward, shape);
         HitTargets.Sort((left, right) => left.Distance.CompareTo(right.Distance));
     }
 
@@ -112,8 +112,7 @@ internal static class CleavingThrustSystem
         Attack attack,
         Vector3 origin,
         Vector3 forward,
-        CleavingThrustAttackShape shape,
-        bool hitThroughWalls)
+        CleavingThrustAttackShape shape)
     {
         HashSet<IDestructible> hitDestructibles = new();
         foreach (CleavingThrustHitTarget existingTarget in HitTargets)
@@ -149,7 +148,7 @@ internal static class CleavingThrustSystem
                 continue;
             }
 
-            if (!hitThroughWalls && IsBlockedByEnvironment(origin, point, destructible))
+            if (IsBlockedByEnvironment(origin, point, destructible))
             {
                 continue;
             }
@@ -164,7 +163,6 @@ internal static class CleavingThrustSystem
         Vector3 origin,
         Vector3 forward,
         CleavingThrustAttackShape shape,
-        bool hitThroughWalls,
         out CleavingThrustHitTarget target)
     {
         target = default;
@@ -185,7 +183,7 @@ internal static class CleavingThrustSystem
             return false;
         }
 
-        if (!hitThroughWalls && IsBlockedByEnvironment(origin, point, candidate))
+        if (IsBlockedByEnvironment(origin, point, candidate))
         {
             return false;
         }
@@ -247,8 +245,7 @@ internal static class CleavingThrustSystem
     private static bool IsValidTarget(Attack attack, Character target)
     {
         Character attacker = attack.m_character;
-        bool isEnemy = BaseAI.IsEnemy(attacker, target) ||
-                       (target.GetBaseAI() != null && target.GetBaseAI().IsAggravatable() && attacker.IsPlayer());
+        bool isEnemy = SecondaryAttackManager.IsEnemyOrAggravatableTarget(attacker, target);
         if (((!attack.m_hitFriendly || attacker.IsTamed()) && !attacker.IsPlayer() && !isEnemy) ||
             (!attack.m_weapon.m_shared.m_tamedOnly && attacker.IsPlayer() && !attacker.IsPVPEnabled() && !isEnemy) ||
             (attack.m_weapon.m_shared.m_tamedOnly && !target.IsTamed()))

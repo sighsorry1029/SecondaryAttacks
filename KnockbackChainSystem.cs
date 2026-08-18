@@ -16,8 +16,6 @@ internal static class KnockbackChainSystem
     private static readonly Collider[] OverlapHits = new Collider[MaxOverlapHits];
     private static int _characterMask;
 
-    internal static bool IsApplyingChainDamage { get; private set; }
-
     internal static bool TryApplyForSecondaryHit(
         Player attacker,
         Character target,
@@ -58,7 +56,12 @@ internal static class KnockbackChainSystem
         }
 
         hit.m_pushForce = boostedPushForce;
-        SpawnVfx(InitialHitVfx, ResolveVfxPoint(hit, target), target.transform.rotation, "knockback_chain_initial_hit_vfx_missing");
+        SecondaryAttackNamedEffectSystem.Create(
+            InitialHitVfx,
+            ResolveVfxPoint(hit, target),
+            target.transform.rotation,
+            "knockback_chain_initial_hit_vfx_missing",
+            6f);
         Vector3 direction = ResolveDirection(hit.m_dir, attacker, target);
         KnockbackChainState state = new(attacker, hit, knockbackChain);
         AttachTracker(target, state, boostedPushForce, 1f, direction);
@@ -195,20 +198,24 @@ internal static class KnockbackChainSystem
 
         state.MarkHit(target);
 
-        bool wasApplyingChainDamage = IsApplyingChainDamage;
-        IsApplyingChainDamage = true;
-        try
+        using (SecondaryAttackRuntimeContext.BeginGeneratedDamage())
         {
             target.Damage(chainHit);
         }
-        finally
-        {
-            IsApplyingChainDamage = wasApplyingChainDamage;
-        }
 
         Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
-        SpawnVfx(CollisionVfx, chainHit.m_point, rotation, "knockback_chain_collision_vfx_missing");
-        SpawnVfx(CollisionSfx, chainHit.m_point, rotation, "knockback_chain_collision_sfx_missing");
+        SecondaryAttackNamedEffectSystem.Create(
+            CollisionVfx,
+            chainHit.m_point,
+            rotation,
+            "knockback_chain_collision_vfx_missing",
+            6f);
+        SecondaryAttackNamedEffectSystem.Create(
+            CollisionSfx,
+            chainHit.m_point,
+            rotation,
+            "knockback_chain_collision_sfx_missing",
+            6f);
 
         return true;
     }
@@ -223,29 +230,6 @@ internal static class KnockbackChainSystem
         return target.GetCenterPoint();
     }
 
-    private static void SpawnVfx(string prefabName, Vector3 position, Quaternion rotation, string warningPrefix)
-    {
-        if (string.IsNullOrWhiteSpace(prefabName))
-        {
-            return;
-        }
-
-        string normalizedPrefabName = prefabName.Trim();
-        GameObject? prefab = ZNetScene.instance?.GetPrefab(normalizedPrefabName);
-        if (prefab == null)
-        {
-            if (SecondaryAttackWarningLog.TryMarkWarning($"{warningPrefix}_{normalizedPrefabName}"))
-            {
-                SecondaryAttacksPlugin.ModLogger.LogWarning($"Knockback chain VFX prefab '{normalizedPrefabName}' was not found.");
-            }
-
-            return;
-        }
-
-        GameObject instance = Object.Instantiate(prefab, position, rotation);
-        Object.Destroy(instance, 6f);
-    }
-
     private static bool IsValidCollisionTarget(Character attacker, Character source, Character? target)
     {
         if (attacker == null ||
@@ -258,14 +242,7 @@ internal static class KnockbackChainSystem
             return false;
         }
 
-        if (BaseAI.IsEnemy(attacker, target))
-        {
-            return true;
-        }
-
-        return attacker.IsPlayer() &&
-               target.GetBaseAI() != null &&
-               target.GetBaseAI().IsAggravatable();
+        return SecondaryAttackManager.IsEnemyOrAggravatableTarget(attacker, target);
     }
 
     private static Vector3 ResolveCollisionDirection(Vector3 sourcePoint, Vector3 targetPoint, Vector3 fallbackDirection)

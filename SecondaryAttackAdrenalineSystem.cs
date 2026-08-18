@@ -330,8 +330,8 @@ internal static class SecondaryAttackAdrenalineSystem
 
     private static bool IsSecondaryProjectileHitContext()
     {
-        return SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext? context) &&
-               context?.Attribution?.SecondaryAttack == true;
+        return SecondaryAttackRuntimeContext.TryPeekProjectileHitContext(out ProjectileHitContext context) &&
+               context.Attribution?.SecondaryAttack == true;
     }
 
     private static bool TryMarkGranted(Attack attack, string key)

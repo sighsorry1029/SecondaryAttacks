@@ -117,7 +117,12 @@ internal static class BurstObserverPresentationSystem
         }
 
         Quaternion triggerEffectRotation = Quaternion.LookRotation(normalizedAim);
-        Vector3 burstAimDirection = ApplyLaunchAngle(character, normalizedAim, effects.Attack.m_launchAngle);
+        Vector3 burstAimDirection = Mathf.Approximately(effects.Attack.m_launchAngle, 0f)
+            ? normalizedAim
+            : ProjectileRuntimeSystem.ApplyLaunchAngle(
+                normalizedAim,
+                effects.Attack.m_launchAngle,
+                character.transform.right);
         Quaternion burstEffectRotation = Quaternion.LookRotation(burstAimDirection);
         effects.WeaponTriggerEffects.Create(spawnPoint, triggerEffectRotation);
         effects.AttackTriggerEffects.Create(spawnPoint, triggerEffectRotation);
@@ -181,23 +186,6 @@ internal static class BurstObserverPresentationSystem
         effects = new PresentationEffects(itemDrop.m_itemData.m_shared, definition.ConfiguredSecondaryAttack);
         EffectsByWeaponHash[weaponPrefabHash] = effects;
         return true;
-    }
-
-    private static Vector3 ApplyLaunchAngle(Character character, Vector3 aimDirection, float launchAngle)
-    {
-        if (Mathf.Approximately(launchAngle, 0f))
-        {
-            return aimDirection;
-        }
-
-        Vector3 axis = Vector3.Cross(Vector3.up, aimDirection);
-        if (axis == Vector3.zero)
-        {
-            axis = character.transform.right;
-        }
-
-        Vector3 adjusted = Quaternion.AngleAxis(launchAngle, axis) * aimDirection;
-        return adjusted.sqrMagnitude > 0.0001f ? adjusted.normalized : aimDirection;
     }
 
     private sealed class CachedEffectList

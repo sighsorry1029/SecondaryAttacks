@@ -2,10 +2,7 @@ namespace SecondaryAttacks;
 
 public static class WarfareTweaksBridge
 {
-    public static bool IsGeneratedDamageActive =>
-        LaunchSlamSystem.IsApplyingLandingDamage ||
-        KnockbackChainSystem.IsApplyingChainDamage ||
-        MeleeProjectileHitCascadeSystem.IsApplyingImpactBurstDamage;
+    public static bool IsGeneratedDamageActive => SecondaryAttackRuntimeContext.IsGeneratedDamageActive;
 
     public static bool ShouldSuppressProjectile(Projectile projectile)
     {

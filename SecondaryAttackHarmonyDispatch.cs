@@ -43,7 +43,7 @@ internal static class SecondaryAttackHarmonyDispatch
         SecondaryAttackAdrenalineSystem.TryGrantAttackUseAdrenalineOnProjectileHit(projectile, collider);
         state.ScatterRicochetDamageScope = ProjectileRuntimeSystem.BeginScatterRicochetDamageScale(projectile, collider, water, normal);
         state.DirectHitContext = DirectWeaponHitContextSystem.BeginProjectileHit(projectile);
-        state.RuntimeContext = SecondaryAttackRuntimeFacade.BeginProjectileHitContext(projectile, collider, hitPoint, water, normal);
+        state.RuntimeContext = SecondaryAttackRuntimeFacade.BeginProjectileHitContext(projectile, collider);
         return true;
     }
 
@@ -95,7 +95,7 @@ internal static class SecondaryAttackHarmonyDispatch
             SecondaryCooldownGroupSystem.UpdateActiveCooldowns(player);
             SneakAmbushChargeSystem.Update(player);
             SecondaryCooldownHudSystem.Update(player);
-            BowSecondaryKeyHintSystem.RefreshKeyHintUi();
+            SecondaryAttackKeyHintSystem.RefreshKeyHintUi();
             SpinningSweepSystem.UpdateInput(player, secondaryAttackHold, primaryAttackHold);
             HarvestSweepSystem.UpdateInput(player, secondaryAttackHold, primaryAttackHold);
             StickyDetonatorSystem.UpdateInput(player, ref blocking);

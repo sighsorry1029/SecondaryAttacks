@@ -23,7 +23,9 @@ internal static class SecondaryAttackCooldownGroupResolver
         Assign(
             definition.OnProjectileHit?.PresetCooldown,
             automaticFamilyGroup,
-            definition.OnProjectileHit?.Preset);
+            definition.OnProjectileHit == null
+                ? null
+                : SecondaryAttackPresetCatalog.GetKey(definition.OnProjectileHit.Preset));
         Assign(definition.Boomerang?.PresetCooldown, automaticFamilyGroup, "boomerang");
         Assign(definition.SpinningSweep?.PresetCooldown, automaticFamilyGroup, "spinningSweep");
 

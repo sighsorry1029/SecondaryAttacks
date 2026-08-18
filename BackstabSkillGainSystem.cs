@@ -85,14 +85,47 @@ internal static class BackstabSkillGainSystem
         }
     }
 
-    internal static float GetBackstabTime(Character target)
+    internal static bool TryReduceBackstabTime(Character target, float seconds)
+    {
+        if (target == null || seconds <= 0f || !TryGetBackstabTime(target, out float currentBackstabTime))
+        {
+            return false;
+        }
+
+        try
+        {
+            BackstabTimeField!(target) = currentBackstabTime - seconds;
+            return true;
+        }
+        catch (System.FieldAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static float GetBackstabTime(Character target)
+    {
+        return TryGetBackstabTime(target, out float backstabTime) ? backstabTime : 0f;
+    }
+
+    private static bool TryGetBackstabTime(Character target, out float backstabTime)
     {
         if (target == null || BackstabTimeField == null)
         {
-            return 0f;
+            backstabTime = 0f;
+            return false;
         }
 
-        return BackstabTimeField(target);
+        try
+        {
+            backstabTime = BackstabTimeField(target);
+            return true;
+        }
+        catch (System.FieldAccessException)
+        {
+            backstabTime = 0f;
+            return false;
+        }
     }
 
     private static AccessTools.FieldRef<Character, float>? TryCreateBackstabTimeFieldRef()
@@ -120,5 +153,19 @@ internal static class BackstabSkillGainSystem
         internal bool Active { get; }
 
         internal float PreviousBackstabTime { get; }
+    }
+}
+
+[HarmonyPatch(typeof(Character), "RPC_Damage")]
+internal static class CharacterRpcDamageBackstabSkillGainPatch
+{
+    private static void Prefix(Character __instance, HitData hit, out BackstabSkillGainSystem.BackstabDamageState __state)
+    {
+        __state = BackstabSkillGainSystem.CaptureBackstabState(__instance, hit);
+    }
+
+    private static void Postfix(Character __instance, HitData hit, BackstabSkillGainSystem.BackstabDamageState __state)
+    {
+        BackstabSkillGainSystem.TryGrantForBackstab(__instance, hit, __state);
     }
 }

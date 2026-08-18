@@ -26,7 +26,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.1.10";
+    internal const string ModVersion = "1.2.0";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -39,33 +39,34 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         CurrentVersion = ModVersion,
         MinimumRequiredVersion = ModVersion
     };
-    internal static PluginSettings Settings { get; } = new();
-    internal static ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor => Settings.BloodMagic.BloodMagicHealthCostSkillRaiseFactor;
-    internal static ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth => Settings.BloodMagic.BloodMagicHealthCostUsesMaxHealth;
-    internal static ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset => Settings.BloodMagic.MagicSummonQualityPreset;
-    internal static ConfigEntry<int> BloodMagicSummonLifetimeSeconds => Settings.BloodMagic.BloodMagicSummonLifetimeSeconds;
-    internal static ConfigEntry<float> BloodMagicSummonLifetimeSkill100Multiplier => Settings.BloodMagic.BloodMagicSummonLifetimeSkill100Multiplier;
-    internal static ConfigEntry<float> BackstabSneakSkillRaiseAmount => Settings.General.BackstabSneakSkillRaiseAmount;
-    internal static ConfigEntry<float> SneakVisibilitySkillEffectFactor => Settings.General.SneakVisibilitySkillEffectFactor;
-    internal static ConfigEntry<float> SneakMovementSpeedSkillFactor => Settings.General.SneakMovementSpeedSkillFactor;
-    internal static ConfigEntry<Toggle> KeepCrouchingDuringElementalDamageOverTime => Settings.General.KeepCrouchingDuringElementalDamageOverTime;
-    internal static ConfigEntry<RangedPresetSelection> FireballStaffPreset => Settings.Ranged.FireballStaffPreset;
-    internal static ConfigEntry<RangedPresetSelection> RapidStaffPreset => Settings.Ranged.RapidStaffPreset;
-    internal static ConfigEntry<RangedPresetSelection> LightningStaffPreset => Settings.Ranged.LightningStaffPreset;
-    internal static ConfigEntry<RangedPresetSelection> BowPreset => Settings.Ranged.BowPreset;
-    internal static ConfigEntry<RangedPresetSelection> CrossbowPreset => Settings.Ranged.CrossbowPreset;
-    internal static ConfigEntry<BombPresetSelection> BombPreset => Settings.Ranged.BombPreset;
-    internal static ConfigEntry<Toggle> SecondaryCooldownHudEnabled => Settings.Ui.SecondaryCooldownHudEnabled;
-    internal static ConfigEntry<Toggle> SecondaryAttackTooltipsEnabled => Settings.Ui.SecondaryAttackTooltipsEnabled;
-    internal static ConfigEntry<float> SecondaryCooldownHudPositionX => Settings.Ui.SecondaryCooldownHudPositionX;
-    internal static ConfigEntry<float> SecondaryCooldownHudPositionY => Settings.Ui.SecondaryCooldownHudPositionY;
-    internal static ConfigEntry<Toggle> AdminNoPresetCooldowns => Settings.General.AdminNoPresetCooldowns;
-    internal static ConfigEntry<Toggle> QuickstepEnabled => Settings.General.QuickstepEnabled;
+    internal static ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth { get; private set; } = null!;
+    internal static ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset { get; private set; } = null!;
+    internal static ConfigEntry<int> BloodMagicSummonLifetimeSeconds { get; private set; } = null!;
+    internal static ConfigEntry<float> BloodMagicSummonLifetimeSkill100Multiplier { get; private set; } = null!;
+    internal static ConfigEntry<float> BackstabSneakSkillRaiseAmount { get; private set; } = null!;
+    internal static ConfigEntry<float> SneakVisibilitySkillEffectFactor { get; private set; } = null!;
+    internal static ConfigEntry<float> SneakMovementSpeedSkillFactor { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> KeepCrouchingDuringElementalDamageOverTime { get; private set; } = null!;
+    internal static ConfigEntry<RangedPresetSelection> FireballStaffPreset { get; private set; } = null!;
+    internal static ConfigEntry<RangedPresetSelection> RapidStaffPreset { get; private set; } = null!;
+    internal static ConfigEntry<RangedPresetSelection> LightningStaffPreset { get; private set; } = null!;
+    internal static ConfigEntry<RangedPresetSelection> BowPreset { get; private set; } = null!;
+    internal static ConfigEntry<RangedPresetSelection> CrossbowPreset { get; private set; } = null!;
+    internal static ConfigEntry<BombPresetSelection> BombPreset { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> SecondaryCooldownHudEnabled { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> SecondaryAttackTooltipsEnabled { get; private set; } = null!;
+    internal static ConfigEntry<float> SecondaryCooldownHudPositionX { get; private set; } = null!;
+    internal static ConfigEntry<float> SecondaryCooldownHudPositionY { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> AdminNoPresetCooldowns { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> QuickstepEnabled { get; private set; } = null!;
     private FileSystemWatcher? _watcher;
     private SecondaryAttackReloadDebouncer? _configReloadDebouncer;
     private readonly object _reloadLock = new();
     private string? _lastConfigFileText;
-    private bool _suppressWorldApplySettingChange;
+    private bool _suppressSettingChangeSideEffects;
+    private bool _worldApplySettingChangeDirty;
+    private bool _summonLifetimeSettingChangeDirty;
 
     public enum Toggle
     {
@@ -109,12 +110,13 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         Config.SaveOnConfigSet = false;
         try
         {
-            Settings.Bind(this);
+            BindGeneralSettings();
+            BindBloodMagicSettings();
+            BindRangedSettings();
+            BindUiSettings();
             QuickstepSystem.Initialize();
             SummonQualityHudCompatibility.Initialize();
             RegisterWorldApplySettingHandlers();
-            _serverConfigLocked = Settings.General.LockConfiguration;
-            _ = ConfigSync.AddLockingConfigEntry(_serverConfigLocked);
             Assembly assembly = Assembly.GetExecutingAssembly();
             _harmony.PatchAll(assembly);
             SecondaryAttackFacade.Initialize();
@@ -182,36 +184,19 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
                     return true;
                 }
 
-                RangedPresetSelection previousFireballStaffPreset = FireballStaffPreset.Value;
-                RangedPresetSelection previousRapidStaffPreset = RapidStaffPreset.Value;
-                RangedPresetSelection previousLightningStaffPreset = LightningStaffPreset.Value;
-                RangedPresetSelection previousBowPreset = BowPreset.Value;
-                RangedPresetSelection previousCrossbowPreset = CrossbowPreset.Value;
-                BombPresetSelection previousBombPreset = BombPreset.Value;
-                MagicSummonQualityPresetSelection previousMagicSummonQualityPreset = MagicSummonQualityPreset.Value;
-
-                _suppressWorldApplySettingChange = true;
+                _worldApplySettingChangeDirty = false;
+                _summonLifetimeSettingChangeDirty = false;
+                _suppressSettingChangeSideEffects = true;
                 try
                 {
                     SaveWithRespectToConfigSet(true);
                 }
                 finally
                 {
-                    _suppressWorldApplySettingChange = false;
+                    _suppressSettingChangeSideEffects = false;
                 }
 
-                bool needsWorldReapply =
-                    previousFireballStaffPreset != FireballStaffPreset.Value ||
-                    previousRapidStaffPreset != RapidStaffPreset.Value ||
-                    previousLightningStaffPreset != LightningStaffPreset.Value ||
-                    previousBowPreset != BowPreset.Value ||
-                    previousCrossbowPreset != CrossbowPreset.Value ||
-                    previousBombPreset != BombPreset.Value ||
-                    previousMagicSummonQualityPreset != MagicSummonQualityPreset.Value;
-                if (needsWorldReapply)
-                {
-                    SecondaryAttackFacade.RequestCurrentWorldReapply();
-                }
+                FlushReloadSettingChanges();
 
                 _lastConfigFileText = configFileText;
                 ModLogger.LogInfo("Configuration reload complete.");
@@ -290,6 +275,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         CrossbowPreset.SettingChanged += OnWorldApplySettingChanged;
         BombPreset.SettingChanged += OnWorldApplySettingChanged;
         MagicSummonQualityPreset.SettingChanged += OnWorldApplySettingChanged;
+        BloodMagicSummonLifetimeSeconds.SettingChanged += OnSummonLifetimeSettingChanged;
     }
 
     private void UnregisterWorldApplySettingHandlers()
@@ -301,121 +287,93 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         CrossbowPreset.SettingChanged -= OnWorldApplySettingChanged;
         BombPreset.SettingChanged -= OnWorldApplySettingChanged;
         MagicSummonQualityPreset.SettingChanged -= OnWorldApplySettingChanged;
+        BloodMagicSummonLifetimeSeconds.SettingChanged -= OnSummonLifetimeSettingChanged;
     }
 
     private void OnWorldApplySettingChanged(object? sender, EventArgs e)
     {
-        if (_suppressWorldApplySettingChange)
+        if (_suppressSettingChangeSideEffects)
         {
+            _worldApplySettingChangeDirty = true;
             return;
         }
 
         SecondaryAttackFacade.RequestCurrentWorldReapply();
     }
 
-    internal sealed class PluginSettings
+    private void OnSummonLifetimeSettingChanged(object? sender, EventArgs e)
     {
-        internal GeneralSettings General { get; } = new();
-
-        internal BloodMagicSettings BloodMagic { get; } = new();
-
-        internal RangedSettings Ranged { get; } = new();
-
-        internal UiSettings Ui { get; } = new();
-
-        internal void Bind(SecondaryAttacksPlugin plugin)
+        if (_suppressSettingChangeSideEffects)
         {
-            General.Bind(plugin);
-            BloodMagic.Bind(plugin);
-            Ranged.Bind(plugin);
-            Ui.Bind(plugin);
+            _summonLifetimeSettingChangeDirty = true;
+            return;
+        }
+
+        MagicSummonQualityPresetSystem.RefreshLoadedSummonLifetimeState();
+    }
+
+    private void FlushReloadSettingChanges()
+    {
+        bool reapplyWorld = _worldApplySettingChangeDirty;
+        bool refreshSummonLifetime = _summonLifetimeSettingChangeDirty;
+        _worldApplySettingChangeDirty = false;
+        _summonLifetimeSettingChangeDirty = false;
+
+        if (reapplyWorld)
+        {
+            SecondaryAttackFacade.RequestCurrentWorldReapply();
+        }
+
+        if (refreshSummonLifetime)
+        {
+            MagicSummonQualityPresetSystem.RefreshLoadedSummonLifetimeState();
         }
     }
 
-    internal sealed class GeneralSettings
+    private void BindGeneralSettings()
     {
-        internal ConfigEntry<Toggle> LockConfiguration = null!;
-        internal ConfigEntry<float> BackstabSneakSkillRaiseAmount = null!;
-        internal ConfigEntry<float> SneakVisibilitySkillEffectFactor = null!;
-        internal ConfigEntry<float> SneakMovementSpeedSkillFactor = null!;
-        internal ConfigEntry<Toggle> QuickstepEnabled = null!;
-        internal ConfigEntry<Toggle> AdminNoPresetCooldowns = null!;
-        internal ConfigEntry<Toggle> KeepCrouchingDuringElementalDamageOverTime = null!;
-
-        internal void Bind(SecondaryAttacksPlugin plugin)
-        {
-            const string group = "1 - General";
-            LockConfiguration = plugin.config(group, "Lock Configuration", Toggle.On, new ConfigDescription("If on, the configuration is locked and can be changed by server admins only.", null, new ConfigurationManagerAttributes { Order = 700 }));
-            AdminNoPresetCooldowns = plugin.config(group, "Admin No Preset Cooldowns", Toggle.Off, new ConfigDescription("Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.", null, new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: false);
-            QuickstepEnabled = plugin.config(group, "Quickstep Enabled", Toggle.Off, new ConfigDescription("Enables the fixed quickstep for equipped Knives and Unarmed weapons. Bare fists are excluded. Quickstep uses 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep and its double-press dodge handoff each consume 60% of the current dodge stamina cost.", null, new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
-            BackstabSneakSkillRaiseAmount = plugin.config(group, "Backstab Sneak Skill Raise Amount", 1.0f, new ConfigDescription("Sneak skill raise amount awarded whenever any attack successfully triggers backstab damage. 0 disables this reward.", new AcceptableValueRange<float>(0f, 10f), new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
-            SneakVisibilitySkillEffectFactor = plugin.config(group, "Sneak Visibility Skill Effect Factor", 1.0f, new ConfigDescription("Multiplier for the visibility reduction gained from Sneak skill while crouching. 1.0 keeps vanilla; 2.0 doubles only the skill-based reduction. Visibility is clamped to a fixed minimum of 0.1. At factor 1.0, Sneak 0 is 0.5 in darkness and 1.0 in bright light; Sneak 100 is 0.2 in darkness and 0.6 in bright light.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
-            SneakMovementSpeedSkillFactor = plugin.config(group, "Sneak Movement Speed Skill Factor", 1.0f, new ConfigDescription("Sneak movement speed multiplier at Sneak skill 100 while crouching. 1.0 keeps vanilla; 2.0 doubles crouched movement speed at Sneak 100, with lower Sneak levels linearly interpolated.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 650 }), synchronizedSetting: true);
-            KeepCrouchingDuringElementalDamageOverTime = plugin.config(group, "Keep Crouching During Elemental Damage Over Time", Toggle.Off, new ConfigDescription("If on, periodic Fire, Spirit, and Poison damage-over-time ticks do not cancel the player's crouch toggle. Direct hits, lethal damage, stagger, and knockback retain vanilla behavior.", null, new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
-        }
+        const string group = "1 - General";
+        _ = ConfigSync.AddLockingConfigEntry(config(group, "Lock Configuration", Toggle.On, new ConfigDescription("If on, the configuration is locked and can be changed by server admins only.", null, new ConfigurationManagerAttributes { Order = 700 })));
+        AdminNoPresetCooldowns = config(group, "Admin No Preset Cooldowns", Toggle.Off, new ConfigDescription("Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.", null, new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: false);
+        QuickstepEnabled = config(group, "Quickstep Enabled", Toggle.Off, new ConfigDescription("Enables the fixed quickstep for equipped Knives and Unarmed weapons. Bare fists are excluded. Quickstep uses 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep and its double-press dodge handoff each consume 60% of the current dodge stamina cost.", null, new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
+        BackstabSneakSkillRaiseAmount = config(group, "Backstab Sneak Skill Raise Amount", 1.0f, new ConfigDescription("Sneak skill raise amount awarded whenever any attack successfully triggers backstab damage. 0 disables this reward.", new AcceptableValueRange<float>(0f, 10f), new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
+        SneakVisibilitySkillEffectFactor = config(group, "Sneak Visibility Skill Effect Factor", 1.0f, new ConfigDescription("Multiplier for the visibility reduction gained from Sneak skill while crouching. 1.0 keeps vanilla; 2.0 doubles only the skill-based reduction. Visibility is clamped to a fixed minimum of 0.1. At factor 1.0, Sneak 0 is 0.5 in darkness and 1.0 in bright light; Sneak 100 is 0.2 in darkness and 0.6 in bright light.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
+        SneakMovementSpeedSkillFactor = config(group, "Sneak Movement Speed Skill Factor", 1.0f, new ConfigDescription("Sneak movement speed multiplier at Sneak skill 100 while crouching. 1.0 keeps vanilla; 2.0 doubles crouched movement speed at Sneak 100, with lower Sneak levels linearly interpolated.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 650 }), synchronizedSetting: true);
+        KeepCrouchingDuringElementalDamageOverTime = config(group, "Keep Crouching During Elemental Damage Over Time", Toggle.Off, new ConfigDescription("If on, periodic Fire, Spirit, and Poison damage-over-time ticks do not cancel the player's crouch toggle. Direct hits, lethal damage, stagger, and knockback retain vanilla behavior.", null, new ConfigurationManagerAttributes { Order = 640 }), synchronizedSetting: true);
     }
 
-    internal sealed class BloodMagicSettings
+    private void BindBloodMagicSettings()
     {
-        internal ConfigEntry<float> BloodMagicHealthCostSkillRaiseFactor = null!;
-        internal ConfigEntry<Toggle> BloodMagicHealthCostUsesMaxHealth = null!;
-        internal ConfigEntry<MagicSummonQualityPresetSelection> MagicSummonQualityPreset = null!;
-        internal ConfigEntry<int> BloodMagicSummonLifetimeSeconds = null!;
-        internal ConfigEntry<float> BloodMagicSummonLifetimeSkill100Multiplier = null!;
-
-        internal void Bind(SecondaryAttacksPlugin plugin)
-        {
-            const string group = "2 - Blood Magic";
-            MagicSummonQualityPreset = plugin.config(group, "Magic Summon Quality Preset", MagicSummonQualityPresetSelection.LevelByQuality, new ConfigDescription("Global quality preset for BloodMagic summon items whose primary or secondary projectile resolves to a SpawnAbility. Explicit summon.qualityPreset values in SecondaryAttacks.BloodMagic.yml override this. Off disables automatic quality scaling; CountByQuality makes item quality raise active summon count; LevelByQuality makes item quality raise summoned creature level.", null, new ConfigurationManagerAttributes { Order = 700 }), synchronizedSetting: true);
-            BloodMagicSummonLifetimeSeconds = plugin.config(group, "Blood Magic Summon Lifetime Seconds", 1200, new ConfigDescription("Base lifetime in whole seconds for creatures summoned by player-used Blood Magic staves. Values below 1 are clamped to 1. Changes apply only to summons created after this setting changes; existing summons keep their assigned lifetime.", new AcceptablePositiveInt(), new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: true);
-            BloodMagicSummonLifetimeSkill100Multiplier = plugin.config(group, "Blood Magic Summon Lifetime Multiplier At Skill 100", 2.0f, new ConfigDescription("Multiplier applied to the base summon lifetime at Blood Magic skill 100. Skill 0 uses the base lifetime, with intermediate skill levels interpolated linearly.", new AcceptableValueRange<float>(1f, 10f), new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
-            BloodMagicHealthCostUsesMaxHealth = plugin.config(group, "Blood Magic Health Cost Uses Max Health", Toggle.On, new ConfigDescription("If on, Blood Magic attack health percentage costs are calculated from max health at cast time instead of current health. Flat health cost and Blood Magic skill cost reduction are unchanged.", null, new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
-            BloodMagicHealthCostSkillRaiseFactor = plugin.config(group, "Blood Magic Health Cost Skill Raise Factor", 0.01f, new ConfigDescription("Additional Blood Magic skill raise amount per actual consumed health. Vanilla Blood Magic skill gain always remains active. 0 disables only this custom health-cost skill gain. Example: consuming 160 health and 0.01 factor awards 1.6 extra raise amount.", new AcceptableValueRange<float>(0f, 0.1f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
-        }
+        const string group = "2 - Blood Magic";
+        MagicSummonQualityPreset = config(group, "Magic Summon Quality Preset", MagicSummonQualityPresetSelection.LevelByQuality, new ConfigDescription("Global quality preset for BloodMagic summon items whose primary or secondary projectile resolves to a SpawnAbility. Explicit summon.qualityPreset values in SecondaryAttacks.BloodMagic.yml override this. Off disables automatic quality scaling; CountByQuality makes item quality raise active summon count; LevelByQuality makes item quality raise summoned creature level.", null, new ConfigurationManagerAttributes { Order = 700 }), synchronizedSetting: true);
+        BloodMagicSummonLifetimeSeconds = config(group, "Blood Magic Summon Lifetime Seconds", 1200, new ConfigDescription("Base lifetime in whole seconds for creatures summoned by player-used Blood Magic staves. 0 disables summon lifetime assignment, restoration, expiration, and HUD timers, including staff-specific YAML overrides. Positive values enable the feature. The configured base is assigned only to newly created summons; existing assigned deadlines are not recalculated.", new AcceptableNonNegativeInt(), new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: true);
+        BloodMagicSummonLifetimeSkill100Multiplier = config(group, "Blood Magic Summon Lifetime Multiplier At Skill 100", 2.0f, new ConfigDescription("Multiplier applied to the base summon lifetime at Blood Magic skill 100. Skill 0 uses the base lifetime, with intermediate skill levels interpolated linearly.", new AcceptableValueRange<float>(1f, 10f), new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
+        BloodMagicHealthCostUsesMaxHealth = config(group, "Blood Magic Health Cost Uses Max Health", Toggle.On, new ConfigDescription("If on, Blood Magic attack health percentage costs are calculated from max health at cast time instead of current health. Flat health cost and Blood Magic skill cost reduction are unchanged.", null, new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
+        BloodMagicHealthCostSkillRaiseFactor = config(group, "Blood Magic Health Cost Skill Raise Factor", 0.01f, new ConfigDescription("Additional Blood Magic skill raise amount per actual consumed health. Vanilla Blood Magic skill gain always remains active. 0 disables only this custom health-cost skill gain. Example: consuming 160 health and 0.01 factor awards 1.6 extra raise amount.", new AcceptableValueRange<float>(0f, 0.1f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);
     }
 
-    internal sealed class RangedSettings
+    private void BindRangedSettings()
     {
-        internal ConfigEntry<RangedPresetSelection> FireballStaffPreset = null!;
-        internal ConfigEntry<RangedPresetSelection> RapidStaffPreset = null!;
-        internal ConfigEntry<RangedPresetSelection> LightningStaffPreset = null!;
-        internal ConfigEntry<RangedPresetSelection> BowPreset = null!;
-        internal ConfigEntry<RangedPresetSelection> CrossbowPreset = null!;
-        internal ConfigEntry<BombPresetSelection> BombPreset = null!;
-
-        internal void Bind(SecondaryAttacksPlugin plugin)
-        {
-            const string group = "3 - Ranged";
-            const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic assignment for this group.";
-            FireballStaffPreset = plugin.config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_fireball. {descriptionSuffix}", synchronizedSetting: true);
-            RapidStaffPreset = plugin.config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_rapidfire. {descriptionSuffix}", synchronizedSetting: true);
-            LightningStaffPreset = plugin.config(group, "Reload Staff Preset", RangedPresetSelection.Burst, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_lightningshot. {descriptionSuffix}", synchronizedSetting: true);
-            BowPreset = plugin.config(group, "Bow Preset", RangedPresetSelection.Barrage, $"Default ranged preset for bow items. {descriptionSuffix}", synchronizedSetting: true);
-            CrossbowPreset = plugin.config(group, "Crossbow Preset", RangedPresetSelection.Burst, $"Default ranged preset for reload-based crossbow-style projectile items. {descriptionSuffix}", synchronizedSetting: true);
-            BombPreset = plugin.config(group, "Bomb Preset", BombPresetSelection.Auto, "Default ranged preset for throw_bomb projectile items. Auto uses overchargedBomb when the primary projectile itself has AOE or spawns an Aoe prefab on hit, and stickyDetonator otherwise. Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic bomb assignment.", synchronizedSetting: true);
-        }
+        const string group = "3 - Ranged";
+        const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic assignment for this group.";
+        FireballStaffPreset = config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_fireball. {descriptionSuffix}", synchronizedSetting: true);
+        RapidStaffPreset = config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_rapidfire. {descriptionSuffix}", synchronizedSetting: true);
+        LightningStaffPreset = config(group, "Reload Staff Preset", RangedPresetSelection.Burst, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_lightningshot. {descriptionSuffix}", synchronizedSetting: true);
+        BowPreset = config(group, "Bow Preset", RangedPresetSelection.Barrage, $"Default ranged preset for bow items. {descriptionSuffix}", synchronizedSetting: true);
+        CrossbowPreset = config(group, "Crossbow Preset", RangedPresetSelection.Burst, $"Default ranged preset for reload-based crossbow-style projectile items. {descriptionSuffix}", synchronizedSetting: true);
+        BombPreset = config(group, "Bomb Preset", BombPresetSelection.Auto, "Default ranged preset for throw_bomb projectile items. Auto uses overchargedBomb when the primary projectile itself has AOE or spawns an Aoe prefab on hit, and stickyDetonator otherwise. Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic bomb assignment.", synchronizedSetting: true);
     }
 
-    internal sealed class UiSettings
+    private void BindUiSettings()
     {
-        internal ConfigEntry<Toggle> SecondaryCooldownHudEnabled = null!;
-        internal ConfigEntry<Toggle> SecondaryAttackTooltipsEnabled = null!;
-        internal ConfigEntry<float> SecondaryCooldownHudPositionX = null!;
-        internal ConfigEntry<float> SecondaryCooldownHudPositionY = null!;
-
-        internal void Bind(SecondaryAttacksPlugin plugin)
-        {
-            const string group = "4 - UI";
-            SecondaryCooldownHudEnabled = plugin.config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns and charge progress are shown in a dedicated HUD block. Off hides this display without changing cooldown behavior.", synchronizedSetting: false);
-            SecondaryAttackTooltipsEnabled = plugin.config(group, "Secondary Attack Tooltips Enabled", Toggle.On, "If on, weapons with an applied SecondaryAttacks preset show its localized name and description in item tooltips. Off hides only this client-side tooltip section.", synchronizedSetting: false);
-            SecondaryCooldownHudPositionX = plugin.config(group, "Secondary Cooldown HUD Position X", 0.615f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
-            SecondaryCooldownHudPositionY = plugin.config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
-        }
+        const string group = "4 - UI";
+        SecondaryCooldownHudEnabled = config(group, "Secondary Cooldown HUD Enabled", Toggle.On, "If on, secondary attack cooldowns and charge progress are shown in a dedicated HUD block. Off hides this display without changing cooldown behavior.", synchronizedSetting: false);
+        SecondaryAttackTooltipsEnabled = config(group, "Secondary Attack Tooltips Enabled", Toggle.On, "If on, weapons with an applied SecondaryAttacks preset show its localized name and description in item tooltips. Off hides only this client-side tooltip section.", synchronizedSetting: false);
+        SecondaryCooldownHudPositionX = config(group, "Secondary Cooldown HUD Position X", 0.615f, new ConfigDescription("Client-side normalized horizontal position for the secondary cooldown HUD. 0 is left, 1 is right. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
+        SecondaryCooldownHudPositionY = config(group, "Secondary Cooldown HUD Position Y", 0.22f, new ConfigDescription("Client-side normalized vertical position for the secondary cooldown HUD. 0 is bottom, 1 is top. Open inventory to preview the configured position.", new AcceptableValueRange<float>(0f, 1f)), synchronizedSetting: false);
     }
 
     #region ConfigOptions
-
-    private static ConfigEntry<Toggle> _serverConfigLocked = null!;
 
     private ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description, bool synchronizedSetting = true)
     {
@@ -434,25 +392,25 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         return config(group, name, value, new ConfigDescription(description), synchronizedSetting);
     }
 
-    private sealed class AcceptablePositiveInt : AcceptableValueBase
+    private sealed class AcceptableNonNegativeInt : AcceptableValueBase
     {
-        internal AcceptablePositiveInt() : base(typeof(int))
+        internal AcceptableNonNegativeInt() : base(typeof(int))
         {
         }
 
         public override object Clamp(object value)
         {
-            return Math.Max(1, (int)value);
+            return Math.Max(0, (int)value);
         }
 
         public override bool IsValid(object value)
         {
-            return value is int intValue && intValue >= 1;
+            return value is int intValue && intValue >= 0;
         }
 
         public override string ToDescriptionString()
         {
-            return "# Acceptable values: Positive whole numbers (1 or greater)";
+            return "# Acceptable values: Non-negative whole numbers (0 or greater)";
         }
     }
 

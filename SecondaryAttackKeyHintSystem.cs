@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace SecondaryAttacks;
 
-internal static class BowSecondaryKeyHintSystem
+internal static class SecondaryAttackKeyHintSystem
 {
     private const int MissingBlockHintRefreshFrames = 30;
     private static KeyHints? _activeKeyHints;
@@ -572,19 +572,19 @@ internal static class BowSecondaryKeyHintSystem
 }
 
 [HarmonyPatch(typeof(KeyHints), "Awake")]
-internal static class KeyHintsAwakeBowSecondaryPatch
+internal static class KeyHintsAwakeSecondaryAttackPatch
 {
     private static void Postfix(KeyHints __instance)
     {
-        BowSecondaryKeyHintSystem.InitializeKeyHints(__instance);
+        SecondaryAttackKeyHintSystem.InitializeKeyHints(__instance);
     }
 }
 
 [HarmonyPatch(typeof(KeyHints), "UpdateHints")]
-internal static class KeyHintsUpdateBowSecondaryPatch
+internal static class KeyHintsUpdateSecondaryAttackPatch
 {
     private static void Postfix(KeyHints __instance)
     {
-        BowSecondaryKeyHintSystem.UpdateKeyHint(__instance);
+        SecondaryAttackKeyHintSystem.UpdateKeyHint(__instance);
     }
 }

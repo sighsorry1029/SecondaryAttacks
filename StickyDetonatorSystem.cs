@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -11,7 +12,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireStickyDetonator(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             return false;
         }
@@ -89,7 +90,7 @@ internal static class StickyDetonatorSystem
         }
 
         TrimOwnerCharges(owner, Mathf.Max(1, behavior.MaxCharges - 1));
-        SuppressProjectileItemDrops(projectile);
+        ProjectileAccess.SuppressItemDrops(projectile);
         PendingProjectiles.Remove(projectile);
         PendingProjectiles.Add(
             projectile,
@@ -332,7 +333,7 @@ internal static class StickyDetonatorSystem
             : projectile.transform.forward;
         state.ExpiresAt = Time.time + state.Lifetime;
 
-        SuppressProjectileItemDrops(projectile);
+        ProjectileAccess.SuppressItemDrops(projectile);
         ProjectileAccess.SetVelocity(projectile, Vector3.zero);
         ProjectileAccess.SetDidHit(projectile, true);
         projectile.enabled = false;
@@ -490,7 +491,7 @@ internal static class StickyDetonatorSystem
             return;
         }
 
-        SuppressProjectileItemDrops(projectile);
+        ProjectileAccess.SuppressItemDrops(projectile);
         projectile.m_aoe *= state.AoeRadiusFactor;
         projectileInterface.Setup(
             state.Owner,
@@ -539,13 +540,6 @@ internal static class StickyDetonatorSystem
         }
 
         return Quaternion.LookRotation(forward.normalized, up);
-    }
-
-    private static void SuppressProjectileItemDrops(Projectile projectile)
-    {
-        projectile.m_respawnItemOnHit = false;
-        projectile.m_spawnItem = null;
-        projectile.m_spawnOnTtl = false;
     }
 
     private static void Unregister(StickyChargeController controller)
@@ -697,5 +691,20 @@ internal static class StickyDetonatorSystem
     private sealed class StickyDetonatorInputState
     {
         public bool WasBlocking { get; set; }
+    }
+}
+
+[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.IsBlocking))]
+internal static class HumanoidIsBlockingStickyDetonatorPatch
+{
+    private static bool Prefix(Humanoid __instance, ref bool __result)
+    {
+        if (!StickyDetonatorSystem.ShouldSuppressBlock(__instance))
+        {
+            return true;
+        }
+
+        __result = false;
+        return false;
     }
 }

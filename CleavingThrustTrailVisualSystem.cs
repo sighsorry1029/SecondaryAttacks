@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace SecondaryAttacks;
 
-internal static class GreatSwordSkillScalingSystem
+internal static class CleavingThrustTrailVisualSystem
 {
     internal const string CleavingThrustVisualSessionRpcName = "SecondaryAttacks_CleavingThrustVisualSessionV2";
     private const double CleavingThrustVisualSessionDuration = 1.25d;
@@ -404,16 +404,16 @@ internal static class GreatSwordSkillScalingSystem
 }
 
 [HarmonyPatch(typeof(Attack), nameof(Attack.Stop))]
-internal static class AttackStopGreatSwordSkillScalingPatch
+internal static class AttackStopCleavingThrustTrailVisualPatch
 {
     private static void Postfix(Attack __instance)
     {
-        GreatSwordSkillScalingSystem.RestoreTrailScaleForAttack(__instance);
+        CleavingThrustTrailVisualSystem.RestoreTrailScaleForAttack(__instance);
     }
 
     private static void Finalizer(Attack __instance)
     {
-        GreatSwordSkillScalingSystem.RestoreTrailScaleForAttack(__instance);
+        CleavingThrustTrailVisualSystem.RestoreTrailScaleForAttack(__instance);
     }
 }
 
@@ -422,18 +422,18 @@ internal static class MeleeWeaponTrailCleavingThrustObserverScalePatch
 {
     private static void Prefix(
         MeleeWeaponTrail __instance,
-        out GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
+        out CleavingThrustTrailVisualSystem.ObserverTrailSampleScope __state)
     {
-        __state = GreatSwordSkillScalingSystem.BeginObserverTrailSample(__instance);
+        __state = CleavingThrustTrailVisualSystem.BeginObserverTrailSample(__instance);
     }
 
-    private static void Postfix(ref GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
+    private static void Postfix(ref CleavingThrustTrailVisualSystem.ObserverTrailSampleScope __state)
     {
-        GreatSwordSkillScalingSystem.EndObserverTrailSample(ref __state);
+        CleavingThrustTrailVisualSystem.EndObserverTrailSample(ref __state);
     }
 
-    private static void Finalizer(ref GreatSwordSkillScalingSystem.ObserverTrailSampleScope __state)
+    private static void Finalizer(ref CleavingThrustTrailVisualSystem.ObserverTrailSampleScope __state)
     {
-        GreatSwordSkillScalingSystem.EndObserverTrailSample(ref __state);
+        CleavingThrustTrailVisualSystem.EndObserverTrailSample(ref __state);
     }
 }

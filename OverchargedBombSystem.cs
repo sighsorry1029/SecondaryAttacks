@@ -10,7 +10,7 @@ internal static partial class ProjectileRuntimeSystem
     internal static bool FireOverchargedBomb(Attack attack, SecondaryAttackDefinition definition)
     {
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
-        if (!TryGetProjectilePayload(attack, definition, launchData, out Projectile _))
+        if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
             attack.m_consumeItem = false;
             return false;
@@ -429,51 +429,10 @@ internal static class OverchargedBombSystem
         marker = instance.AddComponent<RuntimeVisualScaleMarker>();
         marker.Scale = scale;
 
-        ScaleParticleSystems(instance, scale);
+        SecondaryAttackNamedEffectSystem.ScaleParticleSystems(instance, scale);
         ScaleTrailRenderers(instance, scale);
         ScaleLineRenderers(instance, scale);
         ScaleLights(instance, scale);
-    }
-
-    private static void ScaleParticleSystems(GameObject instance, float scale)
-    {
-        foreach (ParticleSystem particleSystem in instance.GetComponentsInChildren<ParticleSystem>(true))
-        {
-            ParticleSystem.MainModule main = particleSystem.main;
-            if (main.startSize3D)
-            {
-                main.startSizeX = ScaleCurve(main.startSizeX, scale);
-                main.startSizeY = ScaleCurve(main.startSizeY, scale);
-                main.startSizeZ = ScaleCurve(main.startSizeZ, scale);
-            }
-            else
-            {
-                main.startSize = ScaleCurve(main.startSize, scale);
-            }
-
-            main.startSpeed = ScaleCurve(main.startSpeed, scale);
-
-            ParticleSystem.ShapeModule shape = particleSystem.shape;
-            if (shape.enabled)
-            {
-                shape.radius *= scale;
-                shape.scale *= scale;
-                shape.position *= scale;
-            }
-
-            ParticleSystem.TrailModule trails = particleSystem.trails;
-            if (trails.enabled)
-            {
-                trails.widthOverTrail = ScaleCurve(trails.widthOverTrail, scale);
-            }
-
-            ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
-            if (renderer != null)
-            {
-                renderer.lengthScale *= scale;
-                renderer.velocityScale *= scale;
-            }
-        }
     }
 
     private static void ScaleTrailRenderers(GameObject instance, float scale)
@@ -498,26 +457,6 @@ internal static class OverchargedBombSystem
         {
             light.range *= scale;
         }
-    }
-
-    private static ParticleSystem.MinMaxCurve ScaleCurve(ParticleSystem.MinMaxCurve curve, float scale)
-    {
-        switch (curve.mode)
-        {
-            case ParticleSystemCurveMode.Constant:
-                curve.constant *= scale;
-                break;
-            case ParticleSystemCurveMode.TwoConstants:
-                curve.constantMin *= scale;
-                curve.constantMax *= scale;
-                break;
-            case ParticleSystemCurveMode.Curve:
-            case ParticleSystemCurveMode.TwoCurves:
-                curve.curveMultiplier *= scale;
-                break;
-        }
-
-        return curve;
     }
 
     private sealed class ProjectileState

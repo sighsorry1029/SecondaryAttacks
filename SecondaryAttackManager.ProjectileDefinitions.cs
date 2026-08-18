@@ -21,7 +21,7 @@ internal static partial class SecondaryAttackManager
         }
 
         bool usesAmmo = !string.IsNullOrWhiteSpace(sharedData.m_ammoType);
-        if (!ProjectileRuntimeSystem.TryValidateConfiguredPayload(prefabName, primaryAttack, preset, usesAmmo, out string compatibilityReason))
+        if (!ProjectileRuntimeSystem.TryValidateConfiguredPayload(primaryAttack, preset, usesAmmo, out string compatibilityReason))
         {
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: {compatibilityReason}");
             return false;
@@ -285,9 +285,17 @@ internal static partial class SecondaryAttackManager
             return null;
         }
 
-        string preset = config.Preset.Trim();
-        if (!preset.Equals("spearRain", StringComparison.OrdinalIgnoreCase) &&
-            !preset.Equals("impactBurst", StringComparison.OrdinalIgnoreCase))
+        string presetName = config.Preset.Trim();
+        MeleeSpecialPreset preset;
+        if (presetName.Equals("spearRain", StringComparison.OrdinalIgnoreCase))
+        {
+            preset = MeleeSpecialPreset.SpearRain;
+        }
+        else if (presetName.Equals("impactBurst", StringComparison.OrdinalIgnoreCase))
+        {
+            preset = MeleeSpecialPreset.ImpactBurst;
+        }
+        else
         {
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName} onProjectileHit: unknown preset '{config.Preset}'.");
             return null;
@@ -295,7 +303,7 @@ internal static partial class SecondaryAttackManager
 
         return new MeleeOnProjectileHitDefinition
         {
-            Preset = preset.Equals("impactBurst", StringComparison.OrdinalIgnoreCase) ? "impactBurst" : "spearRain",
+            Preset = preset,
             PresetCooldown = CreatePresetCooldown(
                 config.Cooldown,
                 config.CooldownReductionFactor),

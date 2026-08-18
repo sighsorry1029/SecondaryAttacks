@@ -198,7 +198,7 @@ Summon Empower buffs nearby summons with configurable duration, a factor for non
 
 Blood Magic summon quality can scale in two ways: `levelByQuality` increases summon level by staff quality, while `countByQuality` increases the number of active summons.
 
-Blood Magic summons use the global lifetime configured in `2 - Blood Magic` by default. A staff entry can set a positive integer `summon.lifetimeSeconds` in `SecondaryAttacks.BloodMagic.yml` to override that base lifetime. Staff YAML takes precedence over the global config, and Blood Magic skill scaling is applied after the base lifetime is selected. Omitting the YAML value keeps the global fallback.
+Fresh configurations default Blood Magic summon lifetimes to `1200` seconds; existing saved config values are retained. Set `Blood Magic Summon Lifetime Seconds` in `2 - Blood Magic` to a positive whole number to enable lifetime assignment, expiration, restoration, and HUD timers. A value of `0` disables the entire lifetime feature, including staff-specific YAML overrides. When enabled, a staff entry can set a positive integer `summon.lifetimeSeconds` in `SecondaryAttacks.BloodMagic.yml` to override the global base lifetime. Staff YAML takes precedence over the positive global value, and Blood Magic skill scaling is applied after the base lifetime is selected. Omitting the YAML value keeps the global fallback.
 
 ## Configuration
 
