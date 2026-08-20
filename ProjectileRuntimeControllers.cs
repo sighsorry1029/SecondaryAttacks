@@ -911,7 +911,7 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         int shotCount = Mathf.Clamp(projectileBehavior.ProjectileCount, 1, MaxBurstShotCount);
-        if (!FireSingleBurstFireShot(attack, definition))
+        if (!TryFireBurstShot(attack, definition, out _, out _))
         {
             return false;
         }
@@ -960,12 +960,7 @@ internal static partial class ProjectileRuntimeSystem
         }
     }
 
-    private static bool FireSingleBurstFireShot(Attack attack, SecondaryAttackDefinition definition)
-    {
-        return FireSingleBurstFireShot(attack, definition, out _, out _);
-    }
-
-    private static bool FireSingleBurstFireShot(
+    internal static bool TryFireBurstShot(
         Attack attack,
         SecondaryAttackDefinition definition,
         out Vector3 spawnPoint,
@@ -980,6 +975,7 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         PrepareCustomProjectileBurst(attack);
+        // Source attacks may delay FireProjectileBurst, so sample the launch pose again at the actual shot.
         OrientPlayerBodyToCurrentAim(attack);
         attack.GetProjectileSpawnPoint(out spawnPoint, out rawAimDirection);
         Vector3 aimDirection = rawAimDirection;
@@ -1042,6 +1038,8 @@ internal static partial class ProjectileRuntimeSystem
         {
             attack.m_body.rotation = bodyRotation;
         }
+
+        character.UpdateEyeRotation();
     }
 
     private static void SpawnPrimaryProjectileCluster(
@@ -1991,18 +1989,10 @@ internal static partial class ProjectileRuntimeSystem
             }
 
             _nextShotAt = Time.time + _interval;
-            if (!SecondaryAttackRuntimeFacade.TryBeginBurstFireRepeat(_attack))
-            {
-                Destroy(gameObject);
-                return;
-            }
-
-            bool shotFired = FireSingleBurstFireShot(
+            bool shotFired = SecondaryAttackRuntimeFacade.TryExecuteBurstFireRepeat(
                 _attack,
-                _definition,
                 out Vector3 spawnPoint,
                 out Vector3 rawAimDirection);
-            SecondaryAttackRuntimeFacade.CompleteBurstFireRepeat(_attack);
             if (shotFired)
             {
                 _remainingShots--;

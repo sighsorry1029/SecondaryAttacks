@@ -489,8 +489,13 @@ internal static class SecondaryAttackRuntimeFacade
         }
     }
 
-    internal static bool TryBeginBurstFireRepeat(Attack attack)
+    internal static bool TryExecuteBurstFireRepeat(
+        Attack attack,
+        out Vector3 spawnPoint,
+        out Vector3 rawAimDirection)
     {
+        spawnPoint = Vector3.zero;
+        rawAimDirection = Vector3.zero;
         if (!SecondaryAttackRuntimeContext.TryGetActiveAttack(attack, out ActiveSecondaryAttack? activeAttack) ||
             activeAttack == null ||
             !activeAttack.BurstRuntimeStarted ||
@@ -517,16 +522,22 @@ internal static class SecondaryAttackRuntimeFacade
             CommitConfiguredAmmo(attack, ammoContext);
             attack.ProjectileAttackTriggered();
             activeAttack.ProjectileTriggered = true;
+
+            if (!ProjectileRuntimeSystem.TryFireBurstShot(
+                    attack,
+                    activeAttack.Definition,
+                    out spawnPoint,
+                    out rawAimDirection))
+            {
+                return false;
+            }
+
+            ApplyAttackTriggerSideEffects(attack);
             return true;
         }
 
         attack.Stop();
         return false;
-    }
-
-    internal static void CompleteBurstFireRepeat(Attack attack)
-    {
-        ApplyAttackTriggerSideEffects(attack);
     }
 
     private static bool TriggerConfiguredAttack(Attack attack, ActiveSecondaryAttack activeAttack)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed Burst follow-up projectiles being deflected by movement after the player body turns toward the current aim, restoring the eye's world-space yaw and pitch before trigger and launch direction sampling.
+- Consolidated each Burst follow-up into one ordered execution path, applying recoil, self-damage, item consumption, and other trigger side effects only after a projectile shot succeeds while preserving delayed source bursts, per-shot costs, effects, reload cleanup, animations, and observer replication.
+
 ## 1.2.0
 
 - Allowed `Blood Magic Summon Lifetime Seconds` to disable lifetime assignment, restoration, expiration, and HUD timers with `0`, while keeping `1200` seconds as the fresh-configuration default and retaining positive per-staff `summon.lifetimeSeconds` overrides.
