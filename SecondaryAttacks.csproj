@@ -505,6 +505,7 @@
         <Compile Include="SecondaryAttackReloadDebouncer.cs" />
         <Compile Include="SecondaryAttackLocalization.cs" />
         <Compile Include="SecondaryAttackItemTooltipSystem.cs" />
+        <Compile Include="SecondaryAttackSkillTooltipSystem.cs" />
         <Compile Include="SecondaryAttackPresetCatalog.cs" />
         <Compile Include="SecondaryAttackAdrenalineSystem.cs" />
         <Compile Include="SecondaryAttackAdminAccessSystem.cs" />

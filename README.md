@@ -174,7 +174,7 @@ Overcharged Bomb greatly increases bomb damage and area size, at the cost of con
 
 ## Quickstep
 
-Enable `Quickstep Enabled` in the `1 - General` config group to replace dodge with a short dash while an equipped weapon uses the `Knives` or `Unarmed` skill. Bare fists are excluded.
+`Quickstep Enabled` defaults to on in fresh configurations. It replaces dodge with a short dash while an equipped weapon uses the `Knives` or `Unarmed` skill; bare fists are excluded. Existing saved config values are retained.
 
 Quickstep uses fixed behavior: 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep consumes 60% of the current vanilla dodge stamina cost. Pressing dodge again during the dash hands off to a regular roll for another 60%; without enough stamina, the dash continues and the second input is consumed. During the quickstep cooldown, a standalone regular roll remains available at its full vanilla cost. If the standalone `shudnal.Quickstep` plugin is loaded, the integrated implementation disables itself to avoid competing dodge patches.
 
@@ -211,7 +211,9 @@ The mod creates these files in `BepInEx/config/SecondaryAttacks/`:
 
 Use `SecondaryAttacks_AnimationReferences.txt` when choosing values for YAML `animation` fields.
 
-The generated `.cfg` options are grouped as `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`. General lists configuration locking first, followed by the admin cooldown convenience and player movement, backstab, and Sneak adjustments. `Keep Crouching During Elemental Damage Over Time` can preserve crouching through periodic Fire, Spirit, and Poison ticks while leaving direct, lethal, stagger, and knockback damage unchanged.
+The generated `.cfg` options are grouped as `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`. General lists configuration locking first, followed by the admin cooldown convenience and player movement, backstab, and Sneak adjustments. `Keep Crouching During Elemental Damage Over Time` defaults to on in fresh configurations and preserves crouching through periodic Fire, Spirit, and Poison ticks while leaving direct, lethal, stagger, and knockback damage unchanged. Existing saved config values are retained.
+
+Hovering the Blood Magic or Sneak icon in the Skills tab appends a localized SecondaryAttacks section describing the enabled skill-related mechanics without replacing the vanilla skill description.
 
 Ranged automatic assignment is controlled by the `3 - Ranged` config options. Select `Off` for a weapon group to disable its automatic preset. Ranged `Global` blocks only define preset default values; prefab entries are used for exact per-prefab overrides.
 

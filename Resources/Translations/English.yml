@@ -13,6 +13,17 @@ sa_compendium_group_summon_quality: Magic Summon Quality
 sa_item_tooltip_secondary_attack: Secondary Attack
 sa_item_tooltip_summon_quality: Summon Quality
 
+sa_skill_tooltip_blood_magic_heading: "<color=orange>SecondaryAttacks</color>"
+sa_skill_tooltip_blood_magic_cooldown: "Higher Blood Magic reduces configured preset cooldowns."
+sa_skill_tooltip_blood_magic_lifetime: "Higher Blood Magic extends configured summon lifetimes."
+sa_skill_tooltip_blood_magic_max_health_cost: "Percentage health costs use maximum health before normal skill reduction."
+sa_skill_tooltip_blood_magic_health_gain: "Health costs grant extra Blood Magic skill gain."
+sa_skill_tooltip_sneak_heading: "<color=orange>SecondaryAttacks</color>"
+sa_skill_tooltip_sneak_backstab_gain: "Successful backstabs grant extra Sneak skill gain."
+sa_skill_tooltip_sneak_visibility: "Higher Sneak strengthens skill-based visibility reduction."
+sa_skill_tooltip_sneak_movement: "Higher Sneak increases crouched movement speed."
+sa_skill_tooltip_sneak_ambush: "Higher Sneak can accelerate configured Sneak Ambush preparation."
+
 sa_compendium_preset_barrage_name: Barrage
 sa_compendium_preset_barrage_description: Fires multiple projectiles across a spread or a laterally spaced formation.
 sa_compendium_preset_volley_name: Volley

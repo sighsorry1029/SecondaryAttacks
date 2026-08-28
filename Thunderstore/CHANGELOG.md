@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+
+- Added localized SecondaryAttacks sections to the Blood Magic and Sneak skill-icon tooltips, preserving the vanilla description and other mods' appended text while showing only enabled skill-related mechanics.
+- Changed the fresh-configuration defaults for `Quickstep Enabled` and `Keep Crouching During Elemental Damage Over Time` to `On`; existing saved values remain unchanged.
+
 ## 1.2.1
 
 - Fixed Burst follow-up projectiles being deflected by movement after the player body turns toward the current aim, restoring the eye's world-space yaw and pitch before trigger and launch direction sampling.
