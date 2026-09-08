@@ -15,8 +15,8 @@ internal static class StaffRuntimeSystem
     private const string SummonEmpowerAttackCooldownReductionZdoKey = "SecondaryAttacks_SummonEmpowerAttackCooldownReduction";
     private const string ShieldRemainingDisplayZdoKey = "SecondaryAttacks_ShieldRemainingDisplay";
     private const string ShieldDisplayExpiryZdoKey = "SecondaryAttacks_ShieldDisplayExpiry";
-    private const string ApplySummonEmpowerRpcName = "SecondaryAttacks_ApplySummonEmpower";
-    private const string ConvertShieldToHealRpcName = "SecondaryAttacks_ConvertShieldToHeal";
+    internal const string ApplySummonEmpowerRpcName = "SecondaryAttacks_ApplySummonEmpower";
+    internal const string ConvertShieldToHealRpcName = "SecondaryAttacks_ConvertShieldToHeal";
     private const string SummonEmpowerPresetName = "summonEmpower";
     private const string ShieldConvertPresetName = "shieldConvert";
     private const string StaffTargetEffectPrefabName = "fx_bloodweapon_hit";

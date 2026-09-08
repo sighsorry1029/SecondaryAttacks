@@ -12,6 +12,11 @@ internal static class SummonQualityHudCompatibility
     private const string CreatureManagerStarGroupName = "CreatureManager_StarGroup";
     private const string CreatureLevelControlLevelPrefix = "level_";
     private const string StarLevelSystemHighLevelName = "SLS_level_n";
+    private static readonly string[] CreatureManagerContentNames =
+    {
+        CreatureManagerLevelContentName,
+        CreatureManagerBossContentName
+    };
     private static readonly string[] StarLevelSystemLevelNames =
     {
         "SLS_level_2",
@@ -78,7 +83,10 @@ internal static class SummonQualityHudCompatibility
 
     private static bool HasActiveCreatureManagerStarHud(EnemyHud.HudData hudData)
     {
-        Transform parent = GetCreatureManagerHudContentParent(hudData);
+        RectTransform? healthBar = hudData.m_healthFast != null
+            ? hudData.m_healthFast.transform as RectTransform
+            : null;
+        Transform parent = GetHudContentParent(hudData, healthBar?.parent as RectTransform);
         return HasActiveCreatureManagerStarGroup(parent, CreatureManagerLevelContentName) ||
                HasActiveCreatureManagerStarGroup(parent, CreatureManagerBossContentName);
     }
@@ -95,13 +103,9 @@ internal static class SummonQualityHudCompatibility
         return starGroup != null && starGroup.gameObject.activeSelf;
     }
 
-    private static Transform GetCreatureManagerHudContentParent(EnemyHud.HudData hudData)
+    internal static Transform GetHudContentParent(EnemyHud.HudData hudData, RectTransform? healthRoot)
     {
-        RectTransform? healthBar = hudData.m_healthFast != null
-            ? hudData.m_healthFast.transform as RectTransform
-            : null;
-        if (healthBar?.parent is RectTransform healthRoot &&
-            healthRoot.parent is RectTransform healthParent)
+        if (healthRoot?.parent is RectTransform healthParent)
         {
             return healthParent;
         }
@@ -122,6 +126,87 @@ internal static class SummonQualityHudCompatibility
         }
 
         return hudData.m_gui.transform;
+    }
+
+    internal static RectTransform? FindExternalLifetimeRow(
+        Character character,
+        EnemyHud.HudData hudData,
+        RectTransform? contentParent)
+    {
+        Transform hudRoot = hudData.m_gui.transform;
+        return FindActiveCreatureManagerRow(contentParent) ??
+               FindActiveRect(hudRoot, $"SLS_level_{character.GetLevel()}") ??
+               FindActiveRect(hudRoot, StarLevelSystemHighLevelName) ??
+               FindActiveExternalLevelRow(hudRoot, character.GetLevel());
+    }
+
+    private static RectTransform? FindActiveCreatureManagerRow(Transform? contentParent)
+    {
+        foreach (string contentName in CreatureManagerContentNames)
+        {
+            Transform? content = contentParent?.Find(contentName);
+            Transform? starGroup = content?.Find(CreatureManagerStarGroupName);
+            if (content != null &&
+                content.gameObject.activeSelf &&
+                starGroup != null &&
+                starGroup.gameObject.activeSelf)
+            {
+                return content as RectTransform;
+            }
+        }
+
+        return null;
+    }
+
+    private static RectTransform? FindActiveExternalLevelRow(Transform hudRoot, int level)
+    {
+        RectTransform? exactLevel = FindActiveRect(hudRoot, $"{CreatureLevelControlLevelPrefix}{level}");
+        if (exactLevel != null && exactLevel.GetComponent<SummonQualityHudMarker>() == null)
+        {
+            return exactLevel;
+        }
+
+        for (int index = 0; index < hudRoot.childCount; index++)
+        {
+            Transform child = hudRoot.GetChild(index);
+            if (!child.gameObject.activeSelf ||
+                child.GetComponent<SummonQualityHudMarker>() != null ||
+                child is not RectTransform rect ||
+                !IsNumericLevelName(child.name))
+            {
+                continue;
+            }
+
+            return rect;
+        }
+
+        return null;
+    }
+
+    private static bool IsNumericLevelName(string name)
+    {
+        if (!name.StartsWith(CreatureLevelControlLevelPrefix) || name.Length == CreatureLevelControlLevelPrefix.Length)
+        {
+            return false;
+        }
+
+        for (int index = CreatureLevelControlLevelPrefix.Length; index < name.Length; index++)
+        {
+            if (!char.IsDigit(name[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static RectTransform? FindActiveRect(Transform? parent, string name)
+    {
+        Transform? child = parent?.Find(name);
+        return child != null && child.gameObject.activeSelf
+            ? child as RectTransform
+            : null;
     }
 
     private static bool HasActiveCreatureLevelControlStarHud(Transform hudRoot)

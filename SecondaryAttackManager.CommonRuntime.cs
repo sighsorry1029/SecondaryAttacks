@@ -13,18 +13,6 @@ internal static partial class SecondaryAttackManager
 
     private static readonly Dictionary<Humanoid, ItemDrop.ItemData> ReloadConsumptionWeapons = new();
 
-    internal static int GetRuntimeWeaponAppliedWorldRevision(ItemDrop.ItemData weapon)
-    {
-        RuntimeWeaponDefinitionState state = RuntimeWeaponDefinitionStates.GetValue(weapon, _ => new RuntimeWeaponDefinitionState());
-        return state.AppliedWorldRevision;
-    }
-
-    internal static void SetRuntimeWeaponAppliedWorldRevision(ItemDrop.ItemData weapon, int applyRevision)
-    {
-        RuntimeWeaponDefinitionState state = RuntimeWeaponDefinitionStates.GetValue(weapon, _ => new RuntimeWeaponDefinitionState());
-        state.AppliedWorldRevision = applyRevision;
-    }
-
     internal static void TryRestorePersistedReloadedWeaponState(Player player, ItemDrop.ItemData weapon)
     {
         if (player == null || weapon == null || !IsReloadableWeapon(weapon))
@@ -488,11 +476,6 @@ internal static partial class SecondaryAttackManager
         public string PrefabName { get; set; } = "";
 
         public bool PendingSecondary { get; set; }
-    }
-
-    private sealed class RuntimeWeaponDefinitionState
-    {
-        public int AppliedWorldRevision { get; set; } = -1;
     }
 
     internal sealed class ReloadSecondaryResourceCostContext

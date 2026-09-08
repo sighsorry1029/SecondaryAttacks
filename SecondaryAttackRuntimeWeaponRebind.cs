@@ -1,9 +1,12 @@
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace SecondaryAttacks;
 
 internal static class SecondaryAttackRuntimeWeaponRebind
 {
+    private static readonly ConditionalWeakTable<ItemDrop.ItemData, RuntimeWeaponDefinitionState> WeaponStates = new();
+
     public static void Apply(ItemDrop.ItemData? weapon, SecondaryAttackAppliedWorldSnapshot appliedWorldSnapshot)
     {
         if (weapon?.m_dropPrefab == null)
@@ -12,7 +15,8 @@ internal static class SecondaryAttackRuntimeWeaponRebind
         }
 
         int currentApplyRevision = appliedWorldSnapshot.ApplyRevision;
-        if (SecondaryAttackManager.GetRuntimeWeaponAppliedWorldRevision(weapon) == currentApplyRevision)
+        RuntimeWeaponDefinitionState state = WeaponStates.GetValue(weapon, _ => new RuntimeWeaponDefinitionState());
+        if (state.AppliedWorldRevision == currentApplyRevision)
         {
             return;
         }
@@ -39,7 +43,7 @@ internal static class SecondaryAttackRuntimeWeaponRebind
             weapon.m_shared.m_secondaryAttack = SecondaryAttackManager.CloneAttack(prefabItemDrop.m_itemData?.m_shared?.m_secondaryAttack);
         }
 
-        SecondaryAttackManager.SetRuntimeWeaponAppliedWorldRevision(weapon, currentApplyRevision);
+        state.AppliedWorldRevision = currentApplyRevision;
     }
 
     public static void RefreshLocalPlayerInventory(SecondaryAttackAppliedWorldSnapshot appliedWorldSnapshot)
@@ -55,5 +59,10 @@ internal static class SecondaryAttackRuntimeWeaponRebind
         {
             Apply(item, appliedWorldSnapshot);
         }
+    }
+
+    private sealed class RuntimeWeaponDefinitionState
+    {
+        internal int AppliedWorldRevision = -1;
     }
 }

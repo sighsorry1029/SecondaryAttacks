@@ -238,8 +238,14 @@ internal static class MagicSummonQualityPresetSystem
         finally
         {
             ActiveSpawnAbilityStates.Remove(spawnAbility);
-            RegisterNewSummonsAndEnforceLimit(state);
-            RestoreSpawnAbilityAfterSpawn(spawnAbility, state);
+            try
+            {
+                RegisterNewSummonsAndEnforceLimit(state);
+            }
+            finally
+            {
+                RestoreSpawnAbilityAfterSpawn(spawnAbility, state);
+            }
         }
     }
 

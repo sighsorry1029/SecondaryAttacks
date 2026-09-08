@@ -213,7 +213,9 @@ Use `SecondaryAttacks_AnimationReferences.txt` when choosing values for YAML `an
 
 The generated `.cfg` options are grouped as `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`. General lists configuration locking first, followed by the admin cooldown convenience and player movement, backstab, and Sneak adjustments. `Keep Crouching During Elemental Damage Over Time` defaults to on in fresh configurations and preserves crouching through periodic Fire, Spirit, and Poison ticks while leaving direct, lethal, stagger, and knockback damage unchanged. Existing saved config values are retained.
 
-Hovering the Blood Magic or Sneak icon in the Skills tab appends a localized SecondaryAttacks section describing the enabled skill-related mechanics without replacing the vanilla skill description.
+Hovering the Blood Magic or Sneak icon in the Skills tab shows a tooltip beside the Skills panel, following the hovered row. Descriptions are left-aligned, section headings are centered, and the vanilla text width is preserved with separate background padding. The localized SecondaryAttacks section describes enabled skill-related mechanics without replacing the vanilla skill description.
+
+`Sneak Visibility Skill Effect Factor` and `Sneak Movement Speed Skill Factor` default to `2` in fresh configurations. These strengthen the skill-based visibility reduction and scale crouched movement speed up to twice vanilla at Sneak 100; existing saved values remain unchanged.
 
 Ranged automatic assignment is controlled by the `3 - Ranged` config options. Select `Off` for a weapon group to disable its automatic preset. Ranged `Global` blocks only define preset default values; prefab entries are used for exact per-prefab overrides.
 

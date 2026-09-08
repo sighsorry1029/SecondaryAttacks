@@ -29,8 +29,10 @@ internal static class SecondaryAttackDefinitionCompiler
             return false;
         }
 
-        DefinitionFeatures features = AnalyzeDefinitionFeatures(weaponConfig);
-        DefinitionValidationResult validation = ValidateDefinitionRequest(prefabName, sharedData, weaponConfig, features);
+        bool hasMeleeFeatureConfig = weaponConfig.HasEnabledMeleeFeatureConfig;
+        string secondaryType = weaponConfig.Secondary?.Type?.Trim() ?? "";
+        DefinitionValidationResult validation = ValidateDefinitionRequest(
+            prefabName, sharedData, weaponConfig, secondaryType, hasMeleeFeatureConfig);
         switch (validation.Disposition)
         {
             case DefinitionValidationDisposition.EffectOnly:
@@ -39,7 +41,9 @@ internal static class SecondaryAttackDefinitionCompiler
             case DefinitionValidationDisposition.Skip:
                 return false;
             default:
-                return TryCreateValidatedDefinition(buildContext, prefabName, sharedData, validation.PrimaryAttack!, weaponConfig, features, out definition);
+                return TryCreateValidatedDefinition(
+                    buildContext, prefabName, sharedData, validation.PrimaryAttack!, weaponConfig,
+                    secondaryType, hasMeleeFeatureConfig, out definition);
         }
     }
 
@@ -60,99 +64,34 @@ internal static class SecondaryAttackDefinitionCompiler
                string.Equals(secondary.Projectile?.Preset, "none", StringComparison.OrdinalIgnoreCase);
     }
 
-    private readonly struct DefinitionFeatures
-    {
-        public DefinitionFeatures(
-            bool hasMeleeFeatureConfig,
-            bool hasSecondaryConfig,
-            string secondaryType,
-            bool usesSummonEmpower,
-            bool usesShieldConvert,
-            bool usesAftershock,
-            bool usesFractureLine,
-            bool hasCustomPayload,
-            bool hasCopiedSecondary)
-        {
-            HasMeleeFeatureConfig = hasMeleeFeatureConfig;
-            HasSecondaryConfig = hasSecondaryConfig;
-            SecondaryType = secondaryType;
-            UsesSummonEmpower = usesSummonEmpower;
-            UsesShieldConvert = usesShieldConvert;
-            UsesAftershock = usesAftershock;
-            UsesFractureLine = usesFractureLine;
-            HasCustomPayload = hasCustomPayload;
-            HasCopiedSecondary = hasCopiedSecondary;
-        }
-
-        public bool HasMeleeFeatureConfig { get; }
-
-        public bool HasSecondaryConfig { get; }
-
-        public string SecondaryType { get; }
-
-        public bool UsesSummonEmpower { get; }
-
-        public bool UsesShieldConvert { get; }
-
-        public bool UsesAftershock { get; }
-
-        public bool UsesFractureLine { get; }
-
-        public bool HasCustomPayload { get; }
-
-        public bool HasCopiedSecondary { get; }
-    }
-
-    private static DefinitionFeatures AnalyzeDefinitionFeatures(NormalizedWeaponConfig weaponConfig)
-    {
-        bool hasMeleeFeatureConfig = weaponConfig.HasEnabledMeleeFeatureConfig;
-        bool hasSecondaryConfig = weaponConfig.Secondary != null;
-        string secondaryType = weaponConfig.Secondary?.Type?.Trim() ?? "";
-        bool usesSummonEmpower = secondaryType == "summonEmpower";
-        bool usesShieldConvert = secondaryType == "shieldConvert";
-        bool usesAftershock = secondaryType == "aftershock";
-        bool usesFractureLine = secondaryType == "fractureLine";
-        bool hasCustomPayload = secondaryType == "projectile";
-        bool hasCopiedSecondary = secondaryType == "copy";
-        return new DefinitionFeatures(
-            hasMeleeFeatureConfig,
-            hasSecondaryConfig,
-            secondaryType,
-            usesSummonEmpower,
-            usesShieldConvert,
-            usesAftershock,
-            usesFractureLine,
-            hasCustomPayload,
-            hasCopiedSecondary);
-    }
-
     private static bool TryCreateValidatedDefinition(
         SecondaryAttackDefinitionBuildContext buildContext,
         string prefabName,
         ItemDrop.ItemData.SharedData sharedData,
         Attack primaryAttack,
         NormalizedWeaponConfig weaponConfig,
-        DefinitionFeatures features,
+        string secondaryType,
+        bool hasMeleeFeatureConfig,
         out SecondaryAttackDefinition? definition)
     {
         definition = null;
 
-        if (features.UsesSummonEmpower)
+        if (secondaryType == "summonEmpower")
         {
             return SecondaryAttackManager.TryCreateSummonEmpowerDefinition(prefabName, sharedData, primaryAttack, weaponConfig, out definition);
         }
 
-        if (features.UsesShieldConvert)
+        if (secondaryType == "shieldConvert")
         {
             return SecondaryAttackManager.TryCreateShieldConvertDefinition(prefabName, sharedData, primaryAttack, weaponConfig, out definition);
         }
 
-        if (features.HasCustomPayload)
+        if (secondaryType == "projectile")
         {
             if (primaryAttack.m_attackType != Attack.AttackType.Projectile)
             {
                 SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: primary attack is not projectile-based.");
-                if (features.HasMeleeFeatureConfig)
+                if (hasMeleeFeatureConfig)
                 {
                     definition = SecondaryAttackManager.CreateEffectOnlyDefinition(prefabName, weaponConfig);
                     return true;
@@ -164,12 +103,12 @@ internal static class SecondaryAttackDefinitionCompiler
             return SecondaryAttackManager.TryCreateCustomPayloadDefinition(prefabName, sharedData, primaryAttack, weaponConfig, out definition);
         }
 
-        if (features.UsesAftershock)
+        if (secondaryType == "aftershock")
         {
             return SecondaryAttackManager.TryCreateAftershockDefinition(buildContext, prefabName, sharedData, primaryAttack, weaponConfig, out definition);
         }
 
-        if (features.UsesFractureLine)
+        if (secondaryType == "fractureLine")
         {
             return SecondaryAttackManager.TryCreateFractureLineDefinition(buildContext, prefabName, primaryAttack, weaponConfig, out definition);
         }
@@ -177,7 +116,7 @@ internal static class SecondaryAttackDefinitionCompiler
         string sourcePrefabName = string.IsNullOrWhiteSpace(weaponConfig.Secondary?.CopyFrom)
             ? prefabName
             : weaponConfig.Secondary!.CopyFrom.Trim();
-        if (features.HasCopiedSecondary)
+        if (secondaryType == "copy")
         {
             if (!SecondaryAttackManager.TryResolveSecondarySourceAttack(buildContext.ObjectDb, sourcePrefabName, out Attack? sourceSecondaryAttack, out string reason))
             {
@@ -186,7 +125,7 @@ internal static class SecondaryAttackDefinitionCompiler
                     SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: {reason}");
                 }
 
-                if (features.HasMeleeFeatureConfig)
+                if (hasMeleeFeatureConfig)
                 {
                     definition = SecondaryAttackManager.CreateEffectOnlyDefinition(prefabName, weaponConfig);
                     return true;
@@ -198,13 +137,13 @@ internal static class SecondaryAttackDefinitionCompiler
             return SecondaryAttackManager.TryCreateSecondaryOverrideDefinition(prefabName, sourcePrefabName, primaryAttack, sourceSecondaryAttack!, weaponConfig, out definition);
         }
 
-        if (features.HasMeleeFeatureConfig)
+        if (hasMeleeFeatureConfig)
         {
             definition = SecondaryAttackManager.CreateEffectOnlyDefinition(prefabName, weaponConfig);
             return true;
         }
 
-        SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: unsupported secondary.type '{features.SecondaryType}'.");
+        SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: unsupported secondary.type '{secondaryType}'.");
         return false;
     }
 
@@ -232,28 +171,29 @@ internal static class SecondaryAttackDefinitionCompiler
         string prefabName,
         ItemDrop.ItemData.SharedData sharedData,
         NormalizedWeaponConfig weaponConfig,
-        DefinitionFeatures features)
+        string secondaryType,
+        bool hasMeleeFeatureConfig)
     {
-        if (!features.HasSecondaryConfig)
+        if (weaponConfig.Secondary == null)
         {
-            return !features.HasMeleeFeatureConfig
+            return !hasMeleeFeatureConfig
                 ? new DefinitionValidationResult(DefinitionValidationDisposition.Skip)
                 : new DefinitionValidationResult(DefinitionValidationDisposition.EffectOnly);
         }
 
-        if (string.IsNullOrWhiteSpace(features.SecondaryType))
+        if (string.IsNullOrWhiteSpace(secondaryType))
         {
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: a secondary behavior preset is required.");
-            return features.HasMeleeFeatureConfig
+            return hasMeleeFeatureConfig
                 ? new DefinitionValidationResult(DefinitionValidationDisposition.EffectOnly)
                 : new DefinitionValidationResult(DefinitionValidationDisposition.Skip);
         }
 
-        if (features.HasCustomPayload &&
+        if (secondaryType == "projectile" &&
             (weaponConfig.Secondary?.Projectile == null || string.IsNullOrWhiteSpace(weaponConfig.Secondary.Projectile.Preset)))
         {
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: ranged secondary requires preset.");
-            return features.HasMeleeFeatureConfig
+            return hasMeleeFeatureConfig
                 ? new DefinitionValidationResult(DefinitionValidationDisposition.EffectOnly)
                 : new DefinitionValidationResult(DefinitionValidationDisposition.Skip);
         }
@@ -262,7 +202,7 @@ internal static class SecondaryAttackDefinitionCompiler
         if (primaryAttack == null || string.IsNullOrWhiteSpace(primaryAttack.m_attackAnimation))
         {
             SecondaryAttacksPlugin.ModLogger.LogWarning($"Skipping {prefabName}: primary attack is missing.");
-            return features.HasMeleeFeatureConfig
+            return hasMeleeFeatureConfig
                 ? new DefinitionValidationResult(DefinitionValidationDisposition.EffectOnly)
                 : new DefinitionValidationResult(DefinitionValidationDisposition.Skip);
         }

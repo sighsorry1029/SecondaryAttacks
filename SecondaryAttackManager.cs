@@ -17,7 +17,6 @@ internal static partial class SecondaryAttackManager
     private const string StaffRapidFireAnimation = "staff_rapidfire";
 
     private static readonly ConditionalWeakTable<Player, BowSecondaryState> BowSecondaryStates = new();
-    private static readonly ConditionalWeakTable<ItemDrop.ItemData, RuntimeWeaponDefinitionState> RuntimeWeaponDefinitionStates = new();
     private static readonly SortedSet<string> PlayerAnimatorTriggers = new(StringComparer.Ordinal);
     private static bool _animatorDumpWritten;
     private static bool _customAnimationDumpWritten;

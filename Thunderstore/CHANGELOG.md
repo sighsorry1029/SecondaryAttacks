@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3
+
+- Moved Blood Magic and Sneak skill tooltips beside the visible Skills panel, following the hovered row with an 8 UI-unit gap and screen-edge protection. Preserved the vanilla 250-unit text width, added separate background padding, and centered section headings while left-aligning descriptions.
+- Changed the fresh-configuration defaults for `Sneak Visibility Skill Effect Factor` and `Sneak Movement Speed Skill Factor` to `2`; existing saved values remain unchanged.
+- Reduced duplicate summon HUD compatibility searches and simplified secondary-attack definition dispatch and per-weapon revision tracking while preserving preset selection and retry behavior.
+- Ensured temporary summon ability settings are restored even if registering newly spawned summons or enforcing summon limits throws an exception.
+- Added regression checks for skill tooltip layout, heading formatting, definition compilation, and weapon rebinding, plus explicit build options for local DLL deployment and verification without packaging.
+
 ## 1.2.2
 
 - Added localized SecondaryAttacks sections to the Blood Magic and Sneak skill-icon tooltips, preserving the vanilla description and other mods' appended text while showing only enabled skill-related mechanics.

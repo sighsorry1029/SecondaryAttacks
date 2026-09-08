@@ -20,8 +20,8 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
             return;
         }
 
-        _nview.Register<float, float, float>("SecondaryAttacks_ApplySummonEmpower", RPC_ApplySummonEmpower);
-        _nview.Register<float, int>("SecondaryAttacks_ConvertShieldToHeal", RPC_ConvertShieldToHeal);
+        _nview.Register<float, float, float>(StaffRuntimeSystem.ApplySummonEmpowerRpcName, RPC_ApplySummonEmpower);
+        _nview.Register<float, int>(StaffRuntimeSystem.ConvertShieldToHealRpcName, RPC_ConvertShieldToHeal);
         _nview.Register<float>(BackstabSkillGainSystem.GrantSneakSkillRpcName, RPC_GrantBackstabSneakSkill);
         _nview.Register<Vector3, float>(SneakAmbushSystem.RpcName, RPC_SpawnSneakAmbushVfx);
         _nview.Register<ZDOID, float, float, float>(SneakAmbushSystem.OwnerSmokeRpcName, RPC_ApplySneakAmbushSmoke);

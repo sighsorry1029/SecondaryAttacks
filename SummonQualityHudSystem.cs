@@ -16,11 +16,6 @@ internal static class SummonQualityHudSystem
     private const float LifetimeTextWidth = 64f;
     private const float LifetimeTextMinimumHeight = 18f;
     private const int MissingTagRefreshFrames = 60;
-    private static readonly string[] CreatureManagerContentNames =
-    {
-        "CreatureManager_LevelContent",
-        "CreatureManager_BossLevelContent"
-    };
     private static readonly Dictionary<int, HudLevelGroup> ActiveGroups = new();
     private static readonly Dictionary<int, HudLifetimeText> ActiveLifetimeTexts = new();
     private static readonly Dictionary<int, CachedTag> TagCache = new();
@@ -78,11 +73,16 @@ internal static class SummonQualityHudSystem
         EnemyHud.HudData hudData,
         int instanceId)
     {
-        UpdateQualityHud(character, hudData, instanceId);
-        UpdateLifetimeHud(enemyHud, character, hudData, instanceId);
+        bool? hasExternalStarHud = null;
+        UpdateQualityHud(character, hudData, instanceId, ref hasExternalStarHud);
+        UpdateLifetimeHud(enemyHud, character, hudData, instanceId, ref hasExternalStarHud);
     }
 
-    private static void UpdateQualityHud(Character character, EnemyHud.HudData hudData, int instanceId)
+    private static void UpdateQualityHud(
+        Character character,
+        EnemyHud.HudData hudData,
+        int instanceId,
+        ref bool? hasExternalStarHud)
     {
         SummonQualityPresetTag? tag = ResolveCachedTag(character, instanceId);
         int level = tag != null && tag.UsesLevelByQuality
@@ -96,7 +96,8 @@ internal static class SummonQualityHudSystem
             return;
         }
 
-        if (SummonQualityHudCompatibility.HasActiveExternalStarHud(hudData))
+        hasExternalStarHud ??= SummonQualityHudCompatibility.HasActiveExternalStarHud(hudData);
+        if (hasExternalStarHud.Value)
         {
             DestroyOwnedGroup(instanceId);
             return;
@@ -122,7 +123,8 @@ internal static class SummonQualityHudSystem
         EnemyHud enemyHud,
         Character character,
         EnemyHud.HudData hudData,
-        int instanceId)
+        int instanceId,
+        ref bool? hasExternalStarHud)
     {
         if (!MagicSummonQualityPresetSystem.TryGetSummonLifetime(character, out float remainingSeconds))
         {
@@ -131,8 +133,8 @@ internal static class SummonQualityHudSystem
         }
 
         RectTransform? healthRoot = GetHealthRoot(hudData);
-        RectTransform? contentParent = GetHudContentParent(hudData, healthRoot);
-        RectTransform? row = FindLifetimeRow(character, hudData, instanceId, contentParent);
+        RectTransform? contentParent = SummonQualityHudCompatibility.GetHudContentParent(hudData, healthRoot) as RectTransform;
+        RectTransform? row = FindLifetimeRow(character, hudData, instanceId, contentParent, ref hasExternalStarHud);
         TextMeshProUGUI? sourceText = hudData.m_name != null
             ? hudData.m_name
             : enemyHud.m_baseHudPlayer?.transform.Find("Name")?.GetComponent<TextMeshProUGUI>();
@@ -317,46 +319,17 @@ internal static class SummonQualityHudSystem
         return healthBar?.parent as RectTransform;
     }
 
-    private static RectTransform? GetHudContentParent(
-        EnemyHud.HudData hudData,
-        RectTransform? healthRoot)
-    {
-        if (healthRoot?.parent is RectTransform healthParent)
-        {
-            return healthParent;
-        }
-
-        if (hudData.m_level2?.parent is RectTransform level2Parent)
-        {
-            return level2Parent;
-        }
-
-        if (hudData.m_level3?.parent is RectTransform level3Parent)
-        {
-            return level3Parent;
-        }
-
-        if (hudData.m_name?.rectTransform.parent is RectTransform nameParent)
-        {
-            return nameParent;
-        }
-
-        return hudData.m_gui.transform as RectTransform;
-    }
-
     private static RectTransform? FindLifetimeRow(
         Character character,
         EnemyHud.HudData hudData,
         int instanceId,
-        RectTransform? contentParent)
+        RectTransform? contentParent,
+        ref bool? hasExternalStarHud)
     {
-        Transform hudRoot = hudData.m_gui.transform;
-        if (SummonQualityHudCompatibility.HasActiveExternalStarHud(hudData))
+        hasExternalStarHud ??= SummonQualityHudCompatibility.HasActiveExternalStarHud(hudData);
+        if (hasExternalStarHud.Value)
         {
-            RectTransform? externalRow = FindActiveCreatureManagerRow(contentParent) ??
-                                         FindActiveRect(hudRoot, $"SLS_level_{character.GetLevel()}") ??
-                                         FindActiveRect(hudRoot, "SLS_level_n") ??
-                                         FindActiveExternalLevelRow(hudRoot, character.GetLevel());
+            RectTransform? externalRow = SummonQualityHudCompatibility.FindExternalLifetimeRow(character, hudData, contentParent);
             if (externalRow != null)
             {
                 return externalRow;
@@ -385,76 +358,6 @@ internal static class SummonQualityHudSystem
         // Level-one summons have no visible star block. The inactive vanilla block still
         // provides the correct baseline for the row where stars would otherwise appear.
         return hudData.m_level2 ?? hudData.m_level3;
-    }
-
-    private static RectTransform? FindActiveCreatureManagerRow(Transform? contentParent)
-    {
-        foreach (string contentName in CreatureManagerContentNames)
-        {
-            Transform? content = contentParent?.Find(contentName);
-            Transform? starGroup = content?.Find("CreatureManager_StarGroup");
-            if (content != null &&
-                content.gameObject.activeSelf &&
-                starGroup != null &&
-                starGroup.gameObject.activeSelf)
-            {
-                return content as RectTransform;
-            }
-        }
-
-        return null;
-    }
-
-    private static RectTransform? FindActiveExternalLevelRow(Transform hudRoot, int level)
-    {
-        RectTransform? exactLevel = FindActiveRect(hudRoot, $"level_{level}");
-        if (exactLevel != null && exactLevel.GetComponent<SummonQualityHudMarker>() == null)
-        {
-            return exactLevel;
-        }
-
-        for (int index = 0; index < hudRoot.childCount; index++)
-        {
-            Transform child = hudRoot.GetChild(index);
-            if (!child.gameObject.activeSelf ||
-                child.GetComponent<SummonQualityHudMarker>() != null ||
-                child is not RectTransform rect ||
-                !IsNumericLevelName(child.name))
-            {
-                continue;
-            }
-
-            return rect;
-        }
-
-        return null;
-    }
-
-    private static bool IsNumericLevelName(string name)
-    {
-        const string prefix = "level_";
-        if (!name.StartsWith(prefix) || name.Length == prefix.Length)
-        {
-            return false;
-        }
-
-        for (int index = prefix.Length; index < name.Length; index++)
-        {
-            if (!char.IsDigit(name[index]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static RectTransform? FindActiveRect(Transform? parent, string name)
-    {
-        Transform? child = parent?.Find(name);
-        return child != null && child.gameObject.activeSelf
-            ? child as RectTransform
-            : null;
     }
 
     private static HudLifetimeText? GetOrCreateLifetimeText(
