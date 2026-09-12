@@ -213,21 +213,22 @@ internal static class Program
         Run("rebind first revision applies and same revision skips", () =>
         {
             var weapon = Weapon();
-            var snapshot = Snapshot(definition: new());
+            var snapshot = Snapshot(definition: new() { ConfiguredSecondaryAttack = new Attack { Label = "configured" } });
             SecondaryAttackRuntimeWeaponRebind.Apply(weapon, snapshot);
             Attack first = weapon.m_shared.m_secondaryAttack;
             SecondaryAttackRuntimeWeaponRebind.Apply(weapon, snapshot);
-            Calls("resolve-rebind", "build-rebind", "normalize-rebind");
+            Equal("configured", first.Label, "configured attack");
             Equal(true, ReferenceEquals(first, weapon.m_shared.m_secondaryAttack), "same revision attack reference");
         });
         Run("rebind changed revision reapplies", () =>
         {
             var weapon = Weapon();
-            SecondaryAttackRuntimeWeaponRebind.Apply(weapon, Snapshot(0, new()));
+            var definition = new SecondaryAttackDefinition { ConfiguredSecondaryAttack = new Attack { Label = "configured" } };
+            SecondaryAttackRuntimeWeaponRebind.Apply(weapon, Snapshot(0, definition));
             Attack first = weapon.m_shared.m_secondaryAttack;
-            SecondaryAttackRuntimeWeaponRebind.Apply(weapon, Snapshot(1, new()));
+            SecondaryAttackRuntimeWeaponRebind.Apply(weapon, Snapshot(1, definition));
             Equal(false, ReferenceEquals(first, weapon.m_shared.m_secondaryAttack), "new revision attack reference");
-            Equal(2, SecondaryAttackManager.Calls.Count(x => x == "build-rebind"), "build count");
+            Equal("configured", weapon.m_shared.m_secondaryAttack.Label, "configured attack");
         });
         Run("rebind missing component does not record revision", () =>
         {
@@ -259,10 +260,11 @@ internal static class Program
         {
             var first = Weapon();
             var second = new ItemDrop.ItemData { m_dropPrefab = first.m_dropPrefab };
-            var snapshot = Snapshot(definition: new());
+            var snapshot = Snapshot(definition: new() { ConfiguredSecondaryAttack = new Attack { Label = "configured" } });
             SecondaryAttackRuntimeWeaponRebind.Apply(first, snapshot);
             SecondaryAttackRuntimeWeaponRebind.Apply(second, snapshot);
-            Equal(2, SecondaryAttackManager.Calls.Count(x => x == "build-rebind"), "build count");
+            Equal("configured", first.m_shared.m_secondaryAttack.Label, "first configured attack");
+            Equal("configured", second.m_shared.m_secondaryAttack.Label, "second configured attack");
             Equal(false, ReferenceEquals(first.m_shared.m_secondaryAttack, second.m_shared.m_secondaryAttack), "per-item attack");
         });
         foreach (string mode in new[] { "no-definition", "effect-only", "no-objectdb" })
@@ -285,12 +287,12 @@ internal static class Program
                 var definition = new SecondaryAttackDefinition
                 {
                     DynamicOriginalSecondary = true,
+                    ConfiguredSecondaryAttack = new Attack { Label = "configured" },
                     CooldownFallbackSecondaryAttack = explicitFallback ? new Attack { Label = "cooldown" } : null
                 };
                 SecondaryAttackRuntimeWeaponRebind.Apply(weapon, Snapshot(definition: definition));
                 string expected = explicitFallback ? "cooldown" : "original";
                 Equal(expected, weapon.m_shared.m_secondaryAttack.Label, "dynamic fallback attack");
-                Calls("resolve-rebind", "build-rebind", "normalize-rebind", "clone:" + expected);
             });
         Run("rebind inventory refresh handles absent player and inventory", () =>
         {

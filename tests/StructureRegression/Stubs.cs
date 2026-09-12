@@ -77,6 +77,7 @@ namespace SecondaryAttacks
         public bool AppliesSecondaryOverride = true;
         public bool DynamicOriginalSecondary;
         public Attack? CooldownFallbackSecondaryAttack;
+        public Attack? ConfiguredSecondaryAttack;
     }
 
     internal sealed class SecondaryAttackAppliedWorldSnapshot

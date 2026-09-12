@@ -31,12 +31,22 @@ internal static class SecondaryAttackRuntimeWeaponRebind
             definition.AppliesSecondaryOverride &&
             ObjectDB.instance != null)
         {
-            Attack sourceAttack = SecondaryAttackManager.ResolveSourceAttack(ObjectDB.instance, prefabItemDrop, definition);
-            Attack configuredSecondaryAttack = SecondaryAttackManager.BuildSecondaryAttack(sourceAttack, definition);
-            SecondaryAttackManager.NormalizeCopiedProjectileAim(configuredSecondaryAttack, definition);
-            weapon.m_shared.m_secondaryAttack = ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(definition)
-                ? SecondaryAttackManager.CloneAttack(definition.CooldownFallbackSecondaryAttack ?? prefabItemDrop.m_itemData?.m_shared?.m_secondaryAttack)
-                : configuredSecondaryAttack;
+            if (ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(definition))
+            {
+                weapon.m_shared.m_secondaryAttack = SecondaryAttackManager.CloneAttack(
+                    definition.CooldownFallbackSecondaryAttack ?? prefabItemDrop.m_itemData?.m_shared?.m_secondaryAttack);
+            }
+            else if (definition.ConfiguredSecondaryAttack != null)
+            {
+                weapon.m_shared.m_secondaryAttack = SecondaryAttackManager.CloneAttack(definition.ConfiguredSecondaryAttack);
+            }
+            else
+            {
+                Attack sourceAttack = SecondaryAttackManager.ResolveSourceAttack(ObjectDB.instance, prefabItemDrop, definition);
+                Attack configuredSecondaryAttack = SecondaryAttackManager.BuildSecondaryAttack(sourceAttack, definition);
+                SecondaryAttackManager.NormalizeCopiedProjectileAim(configuredSecondaryAttack, definition);
+                weapon.m_shared.m_secondaryAttack = configuredSecondaryAttack;
+            }
         }
         else
         {
