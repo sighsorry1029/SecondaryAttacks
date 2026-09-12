@@ -331,3 +331,8 @@ BombBile:
 # opt out example. Keep commented unless you really want to disable automatic fallback for that prefab.
 # CrossbowRipperLightning:
 #   preset: none
+
+# This special Draugr Fang variant points directly at the ArrowIron item prefab
+# instead of a Projectile payload, so projectile presets cannot safely use it.
+SP_BowDraugrFang:
+  preset: none
