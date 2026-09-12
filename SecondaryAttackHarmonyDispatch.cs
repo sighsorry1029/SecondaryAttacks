@@ -92,7 +92,6 @@ internal static class SecondaryAttackHarmonyDispatch
             SecondaryAttackFacade.TryApplyPendingConfig();
             MeleeBoomerangProjectileSystem.UpdateDeferredReturnAutoEquips(player);
             SecondaryAttackRuntimeFacade.TryUpdateSecondaryProjectileHoldRepeat(player, secondaryAttackHold);
-            SecondaryCooldownGroupSystem.UpdateActiveCooldowns(player);
             SneakAmbushChargeSystem.Update(player);
             SecondaryCooldownHudSystem.Update(player);
             SecondaryAttackKeyHintSystem.RefreshKeyHintUi();

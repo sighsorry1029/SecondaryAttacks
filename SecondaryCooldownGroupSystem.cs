@@ -104,27 +104,6 @@ internal static class SecondaryCooldownGroupSystem
         return true;
     }
 
-    internal static void UpdateActiveCooldowns(Player player)
-    {
-        if (player == null)
-        {
-            return;
-        }
-
-        if (ShouldBypassCooldowns(player))
-        {
-            return;
-        }
-
-        if (!Cooldowns.TryGetValue(player, out CharacterCooldownState state))
-        {
-            return;
-        }
-
-        EnsureCurrentApplyRevision(state);
-        PruneExpired(state, SecondaryAttackManager.GetNetworkTimeSeconds());
-    }
-
     internal static void CollectHudEntries(
         Player player,
         List<SecondaryCooldownHudSystem.Entry> entries)
