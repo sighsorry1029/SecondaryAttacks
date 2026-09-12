@@ -172,7 +172,7 @@ internal static class SummonQualityHudCompatibility
             if (!child.gameObject.activeSelf ||
                 child.GetComponent<SummonQualityHudMarker>() != null ||
                 child is not RectTransform rect ||
-                !IsNumericLevelName(child.name))
+                !IsCreatureLevelControlLevelGroup(child.name))
             {
                 continue;
             }
@@ -181,24 +181,6 @@ internal static class SummonQualityHudCompatibility
         }
 
         return null;
-    }
-
-    private static bool IsNumericLevelName(string name)
-    {
-        if (!name.StartsWith(CreatureLevelControlLevelPrefix) || name.Length == CreatureLevelControlLevelPrefix.Length)
-        {
-            return false;
-        }
-
-        for (int index = CreatureLevelControlLevelPrefix.Length; index < name.Length; index++)
-        {
-            if (!char.IsDigit(name[index]))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static RectTransform? FindActiveRect(Transform? parent, string name)
