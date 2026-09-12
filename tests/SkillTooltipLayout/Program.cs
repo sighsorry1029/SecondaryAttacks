@@ -16,7 +16,6 @@ string[] dependencyDirectories =
 {
     Path.GetDirectoryName(assemblyPath)!,
     Path.Combine(gameDirectory, "valheim_Data", "Managed"),
-    Path.Combine(gameDirectory, "valheim_Data", "Managed", "publicized_assemblies"),
     Path.Combine(gameDirectory, "BepInEx", "core")
 };
 AssemblyLoadContext.Default.Resolving += (context, name) =>

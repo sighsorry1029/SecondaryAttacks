@@ -1,0 +1,25 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <!-- This non-SDK project already relies on publicized compile references. Generate only
+         those same three references from the selected originals in obj, never in the game.
+         Analyses and compatibility checks must use the originals, including their visibility. -->
+    <PropertyGroup>
+        <PublicizerTaskFramework Condition="'$(MSBuildRuntimeType)' == 'Core'">netstandard2.1</PublicizerTaskFramework>
+        <PublicizerTaskFramework Condition="'$(MSBuildRuntimeType)' != 'Core'">net472</PublicizerTaskFramework>
+    </PropertyGroup>
+    <UsingTask TaskName="PublicizeTask" AssemblyFile="$(PkgBepInEx_AssemblyPublicizer_MSBuild)\lib\$(PublicizerTaskFramework)\BepInEx.AssemblyPublicizer.MSBuild.dll" />
+    <ItemGroup>
+        <Publicize Include="assembly_valheim;assembly_utils;assembly_guiutils" />
+    </ItemGroup>
+    <Target Name="PrepareGameCompileReferences" AfterTargets="ResolveReferences" BeforeTargets="FindReferenceAssembliesForReferences">
+        <PublicizeTask IntermediateOutputPath="$(IntermediateOutputPath)" GeneratedIgnoresAccessChecksToFile="$(IntermediateOutputPath)SecondaryAttacks.GameAccess.cs" ReferencePath="@(ReferencePath)" PackageReference="@(PackageReference)" Publicize="@(Publicize)">
+            <Output TaskParameter="RemovedReferences" ItemName="GameOriginalReferences" />
+            <Output TaskParameter="PublicizedReferences" ItemName="GameCompileReferences" />
+        </PublicizeTask>
+        <ItemGroup>
+            <ReferencePath Remove="@(GameOriginalReferences)" />
+            <ReferencePath Include="@(GameCompileReferences)" />
+            <Compile Include="$(IntermediateOutputPath)SecondaryAttacks.GameAccess.cs" />
+            <Compile Include="$(PkgBepInEx_AssemblyPublicizer_MSBuild)\contentFiles\cs\any\IgnoresAccessChecksToAttribute.cs" />
+        </ItemGroup>
+    </Target>
+</Project>

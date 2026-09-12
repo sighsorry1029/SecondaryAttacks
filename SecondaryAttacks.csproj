@@ -78,7 +78,8 @@
           <HintPath>..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_googleanalytics.dll</HintPath>
         </Reference>
         <Reference Include="assembly_guiutils">
-            <HintPath>$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll</HintPath>
+            <HintPath>$(CorlibPath)\assembly_guiutils.dll</HintPath>
+            <Private>false</Private>
         </Reference>
         <Reference Include="assembly_lux">
           <HintPath>..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_lux.dll</HintPath>
@@ -93,10 +94,12 @@
           <HintPath>..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\assembly_sunshafts.dll</HintPath>
         </Reference>
         <Reference Include="assembly_utils">
-            <HintPath>$(PublicizedAssembliesPath)\assembly_utils_publicized.dll</HintPath>
+            <HintPath>$(CorlibPath)\assembly_utils.dll</HintPath>
+            <Private>false</Private>
         </Reference>
         <Reference Include="assembly_valheim">
-            <HintPath>$(PublicizedAssembliesPath)\assembly_valheim_publicized.dll</HintPath>
+            <HintPath>$(CorlibPath)\assembly_valheim.dll</HintPath>
+            <Private>false</Private>
         </Reference>
         <Reference Include="BepInEx">
             <HintPath>$(BepInExPath)\core\BepInEx.dll</HintPath>
@@ -595,8 +598,10 @@
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="YamlDotNet" Version="16.3.0" />
+        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" ExcludeAssets="all" GeneratePathProperty="true" />
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
+    <Import Project="build\GameReferences.targets"/>
     <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
          Other similar extension points exist, see Microsoft.Common.targets.
     <Target Name="BeforeBuild">

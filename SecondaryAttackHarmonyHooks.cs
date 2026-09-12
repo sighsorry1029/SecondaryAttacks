@@ -373,6 +373,32 @@ internal static class AttackStartCooldownAdjustmentPatch
     }
 }
 
+[HarmonyPatch(typeof(Attack), "GetAttackEitr", new Type[0])]
+internal static class AttackGetEitrConfiguredCostPatch
+{
+    private static bool Prefix(
+        Attack __instance,
+        Humanoid ___m_character,
+        ItemDrop.ItemData ___m_weapon,
+        ref float __result)
+    {
+        // 1.0.7 delegates to the primary weapon attack even for a secondary clone.
+        // Preserve the configured instance cost without changing the public tooltip overload.
+        if (___m_character == null || ___m_weapon?.m_shared?.m_attack == null ||
+            __instance.m_attackEitr == ___m_weapon.m_shared.m_attack.m_attackEitr ||
+            !SecondaryAttackRuntimeFacade.TryGetDefinition(___m_weapon, out _))
+        {
+            return true;
+        }
+
+        float cost = __instance.m_attackEitr;
+        __result = cost <= 0f
+            ? 0f
+            : cost - cost * 0.33f * ___m_character.GetSkillFactor(___m_weapon.m_shared.m_skillType);
+        return false;
+    }
+}
+
 [HarmonyPatch(typeof(Player), nameof(Player.AddAdrenaline))]
 internal static class PlayerAddAdrenalineSecondaryAttackPatch
 {

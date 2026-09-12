@@ -209,7 +209,8 @@ internal static class SecondaryAttackItemTooltipSystem
         typeof(int),
         typeof(bool),
         typeof(float),
-        typeof(int)
+        typeof(int),
+        typeof(bool)
     })]
 [HarmonyAfter(
     "randyknapp.mods.epicloot",
@@ -222,9 +223,10 @@ internal static class ItemDataGetTooltipSecondaryAttackPatch
     private static void Postfix(
         ItemDrop.ItemData item,
         bool crafting,
+        bool appending,
         ref string __result)
     {
-        if (crafting ||
+        if (crafting || appending ||
             item == null ||
             SecondaryAttacksPlugin.SecondaryAttackTooltipsEnabled.Value != SecondaryAttacksPlugin.Toggle.On)
         {

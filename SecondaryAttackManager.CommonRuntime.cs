@@ -361,7 +361,7 @@ internal static partial class SecondaryAttackManager
             return;
         }
 
-        float drain = GetItemDurabilityDrain(weapon) * Mathf.Max(0f, durabilityFactor);
+        float drain = GetItemDurabilityDrain(weapon) * Mathf.Max(0f, durabilityFactor) * Game.m_durabilityRate;
         if (drain <= 0f)
         {
             return;

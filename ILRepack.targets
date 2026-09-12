@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <Target Name="ILRepacker" AfterTargets="Build">
+        <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)build\PrepareServerSync.ps1&quot; -InputDll &quot;$(ProjectDir)Libs\ServerSync.dll&quot; -OutputDll &quot;$(ProjectDir)$(OutputPath)Libs\ServerSync.dll&quot; -GameDll &quot;$(CorlibPath)\assembly_valheim.dll&quot; -CecilDll &quot;$(BepInExPath)\core\Mono.Cecil.dll&quot;" />
         <ItemGroup>
             <InputAssemblies Include="$(TargetPath)" />
             <InputAssemblies Include="$(OutputPath)Libs\ServerSync.dll" />
