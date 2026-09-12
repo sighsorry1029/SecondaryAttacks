@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.4
+
+- Added Valheim 1.0.7 compatibility for the expanded `ItemDrop.ItemData.GetTooltip` signature, while preserving tooltip patch order and preventing duplicate secondary-attack descriptions in appended item tooltips.
+- Updated the bundled ServerSync build input for Valheim 1.0.7's constant `ZRoutedRpc.Everybody` contract. The guarded build step patches only the verified bundled binary copy before merging and leaves the vendored source DLL unchanged.
+- Preserved configured secondary-attack Eitr costs after Valheim 1.0.7 changed the private cost calculation to read the primary attack, and applied the new world durability-rate multiplier to secondary attacks that consume durability directly.
+- Excluded `SP_BowDraugrFang` from automatic ranged presets because its `ArrowIron` payload is an item prefab rather than a `Projectile`; existing local YAML remains user-controlled.
+- Rebased the three publicized compile references on the installed original game assemblies without modifying or packaging the game DLLs, and added client/server contract checks for direct references, Harmony targets, reflection members, and movement transpiler field loads.
+- Updated the required BepInExPack dependency to `5.4.2350`.
+
 ## 1.2.3
 
 - Moved Blood Magic and Sneak skill tooltips beside the visible Skills panel, following the hovered row with an 8 UI-unit gap and screen-edge protection. Preserved the vanilla 250-unit text width, added separate background padding, and centered section headings while left-aligning descriptions.
