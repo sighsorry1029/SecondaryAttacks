@@ -529,7 +529,6 @@
         <Compile Include="SecondaryAttackConfig.Raw.cs" />
         <Compile Include="SecondaryAttackBehaviors.cs" />
         <Compile Include="SecondaryAttackDefinition.cs" />
-        <Compile Include="SecondaryAttackDefaultYamlResources.cs" />
         <Compile Include="SecondaryAttackManager.ConfigHelpers.cs" />
         <Compile Include="SecondaryAttackManager.CommonRuntime.cs" />
         <Compile Include="SecondaryAttackHarmonyDispatch.cs" />

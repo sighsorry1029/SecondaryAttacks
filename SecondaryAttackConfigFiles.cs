@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using BepInEx;
 
@@ -40,6 +41,7 @@ internal sealed class SecondaryAttackYamlDomain
 
 internal static class SecondaryAttackYamlDomainRegistry
 {
+    private const string DefaultResourcePrefix = "SecondaryAttacks.Resources.Defaults.";
     internal const string ConfigDirectoryName = "SecondaryAttacks";
     internal const string RangedYamlFileName = "SecondaryAttacks.Ranged.yml";
     internal const string MeleeYamlFileName = "SecondaryAttacks.Melee.yml";
@@ -59,17 +61,17 @@ internal static class SecondaryAttackYamlDomainRegistry
             SecondaryAttackYamlDomainId.Ranged,
             RangedYamlFileName,
             RangedYamlFilePath,
-            () => SecondaryAttackDefaultYamlResources.Load(RangedYamlFileName)),
+            () => LoadDefaultContents(RangedYamlFileName)),
         new(
             SecondaryAttackYamlDomainId.Melee,
             MeleeYamlFileName,
             MeleeYamlFilePath,
-            () => SecondaryAttackDefaultYamlResources.Load(MeleeYamlFileName)),
+            () => LoadDefaultContents(MeleeYamlFileName)),
         new(
             SecondaryAttackYamlDomainId.BloodMagic,
             BloodMagicYamlFileName,
             BloodMagicYamlFilePath,
-            () => SecondaryAttackDefaultYamlResources.Load(BloodMagicYamlFileName)),
+            () => LoadDefaultContents(BloodMagicYamlFileName)),
     };
 
     private static readonly Dictionary<SecondaryAttackYamlDomainId, SecondaryAttackYamlDomain> DomainsById =
@@ -80,6 +82,20 @@ internal static class SecondaryAttackYamlDomainRegistry
     public static SecondaryAttackYamlDomain Get(SecondaryAttackYamlDomainId id)
     {
         return DomainsById[id];
+    }
+
+    private static string LoadDefaultContents(string fileName)
+    {
+        string resourceName = DefaultResourcePrefix + fileName;
+        Assembly assembly = typeof(SecondaryAttackYamlDomainRegistry).Assembly;
+        using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            throw new InvalidOperationException($"Embedded default YAML resource '{resourceName}' was not found.");
+        }
+
+        using StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 }
 
