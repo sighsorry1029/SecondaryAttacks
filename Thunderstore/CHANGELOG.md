@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5
+
+- Reused the world-applied secondary-attack template when rebinding inventory weapons, while preserving per-item attack instances, apply revisions, dynamic-original cooldown fallbacks, and the legacy build fallback for incomplete snapshots.
+- Removed a redundant per-frame cooldown expiration pass and reused the existing Creature Level & Loot Control `level_<digits>` compatibility predicate without changing HUD provider priority or ownership checks.
+- Co-located embedded default YAML loading with the YAML domain registry and removed stale publicized-assembly path settings; configuration keys, YAML resource names, dependencies, and runtime behavior remain unchanged.
+
 ## 1.2.4
 
 - Added Valheim 1.0.7 compatibility for the expanded `ItemDrop.ItemData.GetTooltip` signature, while preserving tooltip patch order and preventing duplicate secondary-attack descriptions in appended item tooltips.
