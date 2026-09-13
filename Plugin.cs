@@ -15,6 +15,7 @@ namespace SecondaryAttacks;
 [BepInPlugin(ModGUID, ModName, ModVersion)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(SecondaryAttacksPlugin.ShieldMeBruhPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.CreatureManagerGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.CreatureLevelControlGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.StarLevelSystemGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -22,11 +23,12 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 {
     internal const string MagicPluginGuid = "blacks7ar.MagicPlugin";
     internal const string QuickstepPluginGuid = "shudnal.Quickstep";
+    internal const string ShieldMeBruhPluginGuid = "vapok.mods.shieldmebruh";
     internal const string CreatureManagerGuid = "sighsorry.CreatureManager";
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.2.5";
+    internal const string ModVersion = "1.2.6";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -60,6 +62,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> SecondaryCooldownHudPositionY { get; private set; } = null!;
     internal static ConfigEntry<Toggle> AdminNoPresetCooldowns { get; private set; } = null!;
     internal static ConfigEntry<Toggle> QuickstepEnabled { get; private set; } = null!;
+    internal static ConfigEntry<Toggle> AutoEquipLastShield { get; private set; } = null!;
     private FileSystemWatcher? _watcher;
     private SecondaryAttackReloadDebouncer? _configReloadDebouncer;
     private readonly object _reloadLock = new();
@@ -115,6 +118,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             BindRangedSettings();
             BindUiSettings();
             QuickstepSystem.Initialize();
+            LastEquippedShieldSystem.Initialize();
             SummonQualityHudCompatibility.Initialize();
             RegisterWorldApplySettingHandlers();
             Assembly assembly = Assembly.GetExecutingAssembly();
@@ -137,6 +141,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         _watcher = null;
         _configReloadDebouncer?.Dispose();
         _configReloadDebouncer = null;
+        LastEquippedShieldSystem.Dispose();
         QuickstepSystem.Dispose();
         UnregisterWorldApplySettingHandlers();
         SecondaryAttackFacade.Dispose();
@@ -335,6 +340,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         const string group = "1 - General";
         _ = ConfigSync.AddLockingConfigEntry(config(group, "Lock Configuration", Toggle.On, new ConfigDescription("If on, the configuration is locked and can be changed by server admins only.", null, new ConfigurationManagerAttributes { Order = 700 })));
         AdminNoPresetCooldowns = config(group, "Admin No Preset Cooldowns", Toggle.Off, new ConfigDescription("Client-side admin convenience. If on, host or server-admin players use SecondaryAttacks presets without preset cooldowns. This does not change server-synced YAML values and does not remove internal hit throttles.", null, new ConfigurationManagerAttributes { Order = 690 }), synchronizedSetting: false);
+        AutoEquipLastShield = config(group, "Auto Equip Last Shield", Toggle.On, new ConfigDescription("Remembers the most recently equipped shield and automatically equips that exact shield after a one-handed weapon is successfully equipped while the left hand is empty. The shield must be in the player's inventory. This feature disables itself when ShieldMeBruh is loaded.", null, new ConfigurationManagerAttributes { Order = 685 }), synchronizedSetting: false);
         QuickstepEnabled = config(group, "Quickstep Enabled", Toggle.On, new ConfigDescription("Enables the fixed quickstep for equipped Knives and Unarmed weapons. Bare fists are excluded. Quickstep uses 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep and its double-press dodge handoff each consume 60% of the current dodge stamina cost.", null, new ConfigurationManagerAttributes { Order = 680 }), synchronizedSetting: true);
         BackstabSneakSkillRaiseAmount = config(group, "Backstab Sneak Skill Raise Amount", 1.0f, new ConfigDescription("Sneak skill raise amount awarded whenever any attack successfully triggers backstab damage. 0 disables this reward.", new AcceptableValueRange<float>(0f, 10f), new ConfigurationManagerAttributes { Order = 670 }), synchronizedSetting: true);
         SneakVisibilitySkillEffectFactor = config(group, "Sneak Visibility Skill Effect Factor", 2.0f, new ConfigDescription("Multiplier for the visibility reduction gained from Sneak skill while crouching. 1.0 keeps vanilla; 2.0 doubles only the skill-based reduction. Visibility is clamped to a fixed minimum of 0.1. At factor 1.0, Sneak 0 is 0.5 in darkness and 1.0 in bright light; Sneak 100 is 0.2 in darkness and 0.6 in bright light.", new AcceptableValueRange<float>(1f, 2f), new ConfigurationManagerAttributes { Order = 660 }), synchronizedSetting: true);

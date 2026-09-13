@@ -477,6 +477,7 @@
         <Compile Include="KeyHintCell.cs" />
         <Compile Include="KnockbackChainSystem.cs" />
         <Compile Include="LaunchSlamSystem.cs" />
+        <Compile Include="LastEquippedShieldSystem.cs" />
         <Compile Include="LocalizationManager.cs" />
         <Compile Include="Compat\GroundworkCompat.cs" />
         <Compile Include="MagicPluginSummonQualitySystem.cs" />

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.6
+
+- Added the client-only `Auto Equip Last Shield` option, enabled by default. The exact most recently equipped shield is remembered and equipped alongside a one-handed weapon when the left hand is empty, without replacing torches or other left-hand equipment.
+- Persisted the selection through namespaced player and item save data, skipped ambiguous duplicate identities, and disabled the feature when ShieldMeBruh is loaded to avoid competing equipment patches.
+
 ## 1.2.5
 
 - Reused the world-applied secondary-attack template when rebinding inventory weapons, while preserving per-item attack instances, apply revisions, dynamic-original cooldown fallbacks, and the legacy build fallback for incomplete snapshots.

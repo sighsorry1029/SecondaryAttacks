@@ -12,6 +12,7 @@ Adds secondary attacks for bows, staves, bombs, melee weapons, and Blood Magic, 
 - Supports cooldowns, durability cost, resource cost, ammo cost, skill gain, adrenaline gain, and HUD feedback.
 - Shares cooldowns by automatically recognized weapon family, with preset-based fallback for unrecognized weapons; Blood Magic summon and shield families remain independent.
 - Optionally replaces dodge with a fixed quickstep while a knife or Unarmed weapon is equipped.
+- Remembers the last equipped shield and automatically equips it alongside a one-handed weapon when the left hand is empty.
 - Includes compatibility support for MagicPlugin summon projectiles and the companion WarfareTweaks mod.
 
 ## Ranged Presets
@@ -178,6 +179,12 @@ Overcharged Bomb greatly increases bomb damage and area size, at the cost of con
 
 Quickstep uses fixed behavior: 200 horizontal acceleration for 0.25 seconds, full-duration invincibility without a shield, 0.15 seconds of invincibility with a shield, and a 0.5-second cooldown. Quickstep consumes 60% of the current vanilla dodge stamina cost. Pressing dodge again during the dash hands off to a regular roll for another 60%; without enough stamina, the dash continues and the second input is consumed. During the quickstep cooldown, a standalone regular roll remains available at its full vanilla cost. If the standalone `shudnal.Quickstep` plugin is loaded, the integrated implementation disables itself to avoid competing dodge patches.
 
+## Last Equipped Shield
+
+`Auto Equip Last Shield` is a client-only option that defaults to on. After a shield is successfully equipped, the mod remembers that exact item. Equipping a one-handed weapon later also equips the remembered shield when it is in the player inventory and the left hand is empty. Existing torches and other left-hand equipment are never replaced, and a missing or broken shield simply remains unequipped.
+
+The remembered item survives inventory moves, storage, tombstones, and logout through namespaced item and player save data. If the standalone `vapok.mods.shieldmebruh` plugin is loaded, the integrated implementation disables itself to avoid competing equipment patches.
+
 ## Blood Magic
 
 `SecondaryAttacks.BloodMagic.yml` adds special support for Blood Magic staves.
@@ -211,7 +218,7 @@ The mod creates these files in `BepInEx/config/SecondaryAttacks/`:
 
 Use `SecondaryAttacks_AnimationReferences.txt` when choosing values for YAML `animation` fields.
 
-The generated `.cfg` options are grouped as `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`. General lists configuration locking first, followed by the admin cooldown convenience and player movement, backstab, and Sneak adjustments. `Keep Crouching During Elemental Damage Over Time` defaults to on in fresh configurations and preserves crouching through periodic Fire, Spirit, and Poison ticks while leaving direct, lethal, stagger, and knockback damage unchanged. Existing saved config values are retained.
+The generated `.cfg` options are grouped as `1 - General`, `2 - Blood Magic`, `3 - Ranged`, and `4 - UI`. General lists configuration locking first, followed by the client-only last-shield and admin cooldown conveniences, player movement, backstab, and Sneak adjustments. `Auto Equip Last Shield` defaults to on and is added as on when the key is absent from an existing configuration. `Keep Crouching During Elemental Damage Over Time` defaults to on in fresh configurations and preserves crouching through periodic Fire, Spirit, and Poison ticks while leaving direct, lethal, stagger, and knockback damage unchanged. Existing saved values for established keys are retained.
 
 Hovering the Blood Magic or Sneak icon in the Skills tab shows a tooltip beside the Skills panel, following the hovered row. Descriptions are left-aligned, section headings are centered, and the vanilla text width is preserved with separate background padding. The localized SecondaryAttacks section describes enabled skill-related mechanics without replacing the vanilla skill description.
 
