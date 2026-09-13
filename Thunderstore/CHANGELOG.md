@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.7
+
+- Gave the vanilla `Club`, which has no native secondary attack, a usable automatic `launchSlam` by borrowing `MaceIron`'s one-handed club secondary attack when the slot remains empty.
+- Preserved existing `Club` secondary attacks supplied by the game or another mod, and documented the fallback in the default melee YAML.
+
 ## 1.2.6
 
 - Added the client-only `Auto Equip Last Shield` option, enabled by default. The exact most recently equipped shield is remembered and equipped alongside a one-handed weapon when the left hand is empty, without replacing torches or other left-hand equipment.

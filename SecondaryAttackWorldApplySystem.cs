@@ -7,6 +7,9 @@ namespace SecondaryAttacks;
 
 internal static class SecondaryAttackWorldApplySystem
 {
+    private const string VanillaClubPrefabName = "Club";
+    private const string DefaultClubSecondarySourcePrefabName = "MaceIron";
+
     private static int _nextApplyRevision = 1;
 
     public static SecondaryAttackAppliedWorldSnapshot Apply(
@@ -419,15 +422,27 @@ internal static class SecondaryAttackWorldApplySystem
                 return false;
         }
 
-        fallback.Secondary = CreateDefaultMeleeSecondary(globalMeleeFallback.Secondary, fallback);
+        fallback.Secondary = CreateDefaultMeleeSecondary(itemDrop, globalMeleeFallback.Secondary, fallback);
         defaultMeleeFallback = fallback;
         return true;
     }
 
     private static NormalizedSecondaryModeConfig? CreateDefaultMeleeSecondary(
+        ItemDrop itemDrop,
         NormalizedSecondaryModeConfig? source,
         NormalizedWeaponConfig fallback)
     {
+        if (fallback.LaunchSlam != null &&
+            string.Equals(itemDrop.name, VanillaClubPrefabName, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(itemDrop.m_itemData?.m_shared?.m_secondaryAttack?.m_attackAnimation))
+        {
+            return new NormalizedSecondaryModeConfig
+            {
+                Type = "copy",
+                CopyFrom = DefaultClubSecondarySourcePrefabName
+            };
+        }
+
         if (fallback.Aftershock != null)
         {
             return CloneAftershockSecondary(source);

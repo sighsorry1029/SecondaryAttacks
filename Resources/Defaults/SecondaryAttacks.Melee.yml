@@ -22,6 +22,7 @@
 # damageFactor: multiplier for the HitData produced by the active secondary attack, not the root primary cost.
 # If the weapon has a real secondary attack, damageFactor multiplies that secondary-derived damage.
 # If the weapon has no usable secondary, a preset may copy a valid primary attack into the secondary slot; then damageFactor multiplies that primary-derived generated secondary damage.
+# Vanilla Club has no secondary attack, so automatic launchSlam borrows MaceIron's one-handed club secondary attack.
 # Projectile-based melee specials such as boomerang, impactBurst, and spearRain multiply the source projectile's original secondary HitData.
 # pushFactor: multiplier for the same active secondary/generated secondary HitData push force.
 
