@@ -495,6 +495,7 @@ internal sealed class MagicSummonOverrideConfig
 {
     public string QualityPreset { get; set; } = "";
 
+    // Parse-only compatibility for existing YAML. Summon scaling is capped at 10 internally.
     public int? MaxQuality { get; set; }
 
     public int? LifetimeSeconds { get; set; }

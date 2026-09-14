@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.8
+
+- Made Blood Magic summon quality presets follow actual staff quality, including Idol upgrades, up to a fixed level/count cap of 10, while preserving each item's normal crafting upgrade limit. Existing `summon.maxQuality` YAML keys remain accepted but are ignored.
+- Fixed repeated summon-limit enforcement removing multiple existing summons in one cast by excluding destroyed or pending-removal summons from subsequent counts, while retaining bounded retry behavior for delayed or failed network removal.
+- Added merged-DLL regression coverage for legacy Blood Magic YAML, quality boundaries, crafting-limit ownership, and local or delayed-network summon replacement sequences.
+
 ## 1.2.7
 
 - Gave the vanilla `Club`, which has no native secondary attack, a usable automatic `launchSlam` by borrowing `MaceIron`'s one-handed club secondary attack when the slot remains empty.

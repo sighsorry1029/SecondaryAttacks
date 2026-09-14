@@ -11,11 +11,11 @@ namespace SecondaryAttacks;
 
 internal static class MagicSummonQualityPresetSystem
 {
-    private const int GlobalMaxQuality = 4;
+    // Summon scaling only; crafting limits remain owned by the item/game.
+    private const int MaxSummonQuality = 10;
     private const int GlobalFixedSummonLevel = 1;
     private const string SummonOwnerZdoKey = "SecondaryAttacks_SummonOwner";
     private const string SummonLifetimeExpiryZdoKey = "SecondaryAttacks_SummonExpiresAt";
-    private static readonly ConditionalWeakTable<ObjectDB, ObjectDbState> ObjectDbStates = new();
     private static readonly ConditionalWeakTable<SpawnAbility, SpawnAbilityRuntimeState> PendingSpawnAbilityStates = new();
     private static readonly ConditionalWeakTable<SpawnAbility, SpawnAbilityRuntimeState> ActiveSpawnAbilityStates = new();
     private static readonly MethodInfo? TameableUnSummonMethod = AccessTools.DeclaredMethod(typeof(Tameable), "UnSummon");
@@ -34,8 +34,6 @@ internal static class MagicSummonQualityPresetSystem
             return;
         }
 
-        ObjectDbState state = ObjectDbStates.GetValue(objectDb, _ => new ObjectDbState());
-        RestoreOriginalMaxQualities(objectDb, state);
         RulesBySharedName.Clear();
         LifetimeOverridesByItemPrefab.Clear();
         LifetimeOverridesBySharedName.Clear();
@@ -50,7 +48,6 @@ internal static class MagicSummonQualityPresetSystem
             return;
         }
 
-        ObjectDbState state = ObjectDbStates.GetValue(objectDb, _ => new ObjectDbState());
         RebuildCoreRules(summonConfigs, objectDb);
         RebuildLifetimeOverrides(summonConfigs, objectDb);
         RulesBySharedName.Clear();
@@ -70,13 +67,6 @@ internal static class MagicSummonQualityPresetSystem
                 continue;
             }
 
-            string restoreKey = itemPrefab.name;
-            if (!state.OriginalMaxQualities.ContainsKey(restoreKey))
-            {
-                state.OriginalMaxQualities[restoreKey] = shared.m_maxQuality;
-            }
-
-            shared.m_maxQuality = rule.MaxQuality;
             RulesBySharedName[shared.m_name] = rule;
         }
     }
@@ -160,7 +150,7 @@ internal static class MagicSummonQualityPresetSystem
         string groupId = "";
         if (hasQualityRule)
         {
-            int quality = Mathf.Clamp(item.m_quality, 1, rule.MaxQuality);
+            int quality = item.m_quality;
             summonLevel = rule.GetSummonLevel(quality);
             maxInstances = rule.GetMaxInstances(quality);
             groupId = rule.GroupId;
@@ -441,9 +431,19 @@ internal static class MagicSummonQualityPresetSystem
 
         Player? owner = ResolveOwner(ownerId);
         List<Character> summons = new();
+        double now = Time.realtimeSinceStartupAsDouble;
         foreach (Character character in Character.GetAllCharacters())
         {
-            if (character == null || character.IsDead() || !IsMatchingSummonGroup(character, groupId))
+            if (character == null || !IsMatchingSummonGroup(character, groupId))
+            {
+                continue;
+            }
+
+            SummonQualityPresetTag tag = character.GetComponent<SummonQualityPresetTag>();
+            ZNetView? view = character.GetComponent<ZNetView>();
+            // Destroy clears the ZDO before Unity removes the Character from its
+            // list. Counting that entry again can evict another living summon.
+            if (!tag.CountsTowardLimit(view != null && view.IsValid(), character.IsDead(), now))
             {
                 continue;
             }
@@ -498,8 +498,7 @@ internal static class MagicSummonQualityPresetSystem
 
             rules.Add(new QualityRule(
                 itemPrefabName,
-                config.QualityPreset,
-                Mathf.Clamp(config.MaxQuality, 1, 10)));
+                config.QualityPreset));
         }
 
         return rules;
@@ -539,8 +538,7 @@ internal static class MagicSummonQualityPresetSystem
 
             rules.Add(new QualityRule(
                 itemPrefab.name,
-                globalPreset,
-                GlobalMaxQuality));
+                globalPreset));
             explicitItems.Add(itemPrefab.name);
         }
     }
@@ -666,21 +664,6 @@ internal static class MagicSummonQualityPresetSystem
                 LifetimeOverridesBySharedName[sharedName] = lifetimeSeconds;
             }
         }
-    }
-
-    private static void RestoreOriginalMaxQualities(ObjectDB objectDb, ObjectDbState state)
-    {
-        foreach ((string itemPrefabName, int maxQuality) in state.OriginalMaxQualities)
-        {
-            GameObject? itemPrefab = objectDb.GetItemPrefab(itemPrefabName);
-            ItemDrop.ItemData.SharedData? shared = itemPrefab != null ? itemPrefab.GetComponent<ItemDrop>()?.m_itemData?.m_shared : null;
-            if (shared != null)
-            {
-                shared.m_maxQuality = maxQuality;
-            }
-        }
-
-        state.OriginalMaxQualities.Clear();
     }
 
     private static bool TryResolveRule(SpawnAbility spawnAbility, ItemDrop.ItemData item, out QualityRule rule)
@@ -918,15 +901,37 @@ internal static class MagicSummonQualityPresetSystem
 
     private static void RemoveSummon(Character summon)
     {
-        Tameable tameable = summon.GetComponent<Tameable>();
-        if (tameable != null)
+        ZNetView? view = summon.GetComponent<ZNetView>();
+        if (view == null || !view.IsValid())
         {
-            InvokeUnSummon(tameable);
             return;
         }
 
-        ZNetView? view = summon.GetComponent<ZNetView>();
-        if (view != null && view.IsValid() && view.IsOwner())
+        Tameable tameable = summon.GetComponent<Tameable>();
+        if (tameable != null)
+        {
+            SummonQualityPresetTag? tag = summon.GetComponent<SummonQualityPresetTag>();
+            if (tag == null || TameableUnSummonMethod == null ||
+                !tag.TryBeginRemoval(Time.realtimeSinceStartupAsDouble))
+            {
+                return;
+            }
+
+            try
+            {
+                // Record the request before the RPC: local delivery can reenter,
+                // while a remote owner may not destroy the object until later.
+                InvokeUnSummon(tameable);
+            }
+            catch
+            {
+                tag.CancelRemoval();
+                throw;
+            }
+            return;
+        }
+
+        if (view.IsOwner())
         {
             ZNetScene.instance.Destroy(summon.gameObject);
         }
@@ -979,11 +984,6 @@ internal static class MagicSummonQualityPresetSystem
 
         string sanitized = new string(characters).Trim('_');
         return string.IsNullOrWhiteSpace(sanitized) ? "Summon" : sanitized;
-    }
-
-    private sealed class ObjectDbState
-    {
-        internal Dictionary<string, int> OriginalMaxQualities { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     internal sealed class SpawnAbilityRuntimeState
@@ -1057,12 +1057,10 @@ internal static class MagicSummonQualityPresetSystem
     {
         internal QualityRule(
             string itemPrefabName,
-            MagicSummonQualityPreset preset,
-            int maxQuality)
+            MagicSummonQualityPreset preset)
         {
             ItemPrefabName = itemPrefabName;
             Preset = preset;
-            MaxQuality = maxQuality;
             GroupId = $"SecondaryAttacks.MagicSummon.{SanitizeGroupKey(itemPrefabName)}";
         }
 
@@ -1070,21 +1068,19 @@ internal static class MagicSummonQualityPresetSystem
 
         internal MagicSummonQualityPreset Preset { get; }
 
-        internal int MaxQuality { get; }
-
         internal string GroupId { get; }
 
         internal int GetSummonLevel(int itemQuality)
         {
             return Preset == MagicSummonQualityPreset.LevelByQuality
-                ? Mathf.Clamp(itemQuality, 1, MaxQuality)
+                ? Mathf.Clamp(itemQuality, 1, MaxSummonQuality)
                 : GlobalFixedSummonLevel;
         }
 
         internal int GetMaxInstances(int itemQuality)
         {
             return Preset == MagicSummonQualityPreset.CountByQuality
-                ? Mathf.Clamp(itemQuality, 1, MaxQuality)
+                ? Mathf.Clamp(itemQuality, 1, MaxSummonQuality)
                 : 1;
         }
     }
@@ -1092,6 +1088,34 @@ internal static class MagicSummonQualityPresetSystem
 
 internal sealed class SummonQualityPresetTag : MonoBehaviour
 {
+    private const double RemovalRetrySeconds = 5d;
+
+    // Local transient state only. Failed/lost requests become eligible at the
+    // next limit check after the deadline; no timer, saved data or RPC is added.
+    [NonSerialized]
+    private double _removalRetryAt;
+
+    internal bool CountsTowardLimit(bool hasValidView, bool isDead, double now)
+    {
+        return hasValidView && !isDead && now >= _removalRetryAt;
+    }
+
+    internal bool TryBeginRemoval(double now)
+    {
+        if (now < _removalRetryAt)
+        {
+            return false;
+        }
+
+        _removalRetryAt = now + RemovalRetrySeconds;
+        return true;
+    }
+
+    internal void CancelRemoval()
+    {
+        _removalRetryAt = 0d;
+    }
+
     [SerializeField]
     internal string GroupId = "";
 

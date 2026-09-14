@@ -205,6 +205,8 @@ Summon Empower buffs nearby summons with configurable duration, a factor for non
 
 Blood Magic summon quality can scale in two ways: `levelByQuality` increases summon level by staff quality, while `countByQuality` increases the number of active summons.
 
+Both presets use actual staff quality, including Idol upgrades, up to a fixed quality cap of 10. `levelByQuality` keeps one summon; `countByQuality` keeps summons at level 1. Normal crafting upgrade limits are preserved. The former YAML `summon.maxQuality` key is still accepted for compatibility but its value is ignored; existing YAML files do not need editing. This also means an old value of 4 no longer prevents Idol qualities above 4 from improving summons. The built-in star HUD supports up to level 10 (9 stars).
+
 Fresh configurations default Blood Magic summon lifetimes to `1200` seconds; existing saved config values are retained. Set `Blood Magic Summon Lifetime Seconds` in `2 - Blood Magic` to a positive whole number to enable lifetime assignment, expiration, restoration, and HUD timers. A value of `0` disables the entire lifetime feature, including staff-specific YAML overrides. When enabled, a staff entry can set a positive integer `summon.lifetimeSeconds` in `SecondaryAttacks.BloodMagic.yml` to override the global base lifetime. Staff YAML takes precedence over the positive global value, and Blood Magic skill scaling is applied after the base lifetime is selected. Omitting the YAML value keeps the global fallback.
 
 ## Configuration

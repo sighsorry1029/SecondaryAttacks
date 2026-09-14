@@ -85,7 +85,6 @@ internal static class SecondaryAttackMagicSummonNormalizer
             {
                 EntryId = normalizedEntryId,
                 QualityPreset = qualityPreset,
-                MaxQuality = ClampInt(raw.MaxQuality ?? 4, 1, 10),
                 LifetimeSeconds = lifetimeSeconds,
                 Summons = normalizedSummons
             };
