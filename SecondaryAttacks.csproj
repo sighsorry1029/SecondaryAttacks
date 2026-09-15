@@ -551,6 +551,7 @@
         <Compile Include="SecondaryAttackWarningLog.cs" />
         <Compile Include="SecondaryCooldownGroupSystem.cs" />
         <Compile Include="SummonPrefabOverrideSystem.cs" />
+        <Compile Include="SubSummonSystem.cs" />
         <Compile Include="SummonSpawnAbilityResolver.cs" />
         <Compile Include="SummonEmpowerMovementSystem.cs" />
         <Compile Include="ShieldAccess.cs" />

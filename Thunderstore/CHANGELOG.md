@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.9
+
+- Added automatic support for immediate child creatures created through `SpawnAbility` by tamed creatures newly summoned directly with a Blood Magic staff. Children are tamed and use the `PlayerSpawned` faction, without changing the original monster prefabs or adding config/YAML options.
+- Limited these children to two living creatures per parent. Further creation is skipped until a child dies or its destruction is confirmed; saved parent/child identifiers, rebuilt world-load references, and guarded server replies preserve tracking across reloads and network ownership changes.
+- Kept unrelated wild/tamed casters, grandchildren, and other spawning paths unchanged. Existing casters must be resummoned; child levels, drops, lifetime, and parent-death cleanup retain the original creature behavior.
+- Added production-code regressions for summon admission, save/load, missing network data, RPC authorization, and delayed replies, plus merged-DLL transpiler checks against original game IL.
+
 ## 1.2.8
 
 - Made Blood Magic summon quality presets follow actual staff quality, including Idol upgrades, up to a fixed level/count cap of 10, while preserving each item's normal crafting upgrade limit. Existing `summon.maxQuality` YAML keys remain accepted but are ignored.
