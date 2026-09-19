@@ -75,7 +75,21 @@ try {
         foreach ($site in $patchSites) {
             $arguments = $site.Attribute.ConstructorArguments
             $targetType = $arguments[0].Value.Resolve()
-            $name = [string]$arguments[1].Value
+            $methodTypeArgument = $arguments[1].Type.FullName -eq 'HarmonyLib.MethodType'
+            if ($methodTypeArgument) {
+                $name = switch ([int]$arguments[1].Value) {
+                    3 { '.ctor' }
+                    4 { '.cctor' }
+                    default { $null }
+                }
+                if (!$name) {
+                    $failures.Add("Unsupported Harmony MethodType $($arguments[1].Value) in $($type.FullName)")
+                    continue
+                }
+            }
+            else {
+                $name = [string]$arguments[1].Value
+            }
             $candidates = @($targetType.Methods | Where-Object Name -eq $name)
             if ($arguments.Count -gt 2) {
                 $signature = (@($arguments[2].Value | ForEach-Object { $_.Value.FullName }) -join ',')

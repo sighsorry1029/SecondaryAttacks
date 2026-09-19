@@ -232,6 +232,8 @@ Hovering the Blood Magic or Sneak icon in the Skills tab shows a tooltip beside 
 
 Ranged automatic assignment is controlled by the `3 - Ranged` config options. Select `Off` for a weapon group to disable its automatic preset. Ranged `Global` blocks only define preset default values; prefab entries are used for exact per-prefab overrides.
 
+When Magic Supremacy is installed, its weapons that already have a native secondary attack keep that attack by default. Add an enabled prefab entry to `SecondaryAttacks.Ranged.yml` when you intentionally want SecondaryAttacks to replace it; `preset: none` restores and keeps the Magic Supremacy attack.
+
 Melee and Blood Magic presets use `Global` blocks for shared defaults and prefab entries for overrides. Use `preset: none` to opt out a specific prefab and keep its original secondary behavior. Disabled examples can remain in the YAML with `enabled: false`, so you can enable one sample at a time without rebuilding the whole entry.
 
 ## Misc

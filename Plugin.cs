@@ -13,6 +13,7 @@ using UnityEngine;
 namespace SecondaryAttacks;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
+[BepInDependency(MagicSupremacyCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.ShieldMeBruhPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -28,7 +29,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.2.9";
+    internal const string ModVersion = "1.2.10";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";

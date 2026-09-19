@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.10
+
+- Added Magic Supremacy compatibility so automatic ranged assignment preserves native secondary attacks on its weapons. Explicit enabled prefab rules can still replace them, and `preset: none` restores the native attack.
+- Detects Magic Supremacy weapon prefabs from its loaded asset bundle, with a 3.1.1 name fallback. Weapons without a usable native secondary attack remain eligible for automatic assignment.
+- Updated the original-game compatibility verifier to recognize Harmony constructor patch attributes.
+
 ## 1.2.9
 
 - Added automatic support for immediate child creatures created through `SpawnAbility` by tamed creatures newly summoned directly with a Blood Magic staff. Children are tamed and use the `PlayerSpawned` faction, without changing the original monster prefabs or adding config/YAML options.

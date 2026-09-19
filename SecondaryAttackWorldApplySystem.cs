@@ -23,6 +23,7 @@ internal static class SecondaryAttackWorldApplySystem
         }
 
         SecondaryAttackObjectDbStateStore.Restore(objectDb);
+        MagicSupremacyCompat.PrepareForApply(objectDb);
         MagicSummonQualityPresetSystem.RestoreObjectDb(objectDb);
         SecondaryAttackDefinitionBuildContext buildContext = new(objectDb, emitMissingWarnings);
 
@@ -65,6 +66,11 @@ internal static class SecondaryAttackWorldApplySystem
 
             if (weaponConfig == null)
             {
+                if (MagicSupremacyCompat.ShouldPreserveNativeSecondary(itemPrefab.name, itemDrop))
+                {
+                    continue;
+                }
+
                 if (TryCreateDefaultBloodMagicFallback(itemPrefab.name, itemDrop, compiledSnapshot.GlobalBloodMagicPresets, out NormalizedWeaponConfig? defaultBloodMagicFallback))
                 {
                     weaponConfig = defaultBloodMagicFallback!;
