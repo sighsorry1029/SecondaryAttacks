@@ -5,8 +5,10 @@
 # Explicit prefab entries inherit the matching Global preset.
 # Set a prefab entry to `enabled: false` to ignore that override and use automatic fallback.
 # Set `preset: none` on a prefab entry to opt out and keep the original secondary.
-# Magic Supremacy weapons that already have a native secondary are excluded from automatic fallback.
+# Magic Supremacy and Wizardry weapons with a native secondary are excluded from automatic fallback.
 # Add an enabled prefab entry only when you intentionally want to replace that native secondary.
+# One-Handed Elemental Weapon Preset (config, default Barrage) covers one-handed ElementalMagic
+# weapons firing a Projectile with no native secondary. Explicit YAML overrides still take priority.
 # You may keep multiple disabled examples for the same prefab. Only one enabled or omitted-enabled entry may exist per prefab.
 #
 # Common fields:

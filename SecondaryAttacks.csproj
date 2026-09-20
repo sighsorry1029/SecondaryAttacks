@@ -480,7 +480,8 @@
         <Compile Include="LastEquippedShieldSystem.cs" />
         <Compile Include="LocalizationManager.cs" />
         <Compile Include="Compat\GroundworkCompat.cs" />
-        <Compile Include="Compat\MagicSupremacyCompat.cs" />
+        <Compile Include="Compat\NativeSecondaryAttackCompat.cs" />
+        <Compile Include="Compat\MagicPluginCompat.cs" />
         <Compile Include="MagicPluginSummonQualitySystem.cs" />
         <Compile Include="MeleePresetCooldownSystem.cs" />
         <Compile Include="MeleeProjectileHitCascadeSystem.cs" />

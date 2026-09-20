@@ -645,6 +645,7 @@ internal static class AttackProjectileAttackTriggeredSecondaryDurabilityFactorPa
 [HarmonyPatch(typeof(Attack), nameof(Attack.FireProjectileBurst))]
 internal static class AttackFireProjectileBurstPatch
 {
+    [HarmonyAfter(SecondaryAttacksPlugin.MagicPluginGuid)]
     private static bool Prefix(Attack __instance, out CopiedThrowProjectileVisualSystem.BurstScope __state)
     {
         return SecondaryAttackHarmonyDispatch.AttackFireProjectileBurstPrefix(__instance, out __state);

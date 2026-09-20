@@ -23,7 +23,7 @@ internal static class SecondaryAttackWorldApplySystem
         }
 
         SecondaryAttackObjectDbStateStore.Restore(objectDb);
-        MagicSupremacyCompat.PrepareForApply(objectDb);
+        NativeSecondaryAttackCompat.PrepareForApply(objectDb);
         MagicSummonQualityPresetSystem.RestoreObjectDb(objectDb);
         SecondaryAttackDefinitionBuildContext buildContext = new(objectDb, emitMissingWarnings);
 
@@ -66,7 +66,7 @@ internal static class SecondaryAttackWorldApplySystem
 
             if (weaponConfig == null)
             {
-                if (MagicSupremacyCompat.ShouldPreserveNativeSecondary(itemPrefab.name, itemDrop))
+                if (NativeSecondaryAttackCompat.ShouldPreserveNativeSecondary(itemPrefab.name, itemDrop))
                 {
                     continue;
                 }
@@ -109,6 +109,7 @@ internal static class SecondaryAttackWorldApplySystem
                 resolvedDefinition.ConfiguredSecondaryAttack = SecondaryAttackManager.CloneAttack(configuredSecondaryAttack);
                 if (!ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(resolvedDefinition))
                 {
+                    NativeSecondaryAttackCompat.CaptureOneHandedOverride(itemDrop);
                     SecondaryAttackObjectDbStateStore.CaptureSecondaryAttack(
                         objectDb,
                         itemPrefab.name,
@@ -232,6 +233,8 @@ internal static class SecondaryAttackWorldApplySystem
             SecondaryAttackWeaponFamilyResolver.ResolveRangedFamily(itemDrop);
         return family switch
         {
+            RangedAutomaticWeaponFamily.OneHandedElemental =>
+                TryGetRangedPresetName(SecondaryAttacksPlugin.OneHandedElementalWeaponPreset.Value, out presetName),
             RangedAutomaticWeaponFamily.Bomb =>
                 TryResolveBombPresetName(itemDrop.m_itemData.m_shared.m_attack, out presetName),
             RangedAutomaticWeaponFamily.FireballStaff =>

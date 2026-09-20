@@ -18,7 +18,8 @@ internal enum RangedAutomaticWeaponFamily
     RapidStaff,
     ReloadStaff,
     Crossbow,
-    Bow
+    Bow,
+    OneHandedElemental
 }
 
 internal enum MeleeAutomaticWeaponFamily
@@ -69,6 +70,7 @@ internal static class SecondaryAttackWeaponFamilyResolver
                 RangedAutomaticWeaponFamily.ReloadStaff => "family:ranged:staff-reload",
                 RangedAutomaticWeaponFamily.Crossbow => "family:ranged:crossbow",
                 RangedAutomaticWeaponFamily.Bow => "family:ranged:bow",
+                RangedAutomaticWeaponFamily.OneHandedElemental => "family:ranged:magic-onehanded",
                 _ => ""
             };
         }
@@ -133,6 +135,13 @@ internal static class SecondaryAttackWeaponFamilyResolver
 
         if (sharedData.m_skillType == Skills.SkillType.ElementalMagic)
         {
+            if (sharedData.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon)
+            {
+                return IsOneHandedElementalProjectileWeapon(sharedData)
+                    ? RangedAutomaticWeaponFamily.OneHandedElemental
+                    : RangedAutomaticWeaponFamily.None;
+            }
+
             string animation = primaryAttack.m_attackAnimation ?? "";
             if (string.Equals(animation, "staff_fireball", StringComparison.OrdinalIgnoreCase))
             {
@@ -162,6 +171,18 @@ internal static class SecondaryAttackWeaponFamilyResolver
                sharedData.m_skillType == Skills.SkillType.Bows
             ? RangedAutomaticWeaponFamily.Bow
             : RangedAutomaticWeaponFamily.None;
+    }
+
+    internal static bool IsOneHandedElementalProjectileWeapon(ItemDrop.ItemData.SharedData? sharedData)
+    {
+        Attack? primaryAttack = sharedData?.m_attack;
+        return sharedData?.m_skillType == Skills.SkillType.ElementalMagic &&
+               sharedData.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon &&
+               primaryAttack != null &&
+               !string.IsNullOrWhiteSpace(primaryAttack.m_attackAnimation) &&
+               primaryAttack.m_attackType == Attack.AttackType.Projectile &&
+               primaryAttack.m_attackProjectile != null &&
+               primaryAttack.m_attackProjectile.GetComponent<Projectile>() != null;
     }
 
     internal static MeleeAutomaticWeaponFamily ResolveMeleeFamily(ItemDrop itemDrop)

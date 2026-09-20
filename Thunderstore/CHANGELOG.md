@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.11
+
+- Added optional Wizardry compatibility so automatic assignment preserves its native secondary attacks. Explicit enabled prefab YAML rules can still replace them, and `preset: none` restores the original attack; Surtling and Golem staves without native secondary attacks remain eligible for automatic Blood Magic presets.
+- Added the server-synced `One-Handed Elemental Weapon Preset` option, defaulting to `Barrage`, for one-handed ElementalMagic weapons with primary Projectile attacks. Existing native secondary attacks are preserved, explicit prefab YAML takes priority, and `Off` disables this automatic group.
+- Added MagicPlugin compatibility: its four elemental Wands use the new automatic group, while its three Scepters retain their native secondary attacks. Reverting a Scepter YAML override restores the current MagicPlugin Stamina/Eitr cost settings, and MagicPlugin projectile tuning runs before SecondaryAttacks preset firing.
+- Preserved original empty secondary attacks across reused ObjectDB prefabs so automatic assignments do not become mistaken for native attacks after world changes. Added isolated regressions for optional-mod discovery, one-handed classification, native attack restoration, and live MagicPlugin cost settings.
+
 ## 1.2.10
 
 - Added Magic Supremacy compatibility so automatic ranged assignment preserves native secondary attacks on its weapons. Explicit enabled prefab rules can still replace them, and `preset: none` restores the native attack.

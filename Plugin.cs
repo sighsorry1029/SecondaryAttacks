@@ -13,7 +13,8 @@ using UnityEngine;
 namespace SecondaryAttacks;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
-[BepInDependency(MagicSupremacyCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(NativeSecondaryAttackCompat.MagicSupremacyGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(NativeSecondaryAttackCompat.WizardryGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.ShieldMeBruhPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -29,7 +30,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.2.10";
+    internal const string ModVersion = "1.2.11";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -52,6 +53,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> SneakMovementSpeedSkillFactor { get; private set; } = null!;
     internal static ConfigEntry<Toggle> KeepCrouchingDuringElementalDamageOverTime { get; private set; } = null!;
     internal static ConfigEntry<RangedPresetSelection> FireballStaffPreset { get; private set; } = null!;
+    internal static ConfigEntry<RangedPresetSelection> OneHandedElementalWeaponPreset { get; private set; } = null!;
     internal static ConfigEntry<RangedPresetSelection> RapidStaffPreset { get; private set; } = null!;
     internal static ConfigEntry<RangedPresetSelection> LightningStaffPreset { get; private set; } = null!;
     internal static ConfigEntry<RangedPresetSelection> BowPreset { get; private set; } = null!;
@@ -274,6 +276,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
     private void RegisterWorldApplySettingHandlers()
     {
+        OneHandedElementalWeaponPreset.SettingChanged += OnWorldApplySettingChanged;
         FireballStaffPreset.SettingChanged += OnWorldApplySettingChanged;
         RapidStaffPreset.SettingChanged += OnWorldApplySettingChanged;
         LightningStaffPreset.SettingChanged += OnWorldApplySettingChanged;
@@ -286,6 +289,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
 
     private void UnregisterWorldApplySettingHandlers()
     {
+        OneHandedElementalWeaponPreset.SettingChanged -= OnWorldApplySettingChanged;
         FireballStaffPreset.SettingChanged -= OnWorldApplySettingChanged;
         RapidStaffPreset.SettingChanged -= OnWorldApplySettingChanged;
         LightningStaffPreset.SettingChanged -= OnWorldApplySettingChanged;
@@ -363,6 +367,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     {
         const string group = "3 - Ranged";
         const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic assignment for this group.";
+        OneHandedElementalWeaponPreset = config(group, "One-Handed Elemental Weapon Preset", RangedPresetSelection.Barrage, $"Default ranged preset for OneHandedWeapon items using ElementalMagic and a primary Projectile attack. Existing native secondary attacks are preserved. This group takes precedence over animation-based staff groups for these weapons. {descriptionSuffix}", synchronizedSetting: true);
         FireballStaffPreset = config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_fireball. {descriptionSuffix}", synchronizedSetting: true);
         RapidStaffPreset = config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_rapidfire. {descriptionSuffix}", synchronizedSetting: true);
         LightningStaffPreset = config(group, "Reload Staff Preset", RangedPresetSelection.Burst, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_lightningshot. {descriptionSuffix}", synchronizedSetting: true);

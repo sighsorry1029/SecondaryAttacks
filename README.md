@@ -232,7 +232,11 @@ Hovering the Blood Magic or Sneak icon in the Skills tab shows a tooltip beside 
 
 Ranged automatic assignment is controlled by the `3 - Ranged` config options. Select `Off` for a weapon group to disable its automatic preset. Ranged `Global` blocks only define preset default values; prefab entries are used for exact per-prefab overrides.
 
-When Magic Supremacy is installed, its weapons that already have a native secondary attack keep that attack by default. Add an enabled prefab entry to `SecondaryAttacks.Ranged.yml` when you intentionally want SecondaryAttacks to replace it; `preset: none` restores and keeps the Magic Supremacy attack.
+`One-Handed Elemental Weapon Preset` is server-synced and defaults to `Barrage`. It covers one-handed ElementalMagic weapons whose primary attack fires an actual Projectile, taking precedence over animation-based staff groups. Automatic assignment preserves any existing native secondary attack; Aoe, summon and melee primary attacks are excluded. These weapons share a cooldown group. The existing `Global.barrage` values and the weapon's primary animation are reused, and explicit prefab YAML rules still take priority.
+
+When Magic Supremacy or Wizardry is installed, its weapons that already have a native secondary attack keep that attack by default. Add an enabled prefab entry to `SecondaryAttacks.Ranged.yml` when you intentionally want SecondaryAttacks to replace it; `preset: none` restores and keeps the original mod's attack. Wizardry's Surtling and Golem summon staves have no native secondary attack and remain eligible for automatic Blood Magic presets. Neither mod is required.
+
+MagicPlugin's Flame, Ice, Lightning and Poison Wands use the one-handed automatic group; its Flame, Ice and Lightning Scepters keep their native secondary attacks by default. When reverting a Scepter YAML override, the current MagicPlugin Stamina/Eitr source and secondary cost are restored along with its native attack. MagicPlugin's projectile tuning runs before SecondaryAttacks handles preset firing; preset-specific spread rules still apply. Existing totem cooldowns and summon quality/lifetime behavior are unchanged. MagicPlugin remains optional.
 
 Melee and Blood Magic presets use `Global` blocks for shared defaults and prefab entries for overrides. Use `preset: none` to opt out a specific prefab and keep its original secondary behavior. Disabled examples can remain in the YAML with `enabled: false`, so you can enable one sample at a time without rebuilding the whole entry.
 
