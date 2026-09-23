@@ -142,6 +142,13 @@ try {
         if ($matches.Count -ne 1) { $failures.Add("Indirect method not unique: $contract") }
         else { $indirectChecks.Add($matches[0].FullName) }
     }
+    $attackDirection = @($game.MainModule.GetType('Attack').Methods | Where-Object {
+        $_.Name -eq 'GetMeleeAttackDir' -and !$_.IsStatic -and $_.ReturnType.FullName -eq 'System.Void' -and
+        ($_.Parameters.ParameterType.FullName -join ',') -eq 'UnityEngine.Transform&,UnityEngine.Vector3&' -and
+        $_.Parameters[0].IsOut -and $_.Parameters[1].IsOut
+    })
+    if ($attackDirection.Count -ne 1) { $failures.Add('Missing exact Attack.GetMeleeAttackDir delegate contract') }
+    else { $indirectChecks.Add($attackDirection[0].FullName + ' [' + $attackDirection[0].Attributes + ']') }
     # These are the exact field-load predicates used by the movement transpiler.
     # Check original IL; successful matching is not a Harmony/Unity execution test.
     $movementFields = @{

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -8,9 +9,19 @@ internal static class CleavingThrustSystem
 {
     private const float FanStepDegrees = 4f;
     private const float TrailRangeScaleFactor = 3f;
+    private const int MaxRetainedCharacterHits = 1024;
     private static readonly List<CleavingThrustHitTarget> HitTargets = new();
+    private static readonly HashSet<Character> CheckedCharacters = new();
+    private static Collider[] CharacterHits = new Collider[64];
     private static int _environmentMask;
     private static int _destructibleMask;
+    private static int _characterMask;
+    private delegate void MeleeAttackDirection(Attack attack, out Transform originJoint, out Vector3 direction);
+    // Original game method is private. Cache an explicit accessor rather than
+    // relying on the compile-time publicizer for a new runtime access path.
+    private static readonly MeleeAttackDirection GetMeleeAttackDirection =
+        AccessTools.MethodDelegate<MeleeAttackDirection>(AccessTools.DeclaredMethod(
+            typeof(Attack), "GetMeleeAttackDir", new[] { typeof(Transform).MakeByRefType(), typeof(Vector3).MakeByRefType() }));
 
     internal static bool CanHandle(Attack attack)
     {
@@ -40,14 +51,20 @@ internal static class CleavingThrustSystem
         {
             GatherTargets(attack, cleavingThrust, origin, forward);
             int targetCount = HitTargets.Count;
+            bool hitCharacter = false;
             for (int i = 0; i < targetCount; i++)
             {
-                ApplyHit(attack, cleavingThrust, HitTargets[i], targetCount);
+                CleavingThrustHitTarget target = HitTargets[i];
+                bool fullCharacterDamage = target.Character != null && !hitCharacter;
+                hitCharacter |= target.Character != null;
+                ApplyHit(attack, cleavingThrust, target, targetCount, fullCharacterDamage);
             }
         }
         finally
         {
             HitTargets.Clear();
+            CheckedCharacters.Clear();
+            System.Array.Clear(CharacterHits, 0, CharacterHits.Length);
         }
     }
 
@@ -80,19 +97,8 @@ internal static class CleavingThrustSystem
     private static void GatherTargets(Attack attack, CleavingThrustDefinition cleavingThrust, Vector3 origin, Vector3 forward)
     {
         HitTargets.Clear();
-        Character attacker = attack.m_character;
         CleavingThrustAttackShape shape = ResolveAttackShape(attack, cleavingThrust);
-
-        foreach (Character candidate in Character.GetAllCharacters())
-        {
-            if (!TryResolveTarget(attack, candidate, origin, forward, shape, out CleavingThrustHitTarget target))
-            {
-                continue;
-            }
-
-            HitTargets.Add(target);
-        }
-
+        GatherCharacterTargets(attack, shape);
         GatherDestructibleTargets(attack, origin, forward, shape);
         HitTargets.Sort((left, right) => left.Distance.CompareTo(right.Distance));
     }
@@ -157,40 +163,85 @@ internal static class CleavingThrustSystem
         }
     }
 
-    private static bool TryResolveTarget(
-        Attack attack,
-        Character? candidate,
-        Vector3 origin,
-        Vector3 forward,
-        CleavingThrustAttackShape shape,
-        out CleavingThrustHitTarget target)
+    private static void GatherCharacterTargets(Attack attack, CleavingThrustAttackShape shape)
     {
-        target = default;
-        Character attacker = attack.m_character;
-        if (candidate == null || candidate == attacker || candidate.IsDead())
+        CheckedCharacters.Clear();
+        GetMeleeAttackDirection(attack, out Transform originJoint, out Vector3 attackDirection);
+        Transform attackerTransform = attack.m_character.transform;
+        Vector3 origin = originJoint.position + Vector3.up * attack.m_attackHeight +
+                         attackerTransform.right * attack.m_attackOffset;
+        Vector3 localDirection = attackerTransform.InverseTransformDirection(attackDirection);
+        // Use the original fan directions and radius-subtracted sweep length.
+        // Overlaps also cover colliders already touching the start of the thrust.
+        for (float angle = -shape.Angle * 0.5f; angle <= shape.Angle * 0.5f; angle += FanStepDegrees)
         {
-            return false;
+            Vector3 direction = attackerTransform.TransformDirection(
+                Quaternion.Euler(0f, -angle, 0f) * localDirection);
+            GatherCharacterSweep(attack, origin, origin, direction, shape.Range, shape.RayWidth, GetDestructibleMask(attack));
+            if (attack.m_attackRayWidthCharExtra > 0f || attack.m_attackHeightChar1 != 0f)
+            {
+                if (_characterMask == 0)
+                {
+                    _characterMask = LayerMask.GetMask("character", "character_net", "character_ghost", "hitbox", "character_noenv", "vehicle");
+                }
+
+                GatherCharacterSweep(attack, origin, origin + Vector3.up * attack.m_attackHeightChar1,
+                    direction, shape.Range, shape.CharacterRayWidth, _characterMask);
+                if (attack.m_attackHeightChar2 != attack.m_attackHeightChar1)
+                {
+                    GatherCharacterSweep(attack, origin, origin + Vector3.up * attack.m_attackHeightChar2,
+                        direction, shape.Range, shape.CharacterRayWidth, _characterMask);
+                }
+            }
+        }
+    }
+
+    private static void GatherCharacterSweep(Attack attack, Vector3 origin, Vector3 sweepOrigin,
+        Vector3 direction, float range, float radius, int mask)
+    {
+        Vector3 end = sweepOrigin + direction * Mathf.Max(0f, range - radius);
+        Collider[] colliders = CharacterHits;
+        int count;
+        while (true)
+        {
+            count = Physics.OverlapCapsuleNonAlloc(sweepOrigin, end, radius, colliders, mask, QueryTriggerInteraction.Ignore);
+            if (count < colliders.Length)
+            {
+                break;
+            }
+
+            if (colliders.Length >= MaxRetainedCharacterHits)
+            {
+                // Rare crowded scenes must not silently lose targets. Keep the
+                // retained buffer bounded and use a complete one-shot query.
+                colliders = Physics.OverlapCapsule(sweepOrigin, end, radius, mask, QueryTriggerInteraction.Ignore);
+                count = colliders.Length;
+                break;
+            }
+
+            System.Array.Clear(colliders, 0, colliders.Length);
+            CharacterHits = colliders = new Collider[colliders.Length * 2];
         }
 
-        if (!IsValidTarget(attack, candidate))
+        for (int i = 0; i < count; i++)
         {
-            return false;
-        }
+            Collider collider = colliders[i];
+            if (collider == null || ResolveDestructible(collider) is not Character candidate ||
+                !CheckedCharacters.Add(candidate) || candidate == attack.m_character || candidate.IsDead() ||
+                !IsValidTarget(attack, candidate))
+            {
+                continue;
+            }
 
-        Vector3 point = candidate.GetCenterPoint();
-        if (!TryResolveAttackShapePoint(origin, forward, point, shape, useCharacterWidth: true, out float distance))
-        {
-            return false;
+            // Keep the existing center-based visibility and nearest-character
+            // policy; only admission now uses the actual collider volume.
+            Vector3 point = candidate.GetCenterPoint();
+            if (!IsBlockedByEnvironment(origin, point, candidate))
+            {
+                float distance = Vector3.ProjectOnPlane(point - origin, Vector3.up).magnitude;
+                HitTargets.Add(new CleavingThrustHitTarget(candidate, candidate, collider, point, distance));
+            }
         }
-
-        if (IsBlockedByEnvironment(origin, point, candidate))
-        {
-            return false;
-        }
-
-        Collider? hitCollider = candidate.GetComponentInChildren<Collider>();
-        target = new CleavingThrustHitTarget(candidate, candidate, hitCollider, point, distance);
-        return true;
     }
 
     private static bool TryResolveAttackShapePoint(
@@ -315,7 +366,8 @@ internal static class CleavingThrustSystem
 
         if (_destructibleMask == 0)
         {
-            _destructibleMask = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain", "vehicle");
+            _destructibleMask = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain",
+                "character", "character_net", "character_ghost", "hitbox", "character_noenv", "vehicle");
         }
 
         return _destructibleMask;
@@ -338,16 +390,14 @@ internal static class CleavingThrustSystem
         return point.sqrMagnitude > 0f ? point : fallbackPoint;
     }
 
-    private static void ApplyHit(Attack attack, CleavingThrustDefinition cleavingThrust, CleavingThrustHitTarget target, int hitCount)
+    private static void ApplyHit(Attack attack, CleavingThrustDefinition cleavingThrust, CleavingThrustHitTarget target, int hitCount, bool fullCharacterDamage)
     {
         Character attacker = attack.m_character;
         ItemDrop.ItemData weapon = attack.m_weapon;
         Skills.SkillType skillType = weapon.m_shared.m_skillType;
         float skillFactor = attacker.GetRandomSkillFactor(skillType);
-        if (attack.m_multiHit && attack.m_lowerDamagePerHit && hitCount > 1)
-        {
-            skillFactor /= hitCount * 0.75f;
-        }
+        float penalty = attack.m_multiHit && attack.m_lowerDamagePerHit && hitCount > 1 ? hitCount * 0.75f : 1f;
+        skillFactor /= penalty;
 
         HitData hitData = SecondaryAttackHitDataFactory.CreateMeleeHit(
             attack,
@@ -358,6 +408,12 @@ internal static class CleavingThrustSystem
             cleavingThrust.DamageFactor,
             cleavingThrust.PushFactor,
             attack.m_raiseSkillAmount);
+        if (fullCharacterDamage)
+        {
+            // Restore damage only. The shared skill factor also scales knockback,
+            // so skipping its penalty would unintentionally increase push force.
+            hitData.m_damage.Modify(penalty);
+        }
         attacker.GetSEMan().ModifyAttack(skillType, ref hitData);
         weapon.m_shared.m_hitEffect.Create(target.Point, Quaternion.identity);
         attack.m_hitEffect.Create(target.Point, Quaternion.identity);

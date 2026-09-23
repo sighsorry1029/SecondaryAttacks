@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.12
+
+- Fixed Cleaving Thrust missing close-range and grazing character hits by extending the greatsword secondary's native collision sweeps against actual colliders, while preserving its attack angle, ray thickness, origin, aim, and environment obstruction checks.
+- Removed the multi-target damage penalty for the nearest eligible character hit by Cleaving Thrust. Other characters and destructible objects retain the existing full target-count penalty, and knockback is unchanged.
+- Simplified attack cloning through the game's public shallow-copy method and removed obsolete copied-projectile visual wrappers, preserving existing configuration, saved data, and visual setup behavior.
+- Added isolated Cleaving Thrust regressions for collision geometry, duplicate colliders, crowded scenes, first-character damage, and knockback, plus an original-game contract check for the cached melee-direction accessor.
+
 ## 1.2.11
 
 - Added optional Wizardry compatibility so automatic assignment preserves its native secondary attacks. Explicit enabled prefab YAML rules can still replace them, and `preset: none` restores the original attack; Surtling and Golem staves without native secondary attacks remain eligible for automatic Blood Magic presets.

@@ -240,6 +240,8 @@ MagicPlugin's Flame, Ice, Lightning and Poison Wands use the one-handed automati
 
 Melee and Blood Magic presets use `Global` blocks for shared defaults and prefab entries for overrides. Use `preset: none` to opt out a specific prefab and keep its original secondary behavior. Disabled examples can remain in the YAML with `enabled: false`, so you can enable one sample at a time without rebuilding the whole entry.
 
+Cleaving Thrust extends the original greatsword secondary's collision sweeps using actual character colliders, including contacts already overlapping the start of the thrust. It preserves the original attack angle, ray thickness, origin and aim; with the default `rangeFactor: 3`, vanilla greatswords extend from 3m to 9m. The nearest eligible character receives damage without the multi-target penalty; other characters and destructible objects keep the existing full target-count penalty, and knockback is unchanged. Environment obstruction checks still apply. The retained `cleavingThrust.angle` field does not override the weapon's native angle.
+
 ## Misc
 
 - Preserves loaded weapon state for crossbows and other reload-based weapons, so secondary handling does not unnecessarily lose a loaded shot.
