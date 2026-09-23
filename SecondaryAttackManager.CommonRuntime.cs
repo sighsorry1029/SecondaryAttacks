@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using HarmonyLib;
 using UnityEngine;
 using ProjectileLaunchData = SecondaryAttacks.ProjectileRuntimeSystem.ProjectileLaunchData;
 
@@ -248,13 +246,11 @@ internal static partial class SecondaryAttackManager
         }
     }
 
-    private static readonly MethodInfo MemberwiseCloneMethod = AccessTools.Method(typeof(object), "MemberwiseClone")!;
-
     internal static Attack CloneAttack(Attack? sourceAttack)
     {
         return sourceAttack == null
             ? new Attack()
-            : (Attack)MemberwiseCloneMethod.Invoke(sourceAttack, Array.Empty<object>())!;
+            : sourceAttack.Clone();
     }
 
     internal static void NormalizeCopiedProjectileAim(Attack? attack, SecondaryAttackDefinition? definition)
