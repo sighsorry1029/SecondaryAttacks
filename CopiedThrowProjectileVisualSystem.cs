@@ -194,31 +194,18 @@ internal static class CopiedThrowProjectileVisualSystem
 
     internal static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(ItemDrop.ItemData weapon)
     {
-        return CreateSpawnedProjectileVisualContext(weapon, includeHitEffects: true);
+        return CreateSpawnedProjectileVisualContext(weapon, sourceProjectilePrefab: null, definition: null, includeHitEffects: true);
     }
 
     internal static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(
         ItemDrop.ItemData weapon,
         GameObject? sourceProjectilePrefab)
     {
-        return CreateSpawnedProjectileVisualContext(weapon, sourceProjectilePrefab, includeHitEffects: true);
-    }
-
-    private static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(ItemDrop.ItemData weapon, bool includeHitEffects)
-    {
-        return CreateSpawnedProjectileVisualContext(weapon, sourceProjectilePrefab: null, includeHitEffects);
-    }
-
-    private static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(
-        ItemDrop.ItemData weapon,
-        GameObject? sourceProjectilePrefab,
-        bool includeHitEffects)
-    {
         return CreateSpawnedProjectileVisualContext(
             weapon,
             sourceProjectilePrefab,
             definition: null,
-            includeHitEffects);
+            includeHitEffects: true);
     }
 
     private static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(
@@ -376,11 +363,6 @@ internal static class CopiedThrowProjectileVisualSystem
             weapon);
     }
 
-    private static void ApplyCurrentWeaponVisual(Projectile projectile, ItemDrop.ItemData weapon)
-    {
-        ApplyCurrentWeaponVisual(projectile, CreateSpawnedProjectileVisualContext(weapon, includeHitEffects: false));
-    }
-
     private static void ApplyCurrentWeaponVisual(Projectile projectile, SpawnedProjectileVisualContext context)
     {
         if (!context.Active || context.SkipVisualSwap)
@@ -516,11 +498,6 @@ internal static class CopiedThrowProjectileVisualSystem
         {
             RendererBuffer.Clear();
         }
-    }
-
-    private static void ApplyLocalFallbackVisual(Projectile projectile, ItemDrop.ItemData weapon)
-    {
-        ApplyLocalFallbackVisual(projectile, CreateSpawnedProjectileVisualContext(weapon, includeHitEffects: false));
     }
 
     private static void ApplyLocalFallbackVisual(Projectile projectile, SpawnedProjectileVisualContext context)
