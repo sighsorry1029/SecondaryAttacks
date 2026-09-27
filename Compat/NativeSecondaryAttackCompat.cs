@@ -216,7 +216,7 @@ internal sealed class NativeSecondaryAttackCompat
             Type pluginType = pluginInfo.Instance.GetType();
             if (_pluginGuid == WizardryGuid)
             {
-                if (!DiscoverWizardryPrefabs(pluginType))
+                if (!DiscoverRegisteredPrefabs(pluginType, _ownedPrefabNames))
                 {
                     return;
                 }
@@ -257,20 +257,20 @@ internal sealed class NativeSecondaryAttackCompat
         }
     }
 
-    private bool DiscoverWizardryPrefabs(Type pluginType)
+    internal static bool DiscoverRegisteredPrefabs(Type pluginType, ISet<string> ownedPrefabNames)
     {
-        // This private registry belongs to the installed Wizardry assembly,
+        // This private registry belongs to the selected plugin assembly,
         // not another mod's bundled ItemManager. Only inspect it after plugin Awake.
         Type? prefabManagerType = pluginType.Assembly.GetType("ItemManager.PrefabManager");
         FieldInfo? prefabsField = prefabManagerType?.GetField("prefabs", BindingFlags.Static | BindingFlags.NonPublic);
         if (prefabsField == null)
         {
-            throw new MissingFieldException("Wizardry ItemManager.PrefabManager.prefabs was not found.");
+            throw new MissingFieldException($"{pluginType.FullName}: ItemManager.PrefabManager.prefabs was not found.");
         }
 
         if (prefabsField.GetValue(null) is not IEnumerable<GameObject> prefabs)
         {
-            throw new InvalidOperationException("Wizardry's registered prefab list has an unexpected type.");
+            throw new InvalidOperationException($"{pluginType.FullName}: registered prefab list has an unexpected type.");
         }
 
         bool foundPrefab = false;
@@ -278,7 +278,7 @@ internal sealed class NativeSecondaryAttackCompat
         {
             if (prefab != null)
             {
-                _ownedPrefabNames.Add(prefab.name);
+                ownedPrefabNames.Add(prefab.name);
                 foundPrefab = true;
             }
         }

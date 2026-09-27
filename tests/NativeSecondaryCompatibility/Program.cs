@@ -43,6 +43,7 @@ internal static class Program
     private static int Main(string[] args)
     {
         string mode = args.Single();
+        if (mode.StartsWith("hunter")) return HunterTests.Run(mode);
         if (mode is "onehanded" or "magicplugin" or "magicplugin-missing")
         {
             return OneHandedTests.Run(mode);

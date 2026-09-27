@@ -47,7 +47,7 @@ internal static class SecondaryAttackDefinitionCompiler
         }
     }
 
-    private static bool IsPresetOptOut(NormalizedWeaponConfig weaponConfig)
+    internal static bool IsPresetOptOut(NormalizedWeaponConfig weaponConfig)
     {
         NormalizedSecondaryModeConfig? secondary = weaponConfig.Secondary;
         if (secondary == null)

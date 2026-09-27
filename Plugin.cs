@@ -15,6 +15,7 @@ namespace SecondaryAttacks;
 [BepInPlugin(ModGUID, ModName, ModVersion)]
 [BepInDependency(NativeSecondaryAttackCompat.MagicSupremacyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(NativeSecondaryAttackCompat.WizardryGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(HunterLegacyCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.ShieldMeBruhPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -30,7 +31,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.2.12";
+    internal const string ModVersion = "1.2.13";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -120,6 +121,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             BindBloodMagicSettings();
             BindRangedSettings();
             BindUiSettings();
+            HunterLegacyCompat.Initialize();
             QuickstepSystem.Initialize();
             LastEquippedShieldSystem.Initialize();
             SummonQualityHudCompatibility.Initialize();
@@ -148,6 +150,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         QuickstepSystem.Dispose();
         UnregisterWorldApplySettingHandlers();
         SecondaryAttackFacade.Dispose();
+        HunterLegacyCompat.Dispose();
         SaveWithRespectToConfigSet();
     }
 

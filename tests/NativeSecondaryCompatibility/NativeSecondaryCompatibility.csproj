@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Compat/NativeSecondaryAttackCompat.cs" Link="Production/NativeSecondaryAttackCompat.cs" />
+    <Compile Include="../../Compat/HunterLegacyCompat.cs" Link="Production/HunterLegacyCompat.cs" />
+    <Compile Include="../../LastEquippedShieldSystem.cs" Link="Production/LastEquippedShieldSystem.cs" />
     <Compile Include="../../Compat/MagicPluginCompat.cs" Link="Production/MagicPluginCompat.cs" />
     <Compile Include="../../SecondaryAttackWeaponFamilyResolver.cs" Link="Production/SecondaryAttackWeaponFamilyResolver.cs" />
     <Compile Include="../../SecondaryAttackObjectDbStateStore.cs" Link="Production/SecondaryAttackObjectDbStateStore.cs" />

@@ -23,6 +23,7 @@ internal static class SecondaryAttackWorldApplySystem
         }
 
         SecondaryAttackObjectDbStateStore.Restore(objectDb);
+        HunterLegacyCompat.PrepareForApply();
         NativeSecondaryAttackCompat.PrepareForApply(objectDb);
         MagicSummonQualityPresetSystem.RestoreObjectDb(objectDb);
         SecondaryAttackDefinitionBuildContext buildContext = new(objectDb, emitMissingWarnings);
@@ -54,6 +55,17 @@ internal static class SecondaryAttackWorldApplySystem
             if (weaponConfig != null)
             {
                 seenConfiguredPrefabs.Add(itemPrefab.name);
+            }
+
+            if (HunterLegacyCompat.ShouldSkipWeapon(itemPrefab.name, itemDrop,
+                    weaponConfig != null && weaponConfig.Enabled && !weaponConfig.UseAutomaticFallback &&
+                    !SecondaryAttackDefinitionCompiler.IsPresetOptOut(weaponConfig)))
+            {
+                continue;
+            }
+
+            if (weaponConfig != null)
+            {
                 if (weaponConfig.Enabled && !weaponConfig.UseAutomaticFallback)
                 {
                     weaponConfig = ResolveDefaultMeleeFallbacks(itemDrop, weaponConfig, compiledSnapshot.GlobalMeleeFallback);

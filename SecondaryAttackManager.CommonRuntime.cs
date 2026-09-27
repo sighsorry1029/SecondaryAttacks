@@ -248,9 +248,14 @@ internal static partial class SecondaryAttackManager
 
     internal static Attack CloneAttack(Attack? sourceAttack)
     {
-        return sourceAttack == null
-            ? new Attack()
-            : sourceAttack.Clone();
+        if (sourceAttack == null)
+        {
+            return new Attack();
+        }
+
+        Attack clone = sourceAttack.Clone();
+        HunterLegacyCompat.ForgetPreparedClone(sourceAttack, clone);
+        return clone;
     }
 
     internal static void NormalizeCopiedProjectileAim(Attack? attack, SecondaryAttackDefinition? definition)

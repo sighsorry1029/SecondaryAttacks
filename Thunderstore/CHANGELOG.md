@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.13
+
+- Added automatic, optional Hunter Legacy compatibility, reviewed against 1.1.4. Its bows, crossbows, slingshots and wrist crossbows retain Hunter's native attacks and input handling; both automatic SecondaryAttacks presets and explicit prefab YAML overrides are skipped. Attempted overrides warn once per prefab, while `preset: none` remains silent. No new config or YAML keys are required.
+- Excluded Hunter wrist crossbows from last-shield auto equip, including previously remembered selections, while preserving saved identities and normal shield behavior.
+- Prevented SecondaryAttacks preparation-only attack clones from remaining in Hunter Legacy 1.1.4's tracking table. Actual attack tracking is preserved; unreviewed versions or changed private contracts disable only this cleanup with a warning.
+- Added isolated compatibility regressions and original/merged DLL contract checks. Hunter Technique effects (Phantom Arrow and Rapid Reload) are not yet integrated with SecondaryAttacks custom projectile presets on vanilla or other mods' weapons.
+- Updated the required BepInExPack dependency to `5.4.2351`.
+
 ## 1.2.12
 
 - Fixed Cleaving Thrust missing close-range and grazing character hits by extending the greatsword secondary's native collision sweeps against actual colliders, while preserving its attack angle, ray thickness, origin, aim, and environment obstruction checks.

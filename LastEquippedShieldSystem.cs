@@ -62,7 +62,10 @@ internal static class LastEquippedShieldSystem
             switch (item.m_shared.m_itemType)
             {
                 case ItemDrop.ItemData.ItemType.Shield:
-                    RememberShield(player, item);
+                    if (!HunterLegacyCompat.IsOffhandCrossbow(item))
+                    {
+                        RememberShield(player, item);
+                    }
                     break;
                 case ItemDrop.ItemData.ItemType.OneHandedWeapon:
                     TryEquipRememberedShield(player, item, triggerEquipEffects);
@@ -159,6 +162,7 @@ internal static class LastEquippedShieldSystem
         foreach (ItemDrop.ItemData candidate in player.GetInventory().GetAllItems())
         {
             if (candidate?.m_shared?.m_itemType != ItemDrop.ItemData.ItemType.Shield ||
+                HunterLegacyCompat.IsOffhandCrossbow(candidate) ||
                 candidate.m_customData == null ||
                 !candidate.m_customData.TryGetValue(ItemIdentityKey, out string candidateId) ||
                 !TryNormalizeShieldId(candidateId, out string normalizedCandidateId) ||

@@ -481,6 +481,7 @@
         <Compile Include="LocalizationManager.cs" />
         <Compile Include="Compat\GroundworkCompat.cs" />
         <Compile Include="Compat\NativeSecondaryAttackCompat.cs" />
+        <Compile Include="Compat\HunterLegacyCompat.cs" />
         <Compile Include="Compat\MagicPluginCompat.cs" />
         <Compile Include="MagicPluginSummonQualitySystem.cs" />
         <Compile Include="MeleePresetCooldownSystem.cs" />

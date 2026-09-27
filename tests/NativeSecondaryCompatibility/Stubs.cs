@@ -43,7 +43,9 @@ public sealed class ItemDrop
     public ItemData m_itemData = new();
     public sealed class ItemData
     {
-        public enum ItemType { None, OneHandedWeapon, TwoHandedWeapon, Bow, Ammo, AmmoNonEquipable }
+        public enum ItemType { None, OneHandedWeapon, TwoHandedWeapon, Bow, Ammo, AmmoNonEquipable, Shield }
+        public UnityEngine.GameObject? m_dropPrefab;
+        public Dictionary<string, string> m_customData = new();
         public SharedData m_shared = new();
         public sealed class SharedData
         {
@@ -63,7 +65,12 @@ public sealed class ObjectDB
 
 namespace BepInEx
 {
-    public sealed class PluginInfo(object instance) { public object Instance = instance; }
+    public sealed class PluginInfo(object instance)
+    {
+        public object Instance = instance;
+        public PluginMetadata Metadata = new();
+    }
+    public sealed class PluginMetadata { public Version Version = new(1, 1, 4); }
 }
 
 namespace BepInEx.Bootstrap
@@ -92,6 +99,7 @@ namespace ItemManager
         private static List<UnityEngine.GameObject>? prefabs = new();
         public static void Register(UnityEngine.GameObject item) => prefabs!.Add(item);
         public static void FailDiscovery() => prefabs = null;
+        public static void Reset() => prefabs = new();
     }
 }
 
@@ -105,6 +113,9 @@ namespace SecondaryAttacks
     internal static class SecondaryAttacksPlugin
     {
         internal const string MagicPluginGuid = "blacks7ar.MagicPlugin";
+        internal const string ShieldMeBruhPluginGuid = "vapok.mods.shieldmebruh";
+        internal enum Toggle { On, Off }
+        internal static readonly BepInEx.Configuration.ConfigEntry<Toggle> AutoEquipLastShield = new(Toggle.On);
         public static readonly TestLogger ModLogger = new();
     }
 
@@ -114,5 +125,38 @@ namespace SecondaryAttacks
         public readonly List<string> Warnings = new();
         public void LogInfo(string message) => Info.Add(message);
         public void LogWarning(string message) => Warnings.Add(message);
+        public void LogError(string message) => throw new Exception(message);
     }
+}
+
+public class Humanoid
+{
+    public ItemDrop.ItemData? RightItem, LeftItem;
+    public readonly List<ItemDrop.ItemData> Equipped = new();
+    public bool EquipItem(ItemDrop.ItemData item, bool effects) { Equipped.Add(item); LeftItem = item; return true; }
+}
+
+public sealed class Player : Humanoid
+{
+    public static Player? m_localPlayer;
+    public Dictionary<string, string> m_customData = new();
+    private readonly Inventory inventory = new();
+    public Inventory GetInventory() => inventory;
+}
+
+public sealed class Inventory
+{
+    private readonly List<ItemDrop.ItemData> items = new();
+    public List<ItemDrop.ItemData> GetAllItems() => items;
+}
+
+namespace HarmonyLib
+{
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class HarmonyPatch : Attribute
+    {
+        public HarmonyPatch(Type type, string method, params Type[] args) { }
+    }
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class HarmonyPostfix : Attribute { }
 }
