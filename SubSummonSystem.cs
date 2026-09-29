@@ -235,7 +235,9 @@ internal static class SubSummonSystem
 [HarmonyPatch(typeof(SpawnAbility), "Spawn", MethodType.Enumerator)]
 internal static class SpawnAbilitySubSummonPatch
 {
-    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
+    // CombatMeter must observe the vanilla creation site before we replace it.
+    [HarmonyAfter("Likhtenvald.CombatMeter")]
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original, ILGenerator generator)
     {
         List<CodeInstruction> codes = instructions.ToList();
         MethodInfo instantiate = typeof(Object).GetMethods().Single(m => m.Name == "Instantiate" && m.IsGenericMethodDefinition &&
@@ -245,9 +247,14 @@ internal static class SpawnAbilitySubSummonPatch
         int error = codes.FindIndex(c => c.opcode == OpCodes.Ldstr && c.operand is string s && s.Contains("has null prefab, skipping spawn"));
         int skip = error < 0 ? -1 : codes.FindIndex(error, c => c.opcode == OpCodes.Br || c.opcode == OpCodes.Br_S);
         FieldInfo? ability = AccessTools.Field(original.DeclaringType, "<>4__this");
-        if (at < 0 || codes.Count(c => c.Calls(instantiate)) != 1 || skip < 0 || skip >= at || ability?.FieldType != typeof(SpawnAbility) ||
-            !(codes[skip].operand is Label continueLabel) || !codes[at + 1].IsStloc())
+        if (at < 0 || at + 1 >= codes.Count || codes.Count(c => c.Calls(instantiate)) != 1 || skip < 0 || skip >= at || ability?.FieldType != typeof(SpawnAbility) ||
+            !(codes[skip].operand is Label continueLabel))
             throw new InvalidOperationException("SecondaryAttacks: SpawnAbility sub-summon guard could not verify the vanilla instantiate/continue path.");
+
+        int continuation = codes.FindIndex(c => c.labels.Contains(continueLabel));
+        if (continuation <= at || codes.Count(c => c.labels.Contains(continueLabel)) != 1 ||
+            !codes.Skip(continuation).Take(4).Any(c => c.opcode == OpCodes.Add) || codes.Any(c => c.blocks.Count != 0))
+            throw new InvalidOperationException("SecondaryAttacks: SpawnAbility sub-summon guard could not verify the loop continuation outside exception regions.");
 
         // Keep vanilla's original per-iteration continue target and final cleanup.
         // A denied spawn never creates an object or executes its post-spawn effects.
@@ -259,18 +266,17 @@ internal static class SpawnAbilitySubSummonPatch
         codes.InsertRange(at, new[] { load, new CodeInstruction(OpCodes.Ldfld, ability) });
         at += 2;
         codes[at].operand = AccessTools.DeclaredMethod(typeof(SubSummonSystem), nameof(SubSummonSystem.Instantiate));
-        // Store the result, then use the exact same local to test for a denied spawn.
-        CodeInstruction store = codes[at + 1];
-        CodeInstruction read = new CodeInstruction(store);
-        read.labels.Clear();
-        read.blocks.Clear();
-        if (store.opcode == OpCodes.Stloc_0) read.opcode = OpCodes.Ldloc_0;
-        else if (store.opcode == OpCodes.Stloc_1) read.opcode = OpCodes.Ldloc_1;
-        else if (store.opcode == OpCodes.Stloc_2) read.opcode = OpCodes.Ldloc_2;
-        else if (store.opcode == OpCodes.Stloc_3) read.opcode = OpCodes.Ldloc_3;
-        else if (store.opcode == OpCodes.Stloc_S) read.opcode = OpCodes.Ldloc_S;
-        else read.opcode = OpCodes.Ldloc;
-        codes.InsertRange(at + 2, new[] { read, new CodeInstruction(OpCodes.Brfalse, continueLabel) });
+        // Preserve the successful result for any post-creation observers and
+        // vanilla's store. Denial must skip both with an empty evaluation stack.
+        Label created = generator.DefineLabel();
+        codes[at + 1].labels.Add(created);
+        codes.InsertRange(at + 1, new[]
+        {
+            new CodeInstruction(OpCodes.Dup),
+            new CodeInstruction(OpCodes.Brtrue, created),
+            new CodeInstruction(OpCodes.Pop),
+            new CodeInstruction(OpCodes.Br, continueLabel)
+        });
         return codes;
     }
 }

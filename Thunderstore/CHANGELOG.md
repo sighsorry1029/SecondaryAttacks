@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.14
+
+- Fixed a `SpawnAbility` Harmony patch initialization failure when running alongside CombatMeter 0.12.0. The transpilers are ordered so CombatMeter retains its summon observer when SecondaryAttacks replaces the creation call.
+- Preserved CombatMeter's existing damage attribution and vanilla setup for successful spawns, while spawns denied by the two-child limit skip both. CombatMeter remains optional; no new config or YAML keys are required, and summon ownership, faction and saved tracking are unchanged.
+- Added isolated regression checks using the original CombatMeter transpiler and game IL, covering both patch registration orders, successful/denied creation and unsupported IL rejection. This does not expand CombatMeter's supported summon types or multiplayer modes.
+
 ## 1.2.13
 
 - Added automatic, optional Hunter Legacy compatibility, reviewed against 1.1.4. Its bows, crossbows, slingshots and wrist crossbows retain Hunter's native attacks and input handling; both automatic SecondaryAttacks presets and explicit prefab YAML overrides are skipped. Attempted overrides warn once per prefab, while `preset: none` remains silent. No new config or YAML keys are required.

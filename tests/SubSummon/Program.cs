@@ -153,4 +153,4 @@ Character.Faction result = c.m_faction;
 SubSummonSystem.RestoreFaction(c, latest.GetComponent<ZNetView>(), ref result);
 Check(result == Character.Faction.PlayerSpawned && c.m_faction == result, "Saved child marker restores faction");
 Console.WriteLine($"PASS {checks} production sub-summon checks with simulated Unity/ZDO/RPC boundaries; no game execution.");
-if (args.Length == 2) OriginalContract.Run(args[0], args[1]);
+if (args.Length is 2 or 3) OriginalContract.Run(args[0], args[1], args.Length == 3 ? args[2] : null);
