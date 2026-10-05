@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.15
+
+- Added thrower ID metadata for recoverable copied throws, including throws that keep their native projectile visuals.
+- FearNoSpear 1.1.2 can carry this metadata to landed weapons and prevent other players from auto-picking them up. Manual pickup and boomerang returns remain unchanged; virtual follow-up projectiles are excluded.
+- Kept FearNoSpear optional, with no new settings, required dependencies, or duplicate auto-pickup patches. Use the updated versions on participating clients.
+
 ## 1.2.14
 
 - Fixed a `SpawnAbility` Harmony patch initialization failure when running alongside CombatMeter 0.12.0. The transpilers are ordered so CombatMeter retains its summon observer when SecondaryAttacks replaces the creation call.

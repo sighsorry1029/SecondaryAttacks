@@ -9,6 +9,8 @@ namespace SecondaryAttacks;
 internal static class CopiedThrowProjectileVisualSystem
 {
     private const string CopiedThrowProjectileMarkerKey = "SecondaryAttacks_CopiedThrowProjectile";
+    // FearNoSpear carries this projectile tag to the actual drop for auto-pickup filtering only.
+    private const string ThrowerPlayerIdKey = "SecondaryAttacks.ThrowerPlayerID";
     private const string CopiedThrowProjectileSpinAxisKey = "SecondaryAttacks_CopiedThrowSpinAxis";
     private const string CopiedThrowProjectileRotationOffsetKey = "SecondaryAttacks_CopiedThrowRotationOffset";
     private const string CopiedThrowProjectileVisualRootName = "SecondaryAttacks_CopiedThrowVisualRoot";
@@ -114,6 +116,7 @@ internal static class CopiedThrowProjectileVisualSystem
             return;
         }
 
+        MarkRecoverableThrower(projectile);
         ItemDrop.ItemData? visualWeapon = attack.m_weapon ?? item;
         if (visualWeapon?.m_dropPrefab == null)
         {
@@ -131,6 +134,26 @@ internal static class CopiedThrowProjectileVisualSystem
 
         MeleeBoomerangProjectileSystem.TryApplyToProjectileSetup(projectile, attack, visualWeapon);
         MeleeProjectileHitCascadeSystem.RegisterOnProjectileHitSource(projectile, attack, visualWeapon);
+    }
+
+    private static void MarkRecoverableThrower(Projectile projectile)
+    {
+        if (!projectile.m_respawnItemOnHit || projectile.m_spawnItem == null ||
+            ProjectileAccess.GetOwner(projectile) is not Player player) return;
+
+        long playerId = player.GetPlayerID();
+        if (playerId == 0L) return;
+        ZNetView? nview = projectile.GetComponent<ZNetView>();
+        if (nview == null || !nview.IsValid() || !nview.IsOwner()) return;
+
+        try
+        {
+            nview.GetZDO().Set(ThrowerPlayerIdKey, playerId);
+        }
+        catch (Exception exception)
+        {
+            SecondaryAttacksPlugin.ModLogger.LogWarning($"Could not tag thrown weapon: {exception.Message}");
+        }
     }
 
     internal static void PrepareProjectileIfNeeded(Projectile projectile)

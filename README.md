@@ -77,6 +77,8 @@ Scattered projectiles lose speed and damage on each bounce through the `ricochet
 
 `SecondaryAttacks.Melee.yml` controls melee skills, copied throws, bombs, and utility-style secondaries. Several presets can use `copyFrom`, letting one weapon borrow another weapon's projectile or secondary attack pattern before applying its own preset behavior.
 
+With FearNoSpear, recoverable copied throws carry the thrower's ID so other players cannot auto-pick up the landed weapon. Manual pickup and boomerang returns are unchanged. Use the updated versions on participating clients. FearNoSpear is optional, and virtual follow-up projectiles do not create protected item drops.
+
 ### Cleaving Thrust
 
 ![](https://i.ibb.co/NG62PSy/cleavingthrust.gif)
