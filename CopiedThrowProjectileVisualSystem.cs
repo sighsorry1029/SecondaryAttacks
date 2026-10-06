@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Reflection.Emit;
+using HarmonyLib;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -15,10 +18,85 @@ internal static class CopiedThrowProjectileVisualSystem
     private const string CopiedThrowProjectileRotationOffsetKey = "SecondaryAttacks_CopiedThrowRotationOffset";
     private const string CopiedThrowProjectileVisualRootName = "SecondaryAttacks_CopiedThrowVisualRoot";
     private const string CopiedThrowProjectileSpinRootName = "SecondaryAttacks_CopiedThrowSpinRoot";
+    internal const string EquippedAppearanceKey = "SecondaryAttacks_EquippedThrowAppearance";
     private const float SpinStateEpsilonSqr = 0.0001f;
 
     private static readonly List<Attack> ActiveCopiedThrowBursts = new();
     private static readonly List<Renderer> RendererBuffer = new();
+    private static readonly ConditionalWeakTable<Attack, EquippedAppearance> AttackAppearances = new();
+    private static readonly ConditionalWeakTable<Projectile, AppearanceVisualState> AppearanceVisualStates = new();
+    private static bool _appearanceWarningReported;
+    private static bool _equippedVisualLookupInstalled;
+
+    internal static IEnumerable<CodeInstruction> RewriteVisualPrefabLookup(IEnumerable<CodeInstruction> instructions)
+    {
+        List<CodeInstruction> result = new(instructions);
+        System.Reflection.MethodInfo original = AccessTools.Method(typeof(ObjectDB), nameof(ObjectDB.GetItemPrefab), new[] { typeof(string) });
+        int index = -1;
+        int matches = 0;
+        for (int i = 0; i < result.Count; i++)
+        {
+            if (!result[i].Calls(original)) continue;
+            index = i;
+            matches++;
+        }
+        _equippedVisualLookupInstalled = matches == 1 && ProjectileAccess.CanResetVisual;
+        if (!_equippedVisualLookupInstalled)
+        {
+            ReportAppearanceFailure(new InvalidOperationException($"Projectile.UpdateVisual lookup contract changed ({matches} matches)"));
+            return result;
+        }
+        CodeInstruction call = result[index];
+        CodeInstruction instance = new(OpCodes.Ldarg_0);
+        instance.labels.AddRange(call.labels);
+        call.labels.Clear();
+        instance.blocks.AddRange(call.blocks);
+        call.blocks.Clear();
+        call.opcode = OpCodes.Call;
+        call.operand = AccessTools.Method(typeof(CopiedThrowProjectileVisualSystem), nameof(ResolveEquippedVisualPrefab));
+        result.Insert(index, instance);
+        return result;
+    }
+
+    internal static void CaptureAttackAppearance(Attack attack, Humanoid owner, ItemDrop.ItemData weapon)
+    {
+        AttackAppearances.Remove(attack);
+        try
+        {
+            if (attack.m_attackType != Attack.AttackType.Projectile ||
+                !SecondaryAttackRuntimeFacade.TryGetDefinition(weapon, out SecondaryAttackDefinition definition) ||
+                definition.Behavior is not CopiedSecondaryBehavior) return;
+            long packed = ProjectileAccess.CaptureEquippedAppearance(owner, weapon);
+            if (packed != 0L) AttackAppearances.Add(attack, new EquippedAppearance(packed));
+        }
+        catch (Exception exception) { ReportAppearanceFailure(exception); }
+    }
+
+    internal static long GetAttackAppearance(Attack attack) =>
+        AttackAppearances.TryGetValue(attack, out EquippedAppearance? value) ? value.Packed : 0L;
+
+    private static void ReportAppearanceFailure(Exception exception)
+    {
+        if (_appearanceWarningReported) return;
+        _appearanceWarningReported = true;
+        SecondaryAttacksPlugin.ModLogger.LogWarning($"Equipped throw appearance unavailable; using the weapon visual: {exception.Message}");
+    }
+
+    private sealed class EquippedAppearance
+    {
+        internal EquippedAppearance(long packed) { Packed = packed; }
+        internal long Packed { get; }
+    }
+
+    private sealed class AppearanceVisualState
+    {
+        internal long Packed;
+        internal ObjectDB? Database;
+        internal GameObject? Prefab;
+        internal GameObject? VariantVisual;
+        internal GameObject? PreviousVisual;
+        internal bool Applying;
+    }
 
     internal readonly struct BurstScope
     {
@@ -41,7 +119,8 @@ internal static class CopiedThrowProjectileVisualSystem
             EffectList.EffectData[]? hitEffectPrefabs,
             ThrowProjectileVisualSpin.AxisMode spinAxisMode,
             Vector3 visualRotationOffset,
-            bool skipVisualSwap)
+            bool skipVisualSwap,
+            long equippedAppearance = 0L)
         {
             Weapon = weapon;
             VisualPrefabName = visualPrefabName;
@@ -50,6 +129,7 @@ internal static class CopiedThrowProjectileVisualSystem
             SpinAxisMode = spinAxisMode;
             VisualRotationOffset = visualRotationOffset;
             SkipVisualSwap = skipVisualSwap;
+            EquippedAppearance = equippedAppearance;
         }
 
         public ItemDrop.ItemData? Weapon { get; }
@@ -65,6 +145,8 @@ internal static class CopiedThrowProjectileVisualSystem
         public Vector3 VisualRotationOffset { get; }
 
         public bool SkipVisualSwap { get; }
+
+        public long EquippedAppearance { get; }
 
         public bool Active => Weapon?.m_dropPrefab != null && !string.IsNullOrEmpty(VisualPrefabName);
     }
@@ -127,7 +209,7 @@ internal static class CopiedThrowProjectileVisualSystem
         SecondaryAttackDefinition? activeDefinition =
             ResolveCopiedThrowDefinition(attack, visualWeapon, visualWeapon.m_dropPrefab.name);
         SpawnedProjectileVisualContext visualContext =
-            CreateSpawnedProjectileVisualContext(visualWeapon, attack.m_attackProjectile, activeDefinition, includeHitEffects: false);
+            CreateSpawnedProjectileVisualContext(visualWeapon, attack.m_attackProjectile, activeDefinition, includeHitEffects: false, GetAttackAppearance(attack));
         ApplyCurrentWeaponVisual(projectile, visualContext);
         ApplyCurrentWeaponHitEffects(projectile, visualWeapon);
         ApplyCopiedThrowAttribution(projectile, visualWeapon);
@@ -173,12 +255,89 @@ internal static class CopiedThrowProjectileVisualSystem
         }
 
         TryApplyHitEffectsFromSyncedVisual(projectile, nview);
+        bool replacingVisual = PrepareEquippedAppearance(projectile, nview);
         if (projectile.m_changedVisual)
         {
             return;
         }
 
-        PrepareProjectileForVisualSwap(projectile);
+        if (!replacingVisual) PrepareProjectileForVisualSwap(projectile);
+    }
+
+    private static bool PrepareEquippedAppearance(Projectile projectile, ZNetView view)
+    {
+        if (!_equippedVisualLookupInstalled) return false;
+        try
+        {
+            long packed = view.GetZDO().GetLong(EquippedAppearanceKey);
+            AppearanceVisualState state = AppearanceVisualStates.GetValue(projectile, _ => new AppearanceVisualState());
+            ObjectDB? database = ObjectDB.instance;
+            if (state.Packed == packed && state.Database == database) return false;
+            state.Packed = packed;
+            state.Database = database;
+            state.Prefab = null;
+            if (packed == 0L || database == null || ProjectileAccess.AppearanceVariant(packed) < 0) return false;
+            GameObject? prefab = database.GetItemPrefab(ProjectileAccess.AppearancePrefabHash(packed));
+            if (prefab == null || prefab.GetComponent<ItemDrop>() == null || ResolveAttachGameObject(prefab) == null) return false;
+            state.Prefab = prefab;
+            state.VariantVisual = null;
+            if (!ProjectileAccess.HasChangedVisual(projectile)) return false;
+            ProjectileAccess.ResetVisual(projectile);
+            // Let vanilla replace its current mesh directly, rather than returning to the empty preparation root.
+            return true;
+        }
+        catch (Exception exception)
+        {
+            ReportAppearanceFailure(exception);
+            return false;
+        }
+    }
+
+    // Used only by the UpdateVisual transpiler. The source name remains in the ZDO for gameplay readers.
+    internal static GameObject ResolveEquippedVisualPrefab(ObjectDB database, string sourceName, Projectile projectile)
+    {
+        if (AppearanceVisualStates.TryGetValue(projectile, out AppearanceVisualState? state) && state.Prefab != null)
+        {
+            state.PreviousVisual = projectile.m_visual;
+            state.Applying = true;
+            return state.Prefab;
+        }
+        return database.GetItemPrefab(sourceName);
+    }
+
+    internal static Exception? RestoreAfterAppearanceFailure(Projectile projectile, Exception? exception)
+    {
+        if (exception == null || !AppearanceVisualStates.TryGetValue(projectile, out AppearanceVisualState? state) || !state.Applying)
+            return exception;
+        state.Applying = false;
+        state.Prefab = null;
+        ReportAppearanceFailure(exception);
+        try
+        {
+            if (state.PreviousVisual != null)
+            {
+                projectile.m_visual = state.PreviousVisual;
+                state.PreviousVisual.SetActive(true);
+            }
+            ProjectileAccess.ResetVisual(projectile);
+            ProjectileAccess.RefreshVisual(projectile);
+            return null;
+        }
+        catch (Exception fallbackException) { return fallbackException; }
+    }
+
+    private static void ApplyEquippedAppearanceVariant(Projectile projectile)
+    {
+        if (!AppearanceVisualStates.TryGetValue(projectile, out AppearanceVisualState? state)) return;
+        state.Applying = false;
+        if (state.Prefab == null || projectile.m_visual == null || state.VariantVisual == projectile.m_visual ||
+            !ProjectileAccess.HasChangedVisual(projectile)) return;
+        state.VariantVisual = projectile.m_visual;
+        try
+        {
+            ProjectileAccess.SetEquipmentVisualVariant(projectile.m_visual, ProjectileAccess.AppearanceVariant(state.Packed));
+        }
+        catch (Exception exception) { ReportAppearanceFailure(exception); }
     }
 
     internal static void EnsureProjectileVisualSpinIfNeeded(Projectile projectile)
@@ -188,6 +347,7 @@ internal static class CopiedThrowProjectileVisualSystem
             return;
         }
 
+        ApplyEquippedAppearanceVariant(projectile);
         string? visualPrefabName = TryResolveSyncedVisualPrefabName(projectile);
         ApplyCopiedThrowVisualSpin(
             projectile,
@@ -222,27 +382,32 @@ internal static class CopiedThrowProjectileVisualSystem
 
     internal static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(
         ItemDrop.ItemData weapon,
-        GameObject? sourceProjectilePrefab)
+        GameObject? sourceProjectilePrefab,
+        long equippedAppearance = 0L)
     {
         return CreateSpawnedProjectileVisualContext(
             weapon,
             sourceProjectilePrefab,
             definition: null,
-            includeHitEffects: true);
+            includeHitEffects: true,
+            equippedAppearance);
     }
 
     private static SpawnedProjectileVisualContext CreateSpawnedProjectileVisualContext(
         ItemDrop.ItemData weapon,
         GameObject? sourceProjectilePrefab,
         SecondaryAttackDefinition? definition,
-        bool includeHitEffects)
+        bool includeHitEffects,
+        long equippedAppearance = 0L)
     {
         if (weapon?.m_dropPrefab == null)
         {
             return default;
         }
 
-        bool skipVisualSwap = UsesNativeProjectileVisual(weapon, sourceProjectilePrefab);
+        if (!_equippedVisualLookupInstalled) equippedAppearance = 0L;
+
+        bool skipVisualSwap = equippedAppearance == 0L && UsesNativeProjectileVisual(weapon, sourceProjectilePrefab);
         GameObject? attachPrefab = null;
         if (!skipVisualSwap)
         {
@@ -259,7 +424,8 @@ internal static class CopiedThrowProjectileVisualSystem
             includeHitEffects ? CopyHitEffectPrefabs(weapon.m_shared?.m_hitEffect) : null,
             spinAxisMode,
             ResolveConfiguredCopiedThrowVisualRotationOffset(definition),
-            skipVisualSwap);
+            skipVisualSwap,
+            equippedAppearance);
     }
 
     internal static bool UsesNativeProjectileVisual(ItemDrop.ItemData weapon, GameObject? sourceProjectilePrefab)
@@ -466,6 +632,9 @@ internal static class CopiedThrowProjectileVisualSystem
         zdo.Set(CopiedThrowProjectileMarkerKey, true);
         zdo.Set(CopiedThrowProjectileSpinAxisKey, ToProjectileSpinAxisString(context.SpinAxisMode));
         zdo.Set(CopiedThrowProjectileRotationOffsetKey, SerializeVector3(context.VisualRotationOffset));
+        // One atomic value; s_visual remains the source weapon used by effects/definition lookup.
+        try { zdo.Set(EquippedAppearanceKey, context.EquippedAppearance); }
+        catch (Exception exception) { ReportAppearanceFailure(exception); }
     }
 
     private static bool IsMarkedCopiedThrowProjectile(Projectile projectile)
@@ -530,9 +699,32 @@ internal static class CopiedThrowProjectileVisualSystem
             return;
         }
 
+        GameObject attachPrefab = context.AttachPrefab;
+        int variant = context.Weapon!.m_variant;
+        try
+        {
+            if (context.EquippedAppearance != 0L && ObjectDB.instance != null)
+            {
+                GameObject? cosmeticPrefab = ObjectDB.instance.GetItemPrefab(ProjectileAccess.AppearancePrefabHash(context.EquippedAppearance));
+                GameObject? cosmeticAttach = cosmeticPrefab != null ? ResolveAttachGameObject(cosmeticPrefab) : null;
+                if (cosmeticAttach != null)
+                {
+                    attachPrefab = cosmeticAttach;
+                    variant = ProjectileAccess.AppearanceVariant(context.EquippedAppearance);
+                }
+            }
+        }
+        catch (Exception exception) { ReportAppearanceFailure(exception); }
         GameObject? previousVisual = projectile.m_visual;
-        GameObject visual = Object.Instantiate(context.AttachPrefab, projectile.transform, false);
-        visual.name = $"{context.AttachPrefab.name}(ProjectileVisual)";
+        GameObject visual;
+        try { visual = Object.Instantiate(attachPrefab, projectile.transform, false); }
+        catch (Exception exception) when (attachPrefab != context.AttachPrefab)
+        {
+            ReportAppearanceFailure(exception);
+            visual = Object.Instantiate(context.AttachPrefab, projectile.transform, false);
+            variant = context.Weapon!.m_variant;
+        }
+        visual.name = $"{attachPrefab.name}(ProjectileVisual)";
         visual.transform.localPosition = Vector3.zero;
         visual.transform.localRotation = Quaternion.identity;
         if (previousVisual != null && previousVisual != visual)
@@ -540,7 +732,8 @@ internal static class CopiedThrowProjectileVisualSystem
             previousVisual.SetActive(false);
         }
 
-        visual.GetComponentInChildren<IEquipmentVisual>()?.Setup(context.Weapon!.m_variant);
+        try { ProjectileAccess.SetEquipmentVisualVariant(visual, variant); }
+        catch (Exception exception) { ReportAppearanceFailure(exception); }
         projectile.m_visual = visual;
 
         ApplyCopiedThrowVisualSpin(projectile, context);

@@ -126,6 +126,9 @@ internal sealed class SecondaryAttacksCharacterRpc : MonoBehaviour
 [HarmonyPatch(typeof(Projectile), "UpdateVisual")]
 internal static class ProjectileUpdateVisualPatch
 {
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) =>
+        CopiedThrowProjectileVisualSystem.RewriteVisualPrefabLookup(instructions);
+
     private static void Prefix(Projectile __instance)
     {
         CopiedThrowProjectileVisualSystem.PrepareProjectileIfNeeded(__instance);
@@ -134,6 +137,18 @@ internal static class ProjectileUpdateVisualPatch
     private static void Postfix(Projectile __instance)
     {
         CopiedThrowProjectileVisualSystem.EnsureProjectileVisualSpinIfNeeded(__instance);
+    }
+
+    private static Exception? Finalizer(Projectile __instance, Exception? __exception) =>
+        CopiedThrowProjectileVisualSystem.RestoreAfterAppearanceFailure(__instance, __exception);
+}
+
+[HarmonyPatch(typeof(Attack), nameof(Attack.Start))]
+internal static class AttackStartEquippedThrowAppearancePatch
+{
+    private static void Prefix(Attack __instance, Humanoid character, ItemDrop.ItemData weapon)
+    {
+        CopiedThrowProjectileVisualSystem.CaptureAttackAppearance(__instance, character, weapon);
     }
 }
 

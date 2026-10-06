@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.16
+
+- Copied melee throws now capture the equipped weapon's appearance and style before it leaves the hand, including appearances applied by Armoire, and preserve that snapshot during flight, boomerang returns and spear-rain follow-ups.
+- Kept the original weapon, stats, damage, hit effects, drops and returned item unchanged. Arrows, spells and reflected projectiles do not use the equipped-weapon appearance override.
+- Added separate compact appearance metadata for other players, applied once per visual with support for delayed network data. Hidden, unavailable or failed cosmetic visuals fall back to the weapon's normal visual without changing item handling.
+- Kept Armoire optional, with no Armoire version gate, new required dependencies or settings; the feature reads the resolved equipped appearance rather than Armoire's private APIs.
+
 ## 1.2.15
 
 - Added thrower ID metadata for recoverable copied throws, including throws that keep their native projectile visuals.

@@ -614,7 +614,7 @@ internal static class MeleeProjectileHitCascadeSystem
         SpearRainTargetMarker? targetMarker = CreateSpearRainTargetMarker(markedTarget, state.Config.FlightTime);
         CopiedThrowProjectileVisualSystem.SpawnedProjectileVisualContext visualContext =
             state.Definition.Behavior is CopiedSecondaryBehavior
-                ? CopiedThrowProjectileVisualSystem.CreateSpawnedProjectileVisualContext(state.Weapon, state.ProjectilePrefab)
+                ? CopiedThrowProjectileVisualSystem.CreateSpawnedProjectileVisualContext(state.Weapon, state.ProjectilePrefab, state.EquippedAppearance)
                 : default;
         for (int spawned = 0; spawned < state.Config.Count; spawned++)
         {
@@ -805,6 +805,7 @@ internal static class MeleeProjectileHitCascadeSystem
             BaseHitData = baseHitData;
             BaseAdrenaline = Mathf.Max(0f, baseAdrenaline);
             WeaponPrefabName = weapon.m_dropPrefab != null ? weapon.m_dropPrefab.name : definition.PrefabName;
+            EquippedAppearance = CopiedThrowProjectileVisualSystem.GetAttackAppearance(sourceAttack);
         }
 
         public SecondaryAttackDefinition Definition { get; }
@@ -828,6 +829,8 @@ internal static class MeleeProjectileHitCascadeSystem
         public float BaseAdrenaline { get; }
 
         public string WeaponPrefabName { get; }
+
+        public long EquippedAppearance { get; }
 
         public bool Triggered { get; set; }
     }

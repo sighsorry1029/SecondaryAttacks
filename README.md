@@ -252,6 +252,8 @@ Cleaving Thrust extends the original greatsword secondary's collision sweeps usi
 
 ## Misc
 
+Copied melee throws capture the equipped weapon appearance before it leaves the hand, including appearances applied by Armoire. The projectile carries that visual and variant to other players and preserves it during boomerang returns and spear-rain follow-ups; the actual weapon, stats, damage, hit effects, drops and returned item remain unchanged. Armoire is optional and has no version gate. Hidden or unavailable appearances use the weapon's normal visual, and this does not replace arrows, spells or reflected projectiles.
+
 - Preserves loaded weapon state for crossbows and other reload-based weapons, so secondary handling does not unnecessarily lose a loaded shot.
 - Replaces heavier MagicPlugin projectile compatibility work with lighter runtime hooks for ElementalMagic projectile tuning.
 - Adds General config tweaks for Sneak scaling, including sneak movement speed, visibility reduction, and backstab skill gain tuning.
