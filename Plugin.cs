@@ -15,6 +15,7 @@ namespace SecondaryAttacks;
 [BepInPlugin(ModGUID, ModName, ModVersion)]
 [BepInDependency(NativeSecondaryAttackCompat.MagicSupremacyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(NativeSecondaryAttackCompat.WizardryGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(NativeSecondaryAttackCompat.VikingsMagicGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(HunterLegacyCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -31,7 +32,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.2.16";
+    internal const string ModVersion = "1.2.17";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -371,9 +372,9 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         const string group = "3 - Ranged";
         const string descriptionSuffix = "Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic assignment for this group.";
         OneHandedElementalWeaponPreset = config(group, "One-Handed Elemental Weapon Preset", RangedPresetSelection.Barrage, $"Default ranged preset for OneHandedWeapon items using ElementalMagic and a primary Projectile attack. Existing native secondary attacks are preserved. This group takes precedence over animation-based staff groups for these weapons. {descriptionSuffix}", synchronizedSetting: true);
-        FireballStaffPreset = config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_fireball. {descriptionSuffix}", synchronizedSetting: true);
-        RapidStaffPreset = config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_rapidfire. {descriptionSuffix}", synchronizedSetting: true);
-        LightningStaffPreset = config(group, "Reload Staff Preset", RangedPresetSelection.Burst, $"Default ranged preset for ElementalMagic items whose primary attack animation is staff_lightningshot. {descriptionSuffix}", synchronizedSetting: true);
+        FireballStaffPreset = config(group, "Fireball Staff Preset", RangedPresetSelection.Sentinel, $"Default ranged preset for ElementalMagic items and offensive two-handed BloodMagic Projectile staves whose primary attack animation is staff_fireball. Existing native secondary attacks on BloodMagic staves are preserved. {descriptionSuffix}", synchronizedSetting: true);
+        RapidStaffPreset = config(group, "Rapidfire Staff Preset", RangedPresetSelection.Spiral, $"Default ranged preset for ElementalMagic items and offensive two-handed BloodMagic Projectile staves whose primary attack animation is staff_rapidfire. Existing native secondary attacks on BloodMagic staves are preserved. {descriptionSuffix}", synchronizedSetting: true);
+        LightningStaffPreset = config(group, "Reload Staff Preset", RangedPresetSelection.Burst, $"Default ranged preset for ElementalMagic items and offensive two-handed BloodMagic Projectile staves whose primary attack animation is staff_lightningshot. Existing native secondary attacks on BloodMagic staves are preserved. {descriptionSuffix}", synchronizedSetting: true);
         BowPreset = config(group, "Bow Preset", RangedPresetSelection.Barrage, $"Default ranged preset for bow items. {descriptionSuffix}", synchronizedSetting: true);
         CrossbowPreset = config(group, "Crossbow Preset", RangedPresetSelection.Burst, $"Default ranged preset for reload-based crossbow-style projectile items. {descriptionSuffix}", synchronizedSetting: true);
         BombPreset = config(group, "Bomb Preset", BombPresetSelection.Auto, "Default ranged preset for throw_bomb projectile items. Auto uses overchargedBomb when the primary projectile itself has AOE or spawns an Aoe prefab on hit, and stickyDetonator otherwise. Explicit prefab entries in SecondaryAttacks.Ranged.yml override this automatic group preset. Select Off to disable automatic bomb assignment.", synchronizedSetting: true);

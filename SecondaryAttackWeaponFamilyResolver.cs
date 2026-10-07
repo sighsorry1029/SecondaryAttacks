@@ -133,7 +133,8 @@ internal static class SecondaryAttackWeaponFamilyResolver
             return RangedAutomaticWeaponFamily.Bomb;
         }
 
-        if (sharedData.m_skillType == Skills.SkillType.ElementalMagic)
+        if (sharedData.m_skillType == Skills.SkillType.ElementalMagic ||
+            IsOffensiveBloodMagicStaff(sharedData))
         {
             if (sharedData.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon)
             {
@@ -142,20 +143,10 @@ internal static class SecondaryAttackWeaponFamilyResolver
                     : RangedAutomaticWeaponFamily.None;
             }
 
-            string animation = primaryAttack.m_attackAnimation ?? "";
-            if (string.Equals(animation, "staff_fireball", StringComparison.OrdinalIgnoreCase))
+            RangedAutomaticWeaponFamily staffFamily = ResolveStaffFamily(primaryAttack.m_attackAnimation);
+            if (staffFamily != RangedAutomaticWeaponFamily.None)
             {
-                return RangedAutomaticWeaponFamily.FireballStaff;
-            }
-
-            if (string.Equals(animation, "staff_rapidfire", StringComparison.OrdinalIgnoreCase))
-            {
-                return RangedAutomaticWeaponFamily.RapidStaff;
-            }
-
-            if (string.Equals(animation, "staff_lightningshot", StringComparison.OrdinalIgnoreCase))
-            {
-                return RangedAutomaticWeaponFamily.ReloadStaff;
+                return staffFamily;
             }
         }
 
@@ -171,6 +162,42 @@ internal static class SecondaryAttackWeaponFamilyResolver
                sharedData.m_skillType == Skills.SkillType.Bows
             ? RangedAutomaticWeaponFamily.Bow
             : RangedAutomaticWeaponFamily.None;
+    }
+
+    private static RangedAutomaticWeaponFamily ResolveStaffFamily(string? animation)
+    {
+        if (string.Equals(animation, "staff_fireball", StringComparison.OrdinalIgnoreCase))
+        {
+            return RangedAutomaticWeaponFamily.FireballStaff;
+        }
+
+        if (string.Equals(animation, "staff_rapidfire", StringComparison.OrdinalIgnoreCase))
+        {
+            return RangedAutomaticWeaponFamily.RapidStaff;
+        }
+
+        return string.Equals(animation, "staff_lightningshot", StringComparison.OrdinalIgnoreCase)
+            ? RangedAutomaticWeaponFamily.ReloadStaff
+            : RangedAutomaticWeaponFamily.None;
+    }
+
+    internal static bool IsOffensiveBloodMagicStaff(ItemDrop.ItemData.SharedData? sharedData)
+    {
+        Attack? primaryAttack = sharedData?.m_attack;
+        if (sharedData?.m_skillType != Skills.SkillType.BloodMagic ||
+            sharedData.m_itemType is not (ItemDrop.ItemData.ItemType.TwoHandedWeapon or ItemDrop.ItemData.ItemType.TwoHandedWeaponLeft) ||
+            primaryAttack == null || primaryAttack.m_attackType != Attack.AttackType.Projectile ||
+            ResolveStaffFamily(primaryAttack.m_attackAnimation) == RangedAutomaticWeaponFamily.None)
+        {
+            return false;
+        }
+
+        // Restrict the new automatic family to ordinary projectile staves.
+        // A separate impact AOE is allowed; Aoe/SpawnAbility payloads are not.
+        var payload = primaryAttack.m_attackProjectile;
+        return payload != null && payload.GetComponent<Projectile>() != null &&
+               payload.GetComponentInChildren<Aoe>(true) == null &&
+               payload.GetComponentInChildren<SpawnAbility>(true) == null;
     }
 
     internal static bool IsOneHandedElementalProjectileWeapon(ItemDrop.ItemData.SharedData? sharedData)

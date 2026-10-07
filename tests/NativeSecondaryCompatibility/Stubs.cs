@@ -5,8 +5,12 @@ namespace UnityEngine
         public string name;
         public ItemDrop? Item;
         public object? Component;
+        public readonly List<object> ExtraComponents = new();
+        public readonly List<GameObject> Children = new();
         public GameObject(string name, ItemDrop? item = null, object? component = null) { this.name = name; Item = item; Component = component; }
-        public T? GetComponent<T>() where T : class => Item as T ?? Component as T;
+        public T? GetComponent<T>() where T : class => Item as T ?? Component as T ?? ExtraComponents.OfType<T>().FirstOrDefault();
+        public T? GetComponentInChildren<T>(bool includeInactive = false) where T : class =>
+            GetComponent<T>() ?? Children.Select(child => child.GetComponentInChildren<T>(includeInactive)).FirstOrDefault(component => component != null);
     }
 
     public sealed class AssetBundle(params string[] names)
@@ -24,12 +28,15 @@ public sealed class Attack
     public UnityEngine.GameObject? m_attackProjectile;
     public float m_attackEitr;
     public float m_attackStamina;
+    public float m_attackHealth;
+    public float m_attackHealthPercentage;
+    public bool m_perBurstResourceUsage;
     public bool m_requiresReload;
     public Attack Clone() => (Attack)MemberwiseClone();
 }
 
 public interface IProjectile { }
-public sealed class Projectile : IProjectile { }
+public sealed class Projectile : IProjectile { public UnityEngine.GameObject? m_spawnOnHit; }
 public sealed class Aoe : IProjectile { }
 public sealed class SpawnAbility : IProjectile { public UnityEngine.GameObject[] m_spawnPrefab = Array.Empty<UnityEngine.GameObject>(); }
 public static class Skills
@@ -43,7 +50,7 @@ public sealed class ItemDrop
     public ItemData m_itemData = new();
     public sealed class ItemData
     {
-        public enum ItemType { None, OneHandedWeapon, TwoHandedWeapon, Bow, Ammo, AmmoNonEquipable, Shield }
+        public enum ItemType { None, OneHandedWeapon, TwoHandedWeapon, Bow, Ammo, AmmoNonEquipable, Shield, TwoHandedWeaponLeft }
         public UnityEngine.GameObject? m_dropPrefab;
         public Dictionary<string, string> m_customData = new();
         public SharedData m_shared = new();

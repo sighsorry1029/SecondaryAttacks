@@ -11,10 +11,26 @@ internal sealed class NativeSecondaryAttackCompat
 {
     internal const string MagicSupremacyGuid = "Dreanegade.Magic_Supremacy";
     internal const string WizardryGuid = "Therzie.Wizardry";
+    internal const string VikingsMagicGuid = "radamanto.Vikings_Magic";
+
+    // Vikings Magic 1.1.8. Include First Oath's empty secondary so an automatic
+    // override is restored before checking native ownership in another world.
+    // Wands use the generic one-handed rule; books and other RDM_ items do not.
+    private static readonly HashSet<string> VikingsMagicStaffNames = new(StringComparer.Ordinal)
+    {
+        "RDM_staff_begin",
+        "RDM_staff_meadows",
+        "RDM_staff_bforest",
+        "RDM_staff_swamp",
+        "RDM_staff_mountain",
+        "RDM_staff_plains",
+        "RDM_staff_mistlands",
+        "RDM_staff_ashlands"
+    };
 
     // Only retain originals while our override is applied. Unmodified native
     // attacks stay owned by their mod, including its live configuration updates.
-    private static readonly ConditionalWeakTable<ItemDrop.ItemData.SharedData, Attack> OneHandedOverrides = new();
+    private static readonly ConditionalWeakTable<ItemDrop.ItemData.SharedData, Attack> MagicWeaponOverrides = new();
 
     // Magic Supremacy 3.1.1 weapon prefabs. Asset-bundle discovery below also
     // picks up later additions without creating a compile-time dependency.
@@ -101,23 +117,31 @@ internal sealed class NativeSecondaryAttackCompat
                 continue;
             }
 
-            if (OneHandedOverrides.TryGetValue(sharedData, out Attack? original))
+            if (MagicWeaponOverrides.TryGetValue(sharedData, out Attack? original))
             {
                 sharedData.m_secondaryAttack = SecondaryAttackManager.CloneAttack(original);
-                OneHandedOverrides.Remove(sharedData);
+                MagicWeaponOverrides.Remove(sharedData);
             }
 
             MagicPluginCompat.RefreshNativeSecondaryCost(itemPrefab.name, sharedData.m_secondaryAttack);
         }
     }
 
-    internal static void CaptureOneHandedOverride(ItemDrop itemDrop)
+    private static bool PreservesNativeMagicAttack(string prefabName, ItemDrop.ItemData.SharedData? sharedData)
+    {
+        return sharedData != null &&
+               (SecondaryAttackWeaponFamilyResolver.IsOneHandedElementalProjectileWeapon(sharedData) ||
+                SecondaryAttackWeaponFamilyResolver.IsOffensiveBloodMagicStaff(sharedData) ||
+                (VikingsMagicStaffNames.Contains(prefabName) && Chainloader.PluginInfos.ContainsKey(VikingsMagicGuid)));
+    }
+
+    internal static void CaptureMagicWeaponOverride(string prefabName, ItemDrop itemDrop)
     {
         ItemDrop.ItemData.SharedData? sharedData = itemDrop.m_itemData?.m_shared;
-        if (SecondaryAttackWeaponFamilyResolver.IsOneHandedElementalProjectileWeapon(sharedData))
+        if (PreservesNativeMagicAttack(prefabName, sharedData))
         {
             // Keep this independent of ObjectDB: worlds can reuse the same prefab.
-            OneHandedOverrides.GetValue(sharedData!, shared => SecondaryAttackManager.CloneAttack(shared.m_secondaryAttack));
+            MagicWeaponOverrides.GetValue(sharedData!, shared => SecondaryAttackManager.CloneAttack(shared.m_secondaryAttack));
         }
     }
 
@@ -128,7 +152,7 @@ internal sealed class NativeSecondaryAttackCompat
             return false;
         }
 
-        return (SecondaryAttackWeaponFamilyResolver.IsOneHandedElementalProjectileWeapon(itemDrop.m_itemData?.m_shared) &&
+        return (PreservesNativeMagicAttack(prefabName, itemDrop.m_itemData?.m_shared) &&
                 HasUsableSecondaryAttack(itemDrop.m_itemData?.m_shared?.m_secondaryAttack)) ||
                MagicSupremacy.HasNativeSecondary(prefabName, itemDrop) ||
                Wizardry.HasNativeSecondary(prefabName, itemDrop);

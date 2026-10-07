@@ -43,6 +43,8 @@ internal static class Program
     private static int Main(string[] args)
     {
         string mode = args.Single();
+        if (mode == "bloodmagic") return BloodMagicStaffTests.Run();
+        if (mode is "vikingsmagic" or "vikingsmagic-absent") return VikingsMagicTests.Run(mode);
         if (mode.StartsWith("hunter")) return HunterTests.Run(mode);
         if (mode is "onehanded" or "magicplugin" or "magicplugin-missing")
         {

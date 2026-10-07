@@ -56,7 +56,7 @@ internal static class OneHandedTests
     private static ObjectDB Db(params GameObject[] items) { var db = new ObjectDB(); db.m_items.AddRange(items); return db; }
     private static void Override(ObjectDB db, GameObject item)
     {
-        NativeSecondaryAttackCompat.CaptureOneHandedOverride(item.Item!);
+        NativeSecondaryAttackCompat.CaptureMagicWeaponOverride(item.name, item.Item!);
         SecondaryAttackObjectDbStateStore.CaptureSecondaryAttack(db, item.name, Shared(item).m_secondaryAttack);
         Shared(item).m_secondaryAttack = new Attack { m_attackAnimation = "SA_barrage", m_attackEitr = 16 };
     }

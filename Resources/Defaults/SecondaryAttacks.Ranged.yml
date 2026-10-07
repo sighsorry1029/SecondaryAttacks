@@ -2,10 +2,12 @@
 # Config options choose which Global preset auto-applies to each group: Fireball Staff, Rapidfire Staff, Reload Staff, Bow, Crossbow, and Bomb.
 # Select `Off` in the matching config option to disable automatic assignment for that group.
 # Bomb Auto uses overchargedBomb for throw_bomb items whose projectile has AOE or spawns an Aoe prefab on hit, and stickyDetonator otherwise.
+# Offensive two-handed BloodMagic Projectile staves also use the matching Fireball/Rapidfire/Reload staff group, preserving native secondary attacks unless explicitly overridden here.
 # Explicit prefab entries inherit the matching Global preset.
 # Set a prefab entry to `enabled: false` to ignore that override and use automatic fallback.
 # Set `preset: none` on a prefab entry to opt out and keep the original secondary.
 # Magic Supremacy and Wizardry weapons with a native secondary are excluded from automatic fallback.
+# Vikings Magic's reviewed staves also preserve native secondaries; its own cooldown still applies to explicit overrides.
 # Add an enabled prefab entry only when you intentionally want to replace that native secondary.
 # One-Handed Elemental Weapon Preset (config, default Barrage) covers one-handed ElementalMagic
 # weapons firing a Projectile with no native secondary. Explicit YAML overrides still take priority.

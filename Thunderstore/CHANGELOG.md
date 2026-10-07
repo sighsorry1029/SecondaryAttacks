@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.17
+
+- Added automatic ranged presets for offensive two-handed Blood Magic staves with supported staff animations and ordinary Projectile payloads. They reuse the existing Fireball, Rapidfire and Reload settings while preserving native secondary attacks by default; summon, shield and hybrid support payloads are excluded from this new automatic group.
+- Added support for Vikings Summoner's offensive staves, reviewed against 1.5.3: Cursed Moon and its other fireball staves use the Fireball preset (default Sentinel), while Glacial Shadow uses the Rapidfire preset (default Spiral). Original projectiles and Blood Magic scaling are retained, with the existing preset resource multipliers; separate impact AOE damage remains controlled by the original mod.
+- Added optional Vikings Magic compatibility, reviewed against 1.1.8. Its seven biome staves keep their native nova/meteor secondary attacks; First Oath and its four wands remain eligible for the existing automatic presets. Explicit YAML replacements remain available, but Vikings Magic's own shared secondary cooldown and status icon still apply.
+- Preserved original attacks across YAML replacement/removal and reused world prefabs, without retaining stale snapshots of untouched native attacks. Added isolated classification and restoration regressions; no new settings, YAML keys or required dependencies are introduced.
+
 ## 1.2.16
 
 - Copied melee throws now capture the equipped weapon's appearance and style before it leaves the hand, including appearances applied by Armoire, and preserve that snapshot during flight, boomerang returns and spear-rain follow-ups.

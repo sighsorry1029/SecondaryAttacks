@@ -121,7 +121,7 @@ internal static class SecondaryAttackWorldApplySystem
                 resolvedDefinition.ConfiguredSecondaryAttack = SecondaryAttackManager.CloneAttack(configuredSecondaryAttack);
                 if (!ProjectilePresetCooldownPolicy.UsesDynamicOriginalSecondary(resolvedDefinition))
                 {
-                    NativeSecondaryAttackCompat.CaptureOneHandedOverride(itemDrop);
+                    NativeSecondaryAttackCompat.CaptureMagicWeaponOverride(itemPrefab.name, itemDrop);
                     SecondaryAttackObjectDbStateStore.CaptureSecondaryAttack(
                         objectDb,
                         itemPrefab.name,
