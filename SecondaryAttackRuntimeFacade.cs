@@ -654,8 +654,13 @@ internal static class SecondaryAttackRuntimeFacade
             Attack.AttackType.None;
     }
 
-    private static void ApplyAttackTriggerSideEffects(Attack attack)
+    internal static void ApplyAttackTriggerSideEffects(Attack attack, bool actualBurstShot = false)
     {
+        if (!actualBurstShot && EpicLootCompat.HandlesAttack(attack))
+        {
+            return;
+        }
+
         if (attack.m_toggleFlying)
         {
             if (attack.m_character.IsFlying())
@@ -687,7 +692,7 @@ internal static class SecondaryAttackRuntimeFacade
 
         if (attack.m_requiresReload)
         {
-            if (ProjectileRuntimeSystem.ShouldDeferBurstFireReloadReset(attack))
+            if (EpicLootCompat.HandlesAttack(attack) || ProjectileRuntimeSystem.ShouldDeferBurstFireReloadReset(attack))
             {
                 return;
             }
@@ -955,10 +960,15 @@ internal static class SecondaryAttackRuntimeFacade
 
     private static void CommitConfiguredAmmo(
         Attack attack,
-        ConfiguredAmmoContext context)
+        ConfiguredAmmoContext context,
+        bool actualBurstShot = false)
     {
         attack.m_ammoItem = context.AmmoItem;
         attack.m_lastUsedAmmo = context.AmmoItem;
+        if (!actualBurstShot && EpicLootCompat.HandlesAttack(attack))
+        {
+            return;
+        }
         if (context.Inventory == null ||
             context.AmmoItem == null ||
             context.RemovalCount <= 0)
@@ -970,6 +980,29 @@ internal static class SecondaryAttackRuntimeFacade
             context.Inventory,
             context.AmmoItem,
             context.RemovalCount);
+    }
+
+    internal static bool TryCommitEpicLootBurstAmmo(
+        Attack attack,
+        SecondaryAttackDefinition definition,
+        int multiplier,
+        out bool paidAmmo)
+    {
+        paidAmmo = false;
+        ProjectileSecondaryBehavior behavior = (ProjectileSecondaryBehavior)definition.Behavior;
+        int count = (int)Math.Min(int.MaxValue, (long)Math.Max(0, behavior.AmmoConsumption) * Math.Max(1, multiplier));
+        if (!TrySelectConfiguredAmmo(attack.m_character, attack.m_weapon, attack.m_character.GetInventory(),
+                attack.m_weapon.m_shared.m_ammoType, count, out ConfiguredAmmoContext context) ||
+            !ProjectileRuntimeSystem.TryValidateBurstPresetPayload(attack, definition, SecondaryAttackPreset.Burst, context.AmmoItem) ||
+            !ConsumePerBurstResourcesIfNeeded(attack, actualBurstShot: true))
+        {
+            attack.Stop();
+            return false;
+        }
+
+        CommitConfiguredAmmo(attack, context, actualBurstShot: true);
+        paidAmmo = context.RemovalCount > 0;
+        return true;
     }
 
     private static int CountAmmo(
@@ -1041,9 +1074,9 @@ internal static class SecondaryAttackRuntimeFacade
         return item.m_shared.m_itemType is ItemDrop.ItemData.ItemType.Ammo or ItemDrop.ItemData.ItemType.AmmoNonEquipable;
     }
 
-    private static bool ConsumePerBurstResourcesIfNeeded(Attack attack)
+    private static bool ConsumePerBurstResourcesIfNeeded(Attack attack, bool actualBurstShot = false)
     {
-        if (!attack.m_perBurstResourceUsage)
+        if (!attack.m_perBurstResourceUsage || !actualBurstShot && EpicLootCompat.HandlesAttack(attack))
         {
             return true;
         }

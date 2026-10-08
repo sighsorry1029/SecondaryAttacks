@@ -918,6 +918,10 @@ internal static partial class ProjectileRuntimeSystem
 
         if (shotCount <= 1)
         {
+            if (EpicLootCompat.HandlesAttack(attack))
+            {
+                ConsumeBurstFireReload(attack);
+            }
             return true;
         }
 
@@ -968,6 +972,18 @@ internal static partial class ProjectileRuntimeSystem
     {
         spawnPoint = Vector3.zero;
         rawAimDirection = Vector3.zero;
+        using EpicLootCompat.Shot? epicShot = EpicLootCompat.BeginShot(attack);
+        bool paidAmmo = false;
+        if (epicShot != null)
+        {
+            if (!SecondaryAttackRuntimeFacade.TryCommitEpicLootBurstAmmo(attack,
+                    definition, epicShot.AmmoMultiplier, out paidAmmo))
+            {
+                return false;
+            }
+            epicShot.PrepareProjectiles();
+        }
+
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
         if (!TryValidateProjectilePayload(attack, definition, launchData))
         {
@@ -987,7 +1003,39 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         SpawnPrimaryProjectileCluster(attack, launchData, spawnPoint, aimDirection);
+        if (epicShot != null)
+        {
+            epicShot.Complete(attack.m_ammoItem, paidAmmo);
+            epicShot.Dispose();
+            SecondaryAttackRuntimeFacade.ApplyAttackTriggerSideEffects(attack, actualBurstShot: true);
+        }
         return true;
+    }
+
+    private static void ConsumeBurstFireReload(Attack attack)
+    {
+        ClearDeferredBurstFireReloadReset(attack);
+        if (attack.m_character == null || !attack.m_requiresReload || EpicLootCompat.PreservesReload(attack))
+        {
+            return;
+        }
+
+        if (attack.m_character is Player player && player.m_weaponLoaded != attack.m_weapon)
+        {
+            SecondaryAttackManager.ConsumePersistedReloadedWeaponState(player, attack.m_weapon);
+            return;
+        }
+
+        SecondaryAttackManager.ReloadStateConsumptionScope reloadState =
+            SecondaryAttackManager.BeginReloadStateConsumption(attack);
+        try
+        {
+            attack.m_character.ResetLoadedWeapon();
+        }
+        finally
+        {
+            SecondaryAttackManager.EndReloadStateConsumption(ref reloadState);
+        }
     }
 
     internal static void OrientPlayerBodyToCurrentAim(Attack attack)
@@ -2047,28 +2095,7 @@ internal static partial class ProjectileRuntimeSystem
             }
 
             _reloadConsumed = true;
-            ClearDeferredBurstFireReloadReset(_attack);
-            if (_attack.m_character == null || !_attack.m_requiresReload)
-            {
-                return;
-            }
-
-            if (_attack.m_character is Player player && player.m_weaponLoaded != _attack.m_weapon)
-            {
-                SecondaryAttackManager.ConsumePersistedReloadedWeaponState(player, _attack.m_weapon);
-                return;
-            }
-
-            SecondaryAttackManager.ReloadStateConsumptionScope reloadState =
-                SecondaryAttackManager.BeginReloadStateConsumption(_attack);
-            try
-            {
-                _attack.m_character.ResetLoadedWeapon();
-            }
-            finally
-            {
-                SecondaryAttackManager.EndReloadStateConsumption(ref reloadState);
-            }
+            ConsumeBurstFireReload(_attack);
         }
     }
 

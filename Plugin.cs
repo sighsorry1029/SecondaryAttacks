@@ -17,6 +17,7 @@ namespace SecondaryAttacks;
 [BepInDependency(NativeSecondaryAttackCompat.WizardryGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(NativeSecondaryAttackCompat.VikingsMagicGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(HunterLegacyCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(EpicLootCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.ShieldMeBruhPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -32,7 +33,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
     internal const string CreatureLevelControlGuid = "org.bepinex.plugins.creaturelevelcontrol";
     internal const string StarLevelSystemGuid = "MidnightsFX.StarLevelSystem";
     internal const string ModName = "SecondaryAttacks";
-    internal const string ModVersion = "1.2.17";
+    internal const string ModVersion = "1.2.18";
     internal const string Author = "sighsorry";
     private const string ModGUID = $"{Author}.{ModName}";
     private static string ConfigFileName = $"{ModGUID}.cfg";
@@ -123,6 +124,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             BindRangedSettings();
             BindUiSettings();
             HunterLegacyCompat.Initialize();
+            EpicLootCompat.Initialize();
             QuickstepSystem.Initialize();
             LastEquippedShieldSystem.Initialize();
             SummonQualityHudCompatibility.Initialize();
@@ -152,6 +154,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         UnregisterWorldApplySettingHandlers();
         SecondaryAttackFacade.Dispose();
         HunterLegacyCompat.Dispose();
+        EpicLootCompat.Dispose();
         SaveWithRespectToConfigSet();
     }
 

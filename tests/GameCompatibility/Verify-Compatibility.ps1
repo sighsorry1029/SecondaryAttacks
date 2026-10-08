@@ -118,7 +118,7 @@ try {
         Projectile = @('m_weapon','m_owner','m_originalHitData','m_vel','m_didHit')
         SEMan = @('m_character')
         SE_Shield = @('m_totalAbsorbDamage','m_damage')
-        Attack = @('m_visEquipment')
+        Attack = @('m_visEquipment','m_character')
         VisEquipment = @('m_rightItemInstance')
         MeleeWeaponTrail = @('_base','_tip','_material','_colors','_sizes','_lifeTime','subdivisions',
             'm_trailMesh','m_lastPosition','_emitTime','m_points','m_smoothedPoints','m_smoothBaseList',

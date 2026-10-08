@@ -115,6 +115,8 @@ internal sealed class ActiveSecondaryAttack
 
     public bool BurstRuntimeStarted { get; set; }
 
+    public bool BurstAmmoConserved { get; set; }
+
     public float NextHoldRepeatTime { get; set; }
 }
 

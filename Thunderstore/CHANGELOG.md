@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.18
+
+- Added optional EpicLoot 0.14.13 compatibility for ammo-using Burst attacks. Each actual shot now rolls multishot independently and pays the configured ammo cost multiplied by Triple Shot's projectile count; a default three-shot burst consumes 3/5/7/9 ammo for zero/one/two/three procs before conservation.
+- Moved compatible Burst ammo payment to actual firing, including delayed first shots. If the selected ammo prefab cannot cover a shot, that shot and the remaining burst stop without partial ammo payment. Same-prefab stacks can cover the cost, while custom costs and zero-ammo settings are preserved.
+- Preserved EpicLoot's one-item Ammo Conservation refund, with no refund for zero-ammo shots. The last successful shot determines whether the burst retains its loaded state, including interrupted bursts and weapon changes.
+- Applied multishot damage, accuracy, projectile count and extra resource costs around each actual shot, restoring temporary state afterward. Ordinary attacks, other presets and non-ammo staves keep their existing paths. No new configuration or required dependency is added; unreviewed EpicLoot versions or changed integration contracts disable this bridge with a warning.
+- Added HarmonyX regressions for both patch orders and original/merged DLL contract checks. Existing attack-start costs and earlier trigger durability/visual effects are not rolled back when a shot cannot fire.
+
 ## 1.2.17
 
 - Added automatic ranged presets for offensive two-handed Blood Magic staves with supported staff animations and ordinary Projectile payloads. They reuse the existing Fireball, Rapidfire and Reload settings while preserving native secondary attacks by default; summon, shield and hybrid support payloads are excluded from this new automatic group.
