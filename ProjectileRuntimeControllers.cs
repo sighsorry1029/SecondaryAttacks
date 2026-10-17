@@ -229,6 +229,7 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         PiercingShotProjectiles.Remove(projectile);
+        PathOfValheimanCompat.UsePresetCollision(projectile);
         PiercingShotProjectiles.Add(projectile, new PiercingShotState(projectileBehavior));
     }
 
@@ -445,6 +446,7 @@ internal static partial class ProjectileRuntimeSystem
         }
 
         ScatterRicochetProjectiles.Remove(projectile);
+        PathOfValheimanCompat.UsePresetCollision(projectile);
         ScatterRicochetProjectiles.Add(
             projectile,
             new ScatterRicochetState(attack, launchData, projectileBehavior, Mathf.Max(0.01f, speed)));
@@ -622,6 +624,7 @@ internal static partial class ProjectileRuntimeSystem
         ProjectileSecondaryBehavior projectileBehavior)
     {
         ScatterRicochetSplitProjectiles.Remove(projectile);
+        PathOfValheimanCompat.UsePresetCollision(projectile);
         ScatterRicochetSplitProjectiles.Add(projectile, new ScatterRicochetSplitState(projectileBehavior));
     }
 
@@ -910,7 +913,7 @@ internal static partial class ProjectileRuntimeSystem
             return false;
         }
 
-        int shotCount = Mathf.Clamp(projectileBehavior.ProjectileCount, 1, MaxBurstShotCount);
+        int shotCount = (int)Math.Min(MaxBurstShotCount, (long)Mathf.Clamp(projectileBehavior.ProjectileCount, 1, MaxBurstShotCount) + PathOfValheimanCompat.ExtraBursts(attack));
         if (!TryFireBurstShot(attack, definition, out _, out _))
         {
             return false;
@@ -918,7 +921,7 @@ internal static partial class ProjectileRuntimeSystem
 
         if (shotCount <= 1)
         {
-            if (EpicLootCompat.HandlesAttack(attack))
+            if (EpicLootCompat.HandlesAttack(attack) || PathOfValheimanCompat.HandlesBurst(attack))
             {
                 ConsumeBurstFireReload(attack);
             }
@@ -973,15 +976,19 @@ internal static partial class ProjectileRuntimeSystem
         spawnPoint = Vector3.zero;
         rawAimDirection = Vector3.zero;
         using EpicLootCompat.Shot? epicShot = EpicLootCompat.BeginShot(attack);
-        bool paidAmmo = false;
-        if (epicShot != null)
+        int paidAmmo = 0;
+        bool managedShot = epicShot != null || PathOfValheimanCompat.HandlesBurst(attack);
+        if (managedShot)
         {
-            if (!SecondaryAttackRuntimeFacade.TryCommitEpicLootBurstAmmo(attack,
-                    definition, epicShot.AmmoMultiplier, out paidAmmo))
+            if (!SecondaryAttackRuntimeFacade.TryCommitCompatibleBurstAmmo(attack,
+                    definition, epicShot?.AmmoMultiplier ?? 1, out paidAmmo))
             {
                 return false;
             }
-            epicShot.PrepareProjectiles();
+            epicShot?.PrepareProjectiles();
+            int beforeRefund = SecondaryAttackRuntimeFacade.CountCurrentAmmo(attack);
+            epicShot?.Complete(attack.m_ammoItem, paidAmmo > 0);
+            paidAmmo = Math.Max(0, paidAmmo - Math.Max(0, SecondaryAttackRuntimeFacade.CountCurrentAmmo(attack) - beforeRefund));
         }
 
         ProjectileLaunchData launchData = CreateLaunchData(attack, definition);
@@ -1002,11 +1009,12 @@ internal static partial class ProjectileRuntimeSystem
             attack.m_burstEffect.Create(spawnPoint, Quaternion.LookRotation(aimDirection));
         }
 
-        SpawnPrimaryProjectileCluster(attack, launchData, spawnPoint, aimDirection);
-        if (epicShot != null)
+        using (PathOfValheimanCompat.BeginEmission(attack, paidAmmo))
+            SpawnPrimaryProjectileCluster(attack, launchData, spawnPoint, aimDirection);
+        if (managedShot)
         {
-            epicShot.Complete(attack.m_ammoItem, paidAmmo);
-            epicShot.Dispose();
+            PathOfValheimanCompat.AfterBurstShot(attack);
+            epicShot?.Dispose();
             SecondaryAttackRuntimeFacade.ApplyAttackTriggerSideEffects(attack, actualBurstShot: true);
         }
         return true;
@@ -1301,6 +1309,7 @@ internal static partial class ProjectileRuntimeSystem
         bool setLastProjectile,
         out Projectile? projectileComponent)
     {
+        using System.IDisposable? povOrigin = PathOfValheimanCompat.BeginProjectile(attack);
         projectileComponent = null;
         if (direction == Vector3.zero)
         {
@@ -1361,6 +1370,7 @@ internal static partial class ProjectileRuntimeSystem
 
     private static HitData CreateProjectileHitData(Attack attack, ItemDrop.ItemData? ammoItem, float damageFactor, float configuredDamageFactor, float configuredSkillRaiseFactor)
     {
+        using System.IDisposable? origin = PathOfValheimanCompat.BeginAttack(attack, projectile: true);
         HitData hitData = new();
         hitData.m_toolTier = (short)attack.m_weapon.m_shared.m_toolTier;
         hitData.m_pushForce = attack.m_weapon.m_shared.m_attackForce * attack.m_forceMultiplier;
@@ -2359,7 +2369,8 @@ internal static partial class ProjectileRuntimeSystem
 
             transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
             _projectile.enabled = true;
-            _projectile.Setup(_owner, direction * _launchSpeed, _hitNoise, _hitData, _weapon, _ammo);
+            using (PathOfValheimanCompat.BeginProjectile(_attack))
+                _projectile.Setup(_owner, direction * _launchSpeed, _hitNoise, _hitData, _weapon, _ammo);
             SecondaryAttackAdrenalineSystem.ApplyProjectileFactor(_projectile, _attack, _behavior.AdrenalineFactor);
             SecondaryAttackRuntimeFacade.SetProjectileAttackAttribution(
                 _projectile,

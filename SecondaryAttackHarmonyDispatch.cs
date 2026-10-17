@@ -6,6 +6,7 @@ internal static class SecondaryAttackHarmonyDispatch
 {
     internal struct ProjectileOnHitState
     {
+        internal bool RejectedByEarlierPatch;
         internal bool RuntimeContext;
         internal DirectWeaponHitContextSystem.Scope DirectHitContext;
         internal ProjectileRuntimeSystem.ScatterRicochetDamageScope ScatterRicochetDamageScope;
@@ -55,6 +56,7 @@ internal static class SecondaryAttackHarmonyDispatch
         Vector3 normal,
         ref ProjectileOnHitState state)
     {
+        if (state.RejectedByEarlierPatch) return;
         DirectWeaponHitContextSystem.End(ref state.DirectHitContext);
         try
         {

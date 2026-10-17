@@ -278,10 +278,11 @@ internal static class Program
             EpicLootCompat.Initialize();
             Check(EpicLootCompat.HandlesAttack(NewAttack()), "valid contract failed after rejected initialization");
             Console.WriteLine($"PASS: {_checks} Burst assertions ({string.Join(",", args)}) with real HarmonyX and deterministic game/EpicLoot doubles. No Unity/game execution.");
+            PoVTests.Run();
             return 0;
         }
         catch (Exception e) { Console.Error.WriteLine(e); return 1; }
-        finally { EpicLootCompat.Dispose(); }
+        finally { PathOfValheimanCompat.Dispose(); EpicLootCompat.Dispose(); }
     }
 
     private static object BuildContractProbe(string fault)

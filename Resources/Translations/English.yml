@@ -18,6 +18,7 @@ sa_skill_tooltip_blood_magic_cooldown: "Higher Blood Magic reduces configured pr
 sa_skill_tooltip_blood_magic_lifetime: "Higher Blood Magic extends configured summon lifetimes."
 sa_skill_tooltip_blood_magic_max_health_cost: "Percentage health costs use maximum health before normal skill reduction."
 sa_skill_tooltip_blood_magic_health_gain: "Health costs grant extra Blood Magic skill gain."
+sa_skill_tooltip_blood_magic_pov_experience: "Health-cost skill gains are converted to Path of Valheiman tree experience."
 sa_skill_tooltip_sneak_heading: "<color=orange>SecondaryAttacks</color>"
 sa_skill_tooltip_sneak_backstab_gain: "Successful backstabs grant extra Sneak skill gain."
 sa_skill_tooltip_sneak_visibility: "Higher Sneak strengthens skill-based visibility reduction."

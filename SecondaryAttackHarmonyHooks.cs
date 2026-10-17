@@ -189,8 +189,10 @@ internal static class EffectListCreateOverchargedBombVisualPatch
 internal static class ProjectileOnHitPatch
 {
     [HarmonyPriority(Priority.Last)]
-    private static bool Prefix(Projectile __instance, Collider collider, Vector3 hitPoint, bool water, Vector3 normal, out SecondaryAttackHarmonyDispatch.ProjectileOnHitState __state)
+    private static bool Prefix(Projectile __instance, Collider collider, Vector3 hitPoint, bool water, Vector3 normal, bool __runOriginal, out SecondaryAttackHarmonyDispatch.ProjectileOnHitState __state)
     {
+        __state = default;
+        if (!__runOriginal) { __state.RejectedByEarlierPatch = true; return false; }
         return SecondaryAttackHarmonyDispatch.ProjectileOnHitPrefix(__instance, collider, hitPoint, water, normal, out __state);
     }
 
@@ -400,7 +402,8 @@ internal static class AttackGetEitrConfiguredCostPatch
         // 1.0.7 delegates to the primary weapon attack even for a secondary clone.
         // Preserve the configured instance cost without changing the public tooltip overload.
         if (___m_character == null || ___m_weapon?.m_shared?.m_attack == null ||
-            __instance.m_attackEitr == ___m_weapon.m_shared.m_attack.m_attackEitr ||
+            (__instance.m_attackEitr == ___m_weapon.m_shared.m_attack.m_attackEitr &&
+             !PathOfValheimanCompat.UsesConfiguredProjectileCost(__instance, ___m_weapon)) ||
             !SecondaryAttackRuntimeFacade.TryGetDefinition(___m_weapon, out _))
         {
             return true;
@@ -410,6 +413,7 @@ internal static class AttackGetEitrConfiguredCostPatch
         __result = cost <= 0f
             ? 0f
             : cost - cost * 0.33f * ___m_character.GetSkillFactor(___m_weapon.m_shared.m_skillType);
+        PathOfValheimanCompat.ModifyConfiguredEitr(__instance, ___m_character, ___m_weapon, ref __result);
         return false;
     }
 }
@@ -577,10 +581,14 @@ internal static class HumanoidStartAttackPatch
 internal static class AttackOnAttackTriggerPatch
 {
     [HarmonyPriority(Priority.First)]
+    [HarmonyAfter(PathOfValheimanCompat.PluginGuid)]
     private static bool Prefix(
         Attack __instance,
+        bool __runOriginal,
         out SecondaryAttackManager.ReloadStateConsumptionScope __state)
     {
+        __state = default;
+        if (!__runOriginal) return false;
         __state = SecondaryAttackManager.BeginReloadStateConsumption(__instance);
         return !SecondaryAttackRuntimeFacade.TryHandleCustomAttackTrigger(__instance);
     }

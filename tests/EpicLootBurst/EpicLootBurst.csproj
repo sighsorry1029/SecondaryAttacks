@@ -11,6 +11,8 @@
     <Compile Include="../../Compat/EpicLootCompat.cs" Link="Production/EpicLootCompat.cs" />
     <Compile Include="obj/ProductionSlices.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="PathOfValheiman.cs" />
+    <Compile Include="../../Compat/PathOfValheimanCompat.cs" Link="Production/PathOfValheimanCompat.cs" />
     <Compile Include="Stubs.cs" />
     <Reference Include="0Harmony"><HintPath>$(BepInExCore)/0Harmony.dll</HintPath></Reference>
     <None Include="$(BepInExCore)/MonoMod*.dll;$(BepInExCore)/Mono.Cecil*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />

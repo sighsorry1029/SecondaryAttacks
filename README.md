@@ -267,5 +267,15 @@ Copied melee throws capture the equipped weapon appearance before it leaves the 
 - Adds General config tweaks for Sneak scaling, including sneak movement speed, visibility reduction, and backstab skill gain tuning.
 - Adds Blood Magic config tweaks for summon lifetime and health-cost behavior, including max-health based costs and Blood Magic skill gain from health-cost abilities.
 
+## Path of Valheiman compatibility
+
+Optional integration reviewed against Path of Valheiman 5.0.4. The bridge checks the callbacks, state fields and installed Harmony patches instead of requiring that exact version. It adds no settings or YAML keys and leaves PoV's node formulas, frozen skill levels, equipment skill bonuses and experience conversion in PoV's control.
+
+Ammo-using `Burst` adopts PoV's additional projectiles: extra crossbow shots extend the sequence up to the existing 16-shot limit; other extra shots join each projectile cluster. Actual shots use PoV's ammo-saving roll. EpicLoot multishot and its one-item refund still apply when present; recoverable ammunition is limited to what was actually paid after refunds. Empty native firing callbacks do not charge ammo or apply extra recoil. Zero configured ammo cost remains free. Shortages stop the remaining sequence without partial ammo payment.
+
+Custom projectile damage and delayed Aftershock waves retain their source attack and weapon while PoV processes them. Configured projectile Eitr costs receive PoV's cost multiplier without charging for unsupported extra magic projectiles. Melee preparation runs after PoV's area/charge patches, Aftershock retains the prepared radius, and hits already rejected by an earlier patch do not trigger SA hit effects. Piercing and Scatter keep control of their own continuation; PoV pierce/chain/bounce counters are disabled only on those projectiles, while its ignore/volley filters are retained. Fixed formations keep their configured counts and spread; PoV extra-shot, ammo-saving and ammo-recovery extensions are supported only for ammo-using Burst in this release.
+
+For marked Blood Magic summons and their immediate children, PoV's keeper lookup uses the stored summoner ID, unless PoV already has an explicit owner. An offline summoner does not fall back to another nearby player. Existing unmarked creatures are unchanged. Skill tooltip text reflects PoV's backstab and experience policies. This is targeted compatibility, not support for every node/preset combination: magic extra-shot budgets, combined piercing/chain behavior, PoV's melee aim redirection and full delayed action-ID propagation remain outside this integration. Actual game, host/client and dedicated-server validation is still required.
+
 ## Github
 https://github.com/sighsorry1029?tab=repositories

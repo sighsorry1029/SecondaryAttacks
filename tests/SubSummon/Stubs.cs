@@ -70,6 +70,8 @@ public static class ZDOExtraData
 public class ZNetView : UnityEngine.Component
 {
     public ZDO? Zdo;
+    public bool Valid = true;
+    public bool IsValid() => Valid && Zdo != null;
     public ZDO? GetZDO() => Zdo;
 }
 public class ZNetPeer { public long m_uid; }
@@ -97,11 +99,18 @@ public class Character : UnityEngine.Component
     public bool Tamed;
     public bool Dead;
     public bool IsTamed() => Tamed;
+    public bool IsPlayer() => this is Player;
     public bool IsDead() => Dead;
     public void SetTamed(bool value) => Tamed = value;
     public Faction GetFaction() => m_faction;
 }
-public class Player : Character { public long GetPlayerID() => 123; }
+public class Player : Character
+{
+    public long Id = 123;
+    public static readonly List<Player> Players = new();
+    public static List<Player> GetAllPlayers() => Players;
+    public long GetPlayerID() => Id;
+}
 public static class Skills { public enum SkillType { BloodMagic, Other } }
 public class ItemDrop
 {

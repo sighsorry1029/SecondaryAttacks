@@ -21,8 +21,8 @@ function Extract-Member([string]$source, [string]$name) {
 $facade = [IO.File]::ReadAllText((Join-Path $root 'SecondaryAttackRuntimeFacade.cs'))
 $controllers = [IO.File]::ReadAllText((Join-Path $root 'ProjectileRuntimeControllers.cs'))
 $text = "using System; using System.Linq; using UnityEngine; namespace SecondaryAttacks {`ninternal static partial class SecondaryAttackRuntimeFacade {`n"
-foreach ($name in @('TrySelectConfiguredAmmo', 'FindConfiguredAmmo', 'CommitConfiguredAmmo', 'TryCommitEpicLootBurstAmmo',
-    'CountAmmo', 'RemoveAmmo', 'IsSameAmmoPrefab', 'IsAmmoItemForType', 'ConsumePerBurstResourcesIfNeeded',
+foreach ($name in @('TrySelectConfiguredAmmo', 'FindConfiguredAmmo', 'CommitConfiguredAmmo', 'TryCommitCompatibleBurstAmmo',
+    'CountCurrentAmmo', 'CountAmmo', 'RemoveAmmo', 'IsSameAmmoPrefab', 'IsAmmoItemForType', 'ConsumePerBurstResourcesIfNeeded',
     'ConfiguredAmmoContext', 'ApplyAttackTriggerSideEffects')) {
     $text += (Extract-Member $facade $name) + "`n"
 }
@@ -32,6 +32,8 @@ foreach ($name in @('TryFireBurstShot', 'FireBurstFire', 'ConsumeBurstFireReload
     $text += (Extract-Member $controllers $name) + "`n"
 }
 $text += "}}`n"
+$hooks = [IO.File]::ReadAllText((Join-Path $root 'SecondaryAttackHarmonyHooks.cs')).Replace('internal static class ', '    internal static class ')
+$text = "using HarmonyLib;`n" + $text + "namespace SecondaryAttacks {`n" + (Extract-Member $hooks 'AttackGetEitrConfiguredCostPatch') + "`n}`n"
 [void][IO.Directory]::CreateDirectory((Join-Path $PSScriptRoot 'obj'))
 [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'obj/ProductionSlices.cs'), $text)
 dotnet build (Join-Path $PSScriptRoot 'EpicLootBurst.csproj') -c Debug "-p:BepInExCore=$BepInExCore" --nologo

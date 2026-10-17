@@ -13,6 +13,20 @@ namespace SecondaryAttacks;
 // Instance state only: neither the original monster nor its attack prefabs are changed.
 internal static class SubSummonSystem
 {
+    internal static bool TryResolveSummoner(Character? character, out Player? player)
+    {
+        player = null;
+        if (character == null || character.IsPlayer() || !character.IsTamed()) return false;
+        ZNetView? view = character.GetComponent<ZNetView>();
+        ZDO? zdo = view != null && view.IsValid() ? view.GetZDO() : null;
+        if (zdo == null || (zdo.GetString(ParentKey, "").Length == 0 && zdo.GetString(ChildKey, "").Length == 0)) return false;
+        long id = zdo.GetLong(PlayerKey, 0L);
+        if (id == 0L) return false;
+        foreach (Player candidate in Player.GetAllPlayers())
+            if (candidate != null && candidate.GetPlayerID() == id) { player = candidate; break; }
+        return true;
+    }
+
     internal const int Limit = 2;
     private static readonly int ParentKey = "SecondaryAttacks_SubSummonParent".GetStableHashCode();
     private static readonly int ChildKey = "SecondaryAttacks_SubSummonChild".GetStableHashCode();

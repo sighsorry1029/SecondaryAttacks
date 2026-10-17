@@ -52,6 +52,8 @@ public class ItemDrop
         public enum ItemType { Ammo, AmmoNonEquipable, Weapon }
         public class SharedData
         {
+            public Attack? m_attack;
+            public int m_skillType;
             public string m_ammoType = "bolt";
             public ItemType m_itemType = ItemType.Ammo;
             public HitData.DamageTypes m_damages = new HitData.DamageTypes { m_damage = 100 };
@@ -71,8 +73,10 @@ public class Inventory
     }
     public int Total => Items.Sum(i => i.m_stack);
 }
-public class Humanoid
+public class Humanoid : Character
 {
+    [MethodImpl(MethodImplOptions.NoInlining)] public void StartAttack() { }
+    public float GetSkillFactor(int skill) => 0f;
     public Inventory Inventory = new Inventory();
     public UnityEngine.Transform transform = new UnityEngine.Transform();
     public int Messages, Resets, SideEffects;
@@ -92,10 +96,13 @@ public class Player : Humanoid
 }
 public class Attack
 {
+    public bool IsSecondary = true;
+    public float m_attackEitr = 10f;
     public Humanoid m_character = null!;
     public ItemDrop.ItemData m_weapon = new ItemDrop.ItemData();
     public ItemDrop.ItemData? m_ammoItem, m_lastUsedAmmo;
     public int m_projectiles = 1;
+    public int m_projectileBursts = 1, m_projectileBurstsFired;
     public float m_projectileAccuracy = 10;
     public bool m_perBurstResourceUsage = true, m_requiresReload = true;
     public bool m_toggleFlying, m_consumeItem;
@@ -108,6 +115,9 @@ public class Attack
     public void ConsumeItem() { }
     public void GetProjectileSpawnPoint(out UnityEngine.Vector3 p, out UnityEngine.Vector3 d) { p = d = default; }
     public static ItemDrop.ItemData? FindAmmo(Humanoid c, ItemDrop.ItemData w) => c.Inventory.Items.FirstOrDefault();
+    [MethodImpl(MethodImplOptions.NoInlining)] public float GetAttackEitr(Character character, ItemDrop.ItemData weapon) => 40;
+    [MethodImpl(MethodImplOptions.NoInlining)] public float GetAttackEitr() => GetAttackEitr(m_character, m_weapon);
+    [MethodImpl(MethodImplOptions.NoInlining)] public void Start() { }
     [MethodImpl(MethodImplOptions.NoInlining)] public void OnAttackTrigger() { }
     [MethodImpl(MethodImplOptions.NoInlining)] public void FireProjectileBurst() { }
     [MethodImpl(MethodImplOptions.NoInlining)] public bool UseAmmo(out ItemDrop.ItemData? ammoItem) { ammoItem = null; return false; }
@@ -147,6 +157,8 @@ namespace SecondaryAttacks
     }
     internal static partial class SecondaryAttackRuntimeFacade
     {
+        internal static readonly Dictionary<ItemDrop.ItemData, SecondaryAttackDefinition> Definitions = new Dictionary<ItemDrop.ItemData, SecondaryAttackDefinition>();
+        internal static bool TryGetDefinition(ItemDrop.ItemData weapon, out SecondaryAttackDefinition definition) => Definitions.TryGetValue(weapon, out definition);
         private static bool TryConsumeAttackResources(Attack attack, bool stopAttackOnFailure, bool flashHudOnFailure)
         {
             if (!attack.ResourcesAvailable) return false;
@@ -179,9 +191,11 @@ namespace SecondaryAttacks
         {
             if (ThrowSpawn) throw new InvalidOperationException("spawn failure");
             Shots.Add((a.m_projectiles, l.Damage, l.Accuracy));
+            PassiveTree.ProjectileMods.ObserveEmission(a);
         }
         private static string GetPresetName(SecondaryAttackPreset p) => p.ToString();
-        private class BurstFireController { public void Initialize(Attack a, SecondaryAttackDefinition d, int count) { } }
+        internal static int Scheduled;
+        private class BurstFireController { public void Initialize(Attack a, SecondaryAttackDefinition d, int count) { Scheduled = count; } }
         internal static void Finish(Attack a) => ConsumeBurstFireReload(a);
     }
 }

@@ -18,6 +18,7 @@ namespace SecondaryAttacks;
 [BepInDependency(NativeSecondaryAttackCompat.VikingsMagicGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(HunterLegacyCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(EpicLootCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(PathOfValheimanCompat.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.MagicPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.QuickstepPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SecondaryAttacksPlugin.ShieldMeBruhPluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -125,6 +126,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
             BindUiSettings();
             HunterLegacyCompat.Initialize();
             EpicLootCompat.Initialize();
+            PathOfValheimanCompat.Initialize();
             QuickstepSystem.Initialize();
             LastEquippedShieldSystem.Initialize();
             SummonQualityHudCompatibility.Initialize();
@@ -155,6 +157,7 @@ public class SecondaryAttacksPlugin : BaseUnityPlugin
         SecondaryAttackFacade.Dispose();
         HunterLegacyCompat.Dispose();
         EpicLootCompat.Dispose();
+        PathOfValheimanCompat.Dispose();
         SaveWithRespectToConfigSet();
     }
 

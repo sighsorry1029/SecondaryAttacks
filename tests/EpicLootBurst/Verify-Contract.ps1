@@ -92,13 +92,13 @@ try {
     $projectiles = $mod.MainModule.GetType('SecondaryAttacks.ProjectileRuntimeSystem')
     $shot = Method $projectiles 'TryFireBurstShot'
     $offset = -1
-    foreach ($name in @('BeginShot','TryCommitEpicLootBurstAmmo','PrepareProjectiles','CreateLaunchData','SpawnPrimaryProjectileCluster','Complete')) {
+    foreach ($name in @('BeginShot','TryCommitCompatibleBurstAmmo','PrepareProjectiles','Complete','CreateLaunchData','SpawnPrimaryProjectileCluster')) {
         $call = @(Calls $shot $name)
         Check ($call.Count -eq 1 -and $call[0].Offset -gt $offset) ('Actual shot sequence changed: ' + $name)
         $offset = $call[0].Offset
     }
     Check (@($shot.Body.ExceptionHandlers | Where-Object HandlerType -eq 'Finally').Count -gt 0) 'Shot needs exception-safe restoration.'
-    $payment = Method ($mod.MainModule.GetType('SecondaryAttacks.SecondaryAttackRuntimeFacade')) 'TryCommitEpicLootBurstAmmo'
+    $payment = Method ($mod.MainModule.GetType('SecondaryAttacks.SecondaryAttackRuntimeFacade')) 'TryCommitCompatibleBurstAmmo'
     $offset = -1
     foreach ($name in @('TrySelectConfiguredAmmo','TryValidateBurstPresetPayload','ConsumePerBurstResourcesIfNeeded','CommitConfiguredAmmo')) {
         $call = @(Calls $payment $name)

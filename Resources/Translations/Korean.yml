@@ -18,6 +18,7 @@ sa_skill_tooltip_blood_magic_cooldown: "혈마법 스킬이 높을수록 설정�
 sa_skill_tooltip_blood_magic_lifetime: "혈마법 스킬이 높을수록 설정된 소환 지속시간이 증가합니다."
 sa_skill_tooltip_blood_magic_max_health_cost: "비율 체력 비용은 기본 스킬 감소 전에 최대 체력을 기준으로 계산됩니다."
 sa_skill_tooltip_blood_magic_health_gain: "체력 비용에 비례해 혈마법 스킬 숙련도를 추가로 얻습니다."
+sa_skill_tooltip_blood_magic_pov_experience: "체력 비용으로 얻는 숙련도는 Path of Valheiman 트리 경험치로 전환됩니다."
 sa_skill_tooltip_sneak_heading: "<color=orange>SecondaryAttacks</color>"
 sa_skill_tooltip_sneak_backstab_gain: "성공한 백스탭은 은신 스킬 숙련도를 추가로 올립니다."
 sa_skill_tooltip_sneak_visibility: "은신 스킬이 높을수록 설정된 스킬 기반 가시성 감소 효과가 강화됩니다."

@@ -15,7 +15,9 @@ ZDO Data(GameObject obj) => obj.GetComponent<ZNetView>()!.Zdo!;
 GameObject Make(bool tamed = true, bool player = false)
 {
     var obj = new GameObject();
-    obj.Add<Character>(player ? new Player() : new Character()).Tamed = tamed;
+    Character character = obj.Add<Character>(player ? new Player() : new Character());
+    character.Tamed = tamed;
+    if (character is Player addedPlayer) Player.Players.Add(addedPlayer);
     ZDO zdo = new() { m_uid = new(++next), Owner = ZNet.Local };
     obj.Add(new ZNetView { Zdo = zdo });
     ZDOMan.instance.Objects.Add(zdo.m_uid, zdo);
@@ -25,6 +27,7 @@ GameObject? Spawn(GameObject prefab, GameObject owner, bool blood = true) => Sub
 void Reset()
 {
     ZDOMan.instance = new();
+    Player.Players.Clear();
     ZNet.Local = 1;
     ZNet.instance.Server = true;
     ZRoutedRpc.instance = new();
@@ -39,6 +42,19 @@ GameObject friendlyPrefab = Make();
 GameObject hostilePrefab = Make(false);
 GameObject parent = Spawn(friendlyPrefab, player)!;
 Check(Data(parent).GetString(parentKey, "").Length == 32, "Blood Magic direct summon is marked");
+Check(SubSummonSystem.TryResolveSummoner(parent.GetComponent<Character>(), out Player? keeper) && keeper == player.GetComponent<Player>(), "Persistent summoner resolves to caster");
+Player stranger = Make(player: true).GetComponent<Player>()!;
+stranger.Id = 456;
+Data(parent).Owner = 456;
+Check(SubSummonSystem.TryResolveSummoner(parent.GetComponent<Character>(), out keeper) && keeper == player.GetComponent<Player>(), "Network owner is not summoner identity");
+Data(parent).Owner = ZNet.Local;
+Player.Players.Remove(player.GetComponent<Player>()!);
+Check(SubSummonSystem.TryResolveSummoner(parent.GetComponent<Character>(), out keeper) && keeper == null, "Offline owner does not select another player");
+Player.Players.Add(player.GetComponent<Player>()!);
+parent.GetComponent<ZNetView>()!.Valid = false;
+Check(!SubSummonSystem.TryResolveSummoner(parent.GetComponent<Character>(), out _), "Invalid network identity excluded");
+parent.GetComponent<ZNetView>()!.Valid = true;
+Check(!SubSummonSystem.TryResolveSummoner(player.GetComponent<Character>(), out _) && !SubSummonSystem.TryResolveSummoner(friendlyPrefab.GetComponent<Character>(), out _), "Players and unmarked tame creatures excluded");
 Check(Data(Spawn(friendlyPrefab, player, false)!).GetString(parentKey, "") == "", "Non-Blood-Magic casts stay unmarked");
 Check(Data(Spawn(hostilePrefab, player)!).GetString(parentKey, "") == "", "Untamed direct summons stay unmarked");
 GameObject unrelated = Make();
@@ -47,6 +63,7 @@ Check(!unrelatedChild.GetComponent<Character>()!.Tamed && Data(unrelatedChild).G
 
 GameObject first = Spawn(hostilePrefab, parent)!;
 GameObject second = Spawn(hostilePrefab, parent)!;
+Check(SubSummonSystem.TryResolveSummoner(first.GetComponent<Character>(), out keeper) && keeper == player.GetComponent<Player>(), "Child inherits the persistent caster identity");
 int created = Object.Created;
 for (int i = 0; i < 5; i++) Check(Spawn(hostilePrefab, parent) == null, "Third and later iterations denied");
 Check(Object.Created == created, "Denied spawns never instantiate");

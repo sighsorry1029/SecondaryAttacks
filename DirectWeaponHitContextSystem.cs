@@ -216,8 +216,8 @@ internal static class CharacterDamageDirectWeaponHitDepthPatch
 internal static class CharacterDamageDirectWeaponHitEffectsPatch
 {
     [HarmonyPriority(Priority.Normal)]
-    private static void Prefix(Character __instance, ref HitData hit)
+    private static void Prefix(Character __instance, ref HitData hit, bool __runOriginal)
     {
-        DirectWeaponHitContextSystem.ApplyDirectWeaponHitEffects(__instance, ref hit);
+        if (__runOriginal) DirectWeaponHitContextSystem.ApplyDirectWeaponHitEffects(__instance, ref hit);
     }
 }

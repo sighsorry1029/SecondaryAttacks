@@ -411,7 +411,8 @@ internal static class SecondaryAttackSkillTooltipSystem
 
         if (SecondaryAttacksPlugin.BloodMagicHealthCostSkillRaiseFactor.Value > 0f)
         {
-            section.Append('\n').Append(BloodMagicHealthGainToken);
+            section.Append('\n').Append(PathOfValheimanCompat.FreezesSkills
+                ? "$sa_skill_tooltip_blood_magic_pov_experience" : BloodMagicHealthGainToken);
         }
 
         if (section.Length == BloodMagicHeadingToken.Length)
@@ -431,7 +432,7 @@ internal static class SecondaryAttackSkillTooltipSystem
         }
 
         StringBuilder section = new(SneakHeadingToken);
-        if (SecondaryAttacksPlugin.BackstabSneakSkillRaiseAmount.Value > 0f)
+        if (SecondaryAttacksPlugin.BackstabSneakSkillRaiseAmount.Value > 0f && !PathOfValheimanCompat.Enabled)
         {
             section.Append('\n').Append(SneakBackstabGainToken);
         }

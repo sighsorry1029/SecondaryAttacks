@@ -75,6 +75,7 @@ internal static class AftershockSystem
     private static void ApplyWave(AftershockController controller, int waveIndex)
     {
         Attack attack = controller.Attack;
+        using System.IDisposable? povOriginScope = PathOfValheimanCompat.BeginAttack(attack);
         AftershockDefinition aftershock = controller.Aftershock;
         Character attacker = attack.m_character;
         ItemDrop.ItemData weapon = attack.m_weapon;
@@ -92,8 +93,8 @@ internal static class AftershockSystem
         float vfxScale = waveScale;
         float sfxVolume = waveScale;
 
-        float hitRadius = Mathf.Max(0.01f, attack.m_attackRayWidth * radiusScale);
-        float characterHitRadius = Mathf.Max(0.01f, (attack.m_attackRayWidth + attack.m_attackRayWidthCharExtra) * radiusScale);
+        float hitRadius = Mathf.Max(0.01f, controller.RayWidth * radiusScale);
+        float characterHitRadius = Mathf.Max(0.01f, (controller.RayWidth + controller.CharacterExtra) * radiusScale);
         Vector3 origin = controller.BaseOrigin + controller.Forward * aftershock.ForwardStep * waveIndex;
         Transform attackOrigin = ResolveAttackOrigin(attack);
         CreateScaledEffects(weapon.m_shared.m_triggerEffect, origin, controller.Rotation, attackOrigin, vfxScale, sfxVolume);
@@ -118,7 +119,7 @@ internal static class AftershockSystem
                 ref averageHitPoint,
                 ref maxAdrenalineMultiplier);
 
-            if (attack.m_attackRayWidthCharExtra > 0f || attack.m_attackHeightChar1 != 0f)
+            if (controller.CharacterExtra > 0f || attack.m_attackHeightChar1 != 0f)
             {
                 CheckHits(
                     controller,
@@ -396,6 +397,10 @@ internal static class AftershockSystem
         private float _nextWaveTime;
         private bool _durabilityDrained;
         private bool _finished;
+        private bool _captureGeometry;
+        private float _rayWidth, _characterExtra;
+        internal float RayWidth => _captureGeometry ? _rayWidth : Attack.m_attackRayWidth;
+        internal float CharacterExtra => _captureGeometry ? _characterExtra : Attack.m_attackRayWidthCharExtra;
 
         internal Attack Attack { get; private set; } = null!;
 
@@ -411,6 +416,9 @@ internal static class AftershockSystem
         {
             Attack = attack;
             Aftershock = aftershock;
+            _captureGeometry = PathOfValheimanCompat.Enabled;
+            _rayWidth = attack.m_attackRayWidth;
+            _characterExtra = attack.m_attackRayWidthCharExtra;
             Transform attackerTransform = attack.m_character.transform;
             Transform attackOrigin = ResolveAttackOrigin(attack);
             Forward = attackerTransform.forward;

@@ -255,6 +255,7 @@ internal static class SecondaryAttackRuntimeFacade
 
         ActiveSecondaryAttack activeAttack = new(definition);
         SecondaryAttackRuntimeContext.SetActiveAttack(attack, activeAttack);
+        PathOfValheimanCompat.RegisterAttack(attack, definition);
         SecondaryAttackAdrenalineSystem.Reset(attack);
         if (definition.CleavingThrust != null)
         {
@@ -656,7 +657,7 @@ internal static class SecondaryAttackRuntimeFacade
 
     internal static void ApplyAttackTriggerSideEffects(Attack attack, bool actualBurstShot = false)
     {
-        if (!actualBurstShot && EpicLootCompat.HandlesAttack(attack))
+        if (!actualBurstShot && (EpicLootCompat.HandlesAttack(attack) || PathOfValheimanCompat.HandlesBurst(attack)))
         {
             return;
         }
@@ -692,7 +693,7 @@ internal static class SecondaryAttackRuntimeFacade
 
         if (attack.m_requiresReload)
         {
-            if (EpicLootCompat.HandlesAttack(attack) || ProjectileRuntimeSystem.ShouldDeferBurstFireReloadReset(attack))
+            if (EpicLootCompat.HandlesAttack(attack) || PathOfValheimanCompat.HandlesBurst(attack) || ProjectileRuntimeSystem.ShouldDeferBurstFireReloadReset(attack))
             {
                 return;
             }
@@ -875,6 +876,7 @@ internal static class SecondaryAttackRuntimeFacade
             return true;
         }
 
+        using System.IDisposable? povEmission = isBurstPreset ? null : PathOfValheimanCompat.BeginEmission(attack);
         bool handled = ProjectileRuntimeSystem.TryHandleBurstPreset(attack, activeAttack.Definition, projectileBehavior.Preset);
         if (handled)
         {
@@ -965,7 +967,7 @@ internal static class SecondaryAttackRuntimeFacade
     {
         attack.m_ammoItem = context.AmmoItem;
         attack.m_lastUsedAmmo = context.AmmoItem;
-        if (!actualBurstShot && EpicLootCompat.HandlesAttack(attack))
+        if (!actualBurstShot && (EpicLootCompat.HandlesAttack(attack) || PathOfValheimanCompat.HandlesBurst(attack)))
         {
             return;
         }
@@ -982,15 +984,17 @@ internal static class SecondaryAttackRuntimeFacade
             context.RemovalCount);
     }
 
-    internal static bool TryCommitEpicLootBurstAmmo(
+    internal static bool TryCommitCompatibleBurstAmmo(
         Attack attack,
         SecondaryAttackDefinition definition,
         int multiplier,
-        out bool paidAmmo)
+        out int paidAmmo)
     {
-        paidAmmo = false;
+        paidAmmo = 0;
         ProjectileSecondaryBehavior behavior = (ProjectileSecondaryBehavior)definition.Behavior;
-        int count = (int)Math.Min(int.MaxValue, (long)Math.Max(0, behavior.AmmoConsumption) * Math.Max(1, multiplier));
+        int configured = Math.Max(0, behavior.AmmoConsumption);
+        int count = (int)Math.Min(int.MaxValue, ((long)configured + (configured > 0 ? PathOfValheimanCompat.ExtraAmmo(attack) : 0)) * Math.Max(1, multiplier));
+        count = PathOfValheimanCompat.RollAmmoCost(attack, count);
         if (!TrySelectConfiguredAmmo(attack.m_character, attack.m_weapon, attack.m_character.GetInventory(),
                 attack.m_weapon.m_shared.m_ammoType, count, out ConfiguredAmmoContext context) ||
             !ProjectileRuntimeSystem.TryValidateBurstPresetPayload(attack, definition, SecondaryAttackPreset.Burst, context.AmmoItem) ||
@@ -1001,8 +1005,13 @@ internal static class SecondaryAttackRuntimeFacade
         }
 
         CommitConfiguredAmmo(attack, context, actualBurstShot: true);
-        paidAmmo = context.RemovalCount > 0;
+        paidAmmo = context.RemovalCount;
         return true;
+    }
+
+    internal static int CountCurrentAmmo(Attack attack)
+    {
+        return attack.m_ammoItem == null ? 0 : CountAmmo(attack.m_character.GetInventory(), attack.m_ammoItem);
     }
 
     private static int CountAmmo(
@@ -1076,7 +1085,7 @@ internal static class SecondaryAttackRuntimeFacade
 
     private static bool ConsumePerBurstResourcesIfNeeded(Attack attack, bool actualBurstShot = false)
     {
-        if (!attack.m_perBurstResourceUsage || !actualBurstShot && EpicLootCompat.HandlesAttack(attack))
+        if (!attack.m_perBurstResourceUsage || !actualBurstShot && (EpicLootCompat.HandlesAttack(attack) || PathOfValheimanCompat.HandlesBurst(attack)))
         {
             return true;
         }
