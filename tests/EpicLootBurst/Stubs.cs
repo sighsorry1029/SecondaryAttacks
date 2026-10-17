@@ -110,6 +110,7 @@ public class Attack
     public static ItemDrop.ItemData? FindAmmo(Humanoid c, ItemDrop.ItemData w) => c.Inventory.Items.FirstOrDefault();
     [MethodImpl(MethodImplOptions.NoInlining)] public void OnAttackTrigger() { }
     [MethodImpl(MethodImplOptions.NoInlining)] public void FireProjectileBurst() { }
+    [MethodImpl(MethodImplOptions.NoInlining)] public bool UseAmmo(out ItemDrop.ItemData? ammoItem) { ammoItem = null; return false; }
 }
 public class Effects
 {
@@ -192,14 +193,18 @@ namespace EpicLoot.MagicItemEffects
     [HarmonyPatch]
     public static class MultiShot
     {
-        private enum PendingShotType { None, TripleBow, DoubleMagic }
-        private static PendingShotType _pendingShot;
-        public static bool IsTripleShotActive;
-        public static int ShotProjectiles;
+        // Deliberately differ from the reviewed DLL: SA must treat this as opaque.
+        public enum PendingShotType : byte { None = 10, TripleBow = 20, DoubleMagic = 30, FutureShot = 40 }
+        public static PendingShotType _pendingShot;
+        private static bool IsTripleShotActive;
+        private static int ShotProjectiles;
+        public static bool TripleFlag => IsTripleShotActive;
+        public static int ProjectileFlag => ShotProjectiles;
         public static Queue<bool> Procs = new Queue<bool>();
         public static int EffectCount = 3;
         public static int Pending => (int)_pendingShot;
         public static void SeedGlobals() { _pendingShot = PendingShotType.DoubleMagic; IsTripleShotActive = true; ShotProjectiles = 7; }
+        public static void Attack_OnAttackTrigger_Prefix(string unrelatedOverload) { }
         [HarmonyPatch(typeof(Attack), nameof(Attack.OnAttackTrigger)), HarmonyPrefix, MethodImpl(MethodImplOptions.NoInlining)]
         public static void Attack_OnAttackTrigger_Prefix(Attack __instance)
         {
@@ -233,10 +238,11 @@ namespace EpicLoot.Magic.MagicItemEffects
 {
     public class AmmoConservation
     {
-        private static bool skipReload;
+        public static bool skipReload;
         public static Queue<bool> Procs = new Queue<bool>();
         public static int Calls;
         public static bool PendingReload { get => skipReload; set => skipReload = value; }
+        [HarmonyPatch(typeof(Attack), nameof(Attack.UseAmmo))]
         public static class AmmoConservation_Attack_UseAmmo_Patch
         {
             public static void Postfix(Attack __instance, ref bool __result, ItemDrop.ItemData ammoItem)

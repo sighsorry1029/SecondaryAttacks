@@ -51,7 +51,29 @@ try {
     Check ($refund.IsPublic -and $refund.IsStatic -and ($refund.Parameters.ParameterType.FullName -join ',') -eq 'Attack,System.Boolean&,ItemDrop/ItemData') 'Conservation callback signature changed.'
     Check (@(Calls $refund 'AddItem').Count -eq 1) 'Conservation refund path changed.'
 
+    # The fixture declarations back the runtime registration checks. Runtime
+    # acceptance itself uses Harmony.GetPatchInfo, not this fixture's version/hash.
+    foreach ($contract in @(
+        @((Method $multi 'Attack_OnAttackTrigger_Prefix'), 'OnAttackTrigger', 'HarmonyPrefix'),
+        @((Method $multi 'Attack_FireProjectileBurst_Prefix'), 'FireProjectileBurst', 'HarmonyPrefix'),
+        @((Method $multi 'Attack_FireProjectileBurst_Finalizer'), 'FireProjectileBurst', 'HarmonyFinalizer'),
+        @($refund, 'UseAmmo', 'Postfix'))) {
+        $callback = $contract[0]
+        $attributes = @($callback.CustomAttributes) + @($callback.DeclaringType.CustomAttributes)
+        $target = @($attributes | Where-Object {
+            $_.AttributeType.FullName -eq 'HarmonyLib.HarmonyPatch' -and $_.ConstructorArguments.Count -eq 2 -and
+            $_.ConstructorArguments[0].Value.FullName -eq 'Attack' -and $_.ConstructorArguments[1].Value -eq $contract[1]
+        })
+        $role = $callback.Name -eq $contract[2] -or @($callback.CustomAttributes | Where-Object {
+            $_.AttributeType.FullName -eq ('HarmonyLib.' + $contract[2])
+        }).Count -eq 1
+        Check ($target.Count -eq 1 -and $role) ('Reference callback registration declaration changed: ' + $callback.Name)
+    }
+
     $attack = $game.MainModule.GetType('Attack')
+    $useAmmo = Method $attack 'UseAmmo'
+    Check ($useAmmo.IsPrivate -and !$useAmmo.IsStatic -and $useAmmo.ReturnType.FullName -eq 'System.Boolean' -and
+        ($useAmmo.Parameters.ParameterType.FullName -join ',') -eq 'ItemDrop/ItemData&') 'Original Attack.UseAmmo registration target changed.'
     $character = $attack.Fields | Where-Object Name -eq 'm_character'
     Check ($character.IsPrivate -and !$character.IsStatic -and $character.FieldType.FullName -eq 'Humanoid') 'Original Attack.m_character access contract changed.'
     Check ((Method $attack 'GetWeapon').IsPublic) 'Attack.GetWeapon must be a public original-game API.'

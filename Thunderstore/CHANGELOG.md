@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.19
+
+- Removed the exact EpicLoot 0.14.13 version restriction. Burst compatibility now checks the required callback signatures, writable state fields and actual Harmony registrations; the detected version is included in diagnostics rather than used to enable or disable support.
+- Allowed compatible enum changes, field visibility changes and unrelated callback overloads. Missing or incompatible contracts disable the bridge with a warning, without leaving partial suppression patches installed.
+- Preserved existing Burst ammo, conservation and reload handling, with effect calculations still delegated to EpicLoot. Added regressions for synthetic version changes and incompatible contracts; matching these checks does not guarantee unchanged behavior in future EpicLoot implementations.
+
 ## 1.2.18
 
 - Added optional EpicLoot 0.14.13 compatibility for ammo-using Burst attacks. Each actual shot now rolls multishot independently and pays the configured ammo cost multiplied by Triple Shot's projectile count; a default three-shot burst consumes 3/5/7/9 ammo for zero/one/two/three procs before conservation.

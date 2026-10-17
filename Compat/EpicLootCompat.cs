@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using BepInEx.Bootstrap;
 using HarmonyLib;
@@ -27,20 +28,18 @@ internal static class EpicLootCompat
 
         try
         {
-            if (plugin.Metadata.Version != new System.Version(0, 14, 13))
-                throw new NotSupportedException($"Unreviewed EpicLoot version {plugin.Metadata.Version}.");
-
             Api api = new(plugin.Instance.GetType().Assembly);
             Harmony harmony = new(HarmonyId);
             harmony.Patch(api.RollMethod, prefix: new HarmonyMethod(typeof(EpicLootCompat), nameof(RunAutomaticRoll)));
             harmony.Patch(api.PrepareMethod, prefix: new HarmonyMethod(typeof(EpicLootCompat), nameof(RunAutomaticPrepare)));
             _api = api;
-            SecondaryAttacksPlugin.ModLogger.LogInfo("EpicLoot Burst compatibility enabled: per-shot multishot and ammo conservation.");
+            SecondaryAttacksPlugin.ModLogger.LogInfo(
+                $"EpicLoot {plugin.Metadata.Version} Burst compatibility enabled: required callbacks, state fields and Harmony registrations matched.");
         }
         catch (Exception exception)
         {
             Dispose();
-            SecondaryAttacksPlugin.ModLogger.LogWarning($"EpicLoot Burst compatibility unavailable: {exception.Message}");
+            SecondaryAttacksPlugin.ModLogger.LogWarning($"EpicLoot {plugin.Metadata.Version} Burst compatibility unavailable: {exception.Message}");
         }
     }
 
@@ -186,30 +185,65 @@ internal static class EpicLootCompat
         {
             Type multi = assembly.GetType("EpicLoot.MagicItemEffects.MultiShot", true)!;
             Type conserve = assembly.GetType("EpicLoot.Magic.MagicItemEffects.AmmoConservation", true)!;
-            RollMethod = multi.GetMethod("Attack_OnAttackTrigger_Prefix", BindingFlags.Public | BindingFlags.Static)
-                ?? throw new MissingMethodException(multi.FullName, "Attack_OnAttackTrigger_Prefix");
-            PrepareMethod = multi.GetMethod("Attack_FireProjectileBurst_Prefix", BindingFlags.Public | BindingFlags.Static)
-                ?? throw new MissingMethodException(multi.FullName, "Attack_FireProjectileBurst_Prefix");
+            RollMethod = RequireMethod(multi, "Attack_OnAttackTrigger_Prefix", typeof(Attack));
+            PrepareMethod = RequireMethod(multi, "Attack_FireProjectileBurst_Prefix",
+                typeof(Attack), typeof(HitData.DamageTypes?).MakeByRefType());
             Roll = (Action<Attack>)Delegate.CreateDelegate(typeof(Action<Attack>), RollMethod);
             Prepare = (PrepareShot)Delegate.CreateDelegate(typeof(PrepareShot), PrepareMethod);
-            MethodInfo refund = conserve.GetNestedType("AmmoConservation_Attack_UseAmmo_Patch")?.GetMethod("Postfix")
-                ?? throw new MissingMethodException(conserve.FullName, "AmmoConservation_Attack_UseAmmo_Patch.Postfix");
+            Type refundType = conserve.GetNestedType("AmmoConservation_Attack_UseAmmo_Patch", BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new TypeLoadException("EpicLoot AmmoConservation_Attack_UseAmmo_Patch is missing.");
+            MethodInfo refund = RequireMethod(refundType, "Postfix", typeof(Attack), typeof(bool).MakeByRefType(), typeof(ItemDrop.ItemData));
             Conserve = (ConserveAmmo)Delegate.CreateDelegate(typeof(ConserveAmmo), refund);
-            Pending = RequireField(multi, "_pendingShot", null, false);
-            if (!Pending.FieldType.IsEnum || string.Join(",", Enum.GetNames(Pending.FieldType)) != "None,TripleBow,DoubleMagic")
+            Pending = RequireField(multi, "_pendingShot", null);
+            // Opaque state: SA snapshots/restores it but never interprets its values.
+            if (!Pending.FieldType.IsEnum)
                 throw new MissingFieldException("EpicLoot pending shot contract changed.");
-            Triple = RequireField(multi, "IsTripleShotActive", typeof(bool), true);
-            Count = RequireField(multi, "ShotProjectiles", typeof(int), true);
-            SkipReload = RequireField(conserve, "skipReload", typeof(bool), false);
+            Triple = RequireField(multi, "IsTripleShotActive", typeof(bool));
+            Count = RequireField(multi, "ShotProjectiles", typeof(int));
+            SkipReload = RequireField(conserve, "skipReload", typeof(bool));
+
+            // A leftover method with a matching signature is not enough: only
+            // bridge callbacks EpicLoot actually installed on the paths we replace.
+            MethodInfo finalizer = RequireMethod(multi, "Attack_FireProjectileBurst_Finalizer",
+                typeof(Attack), typeof(HitData.DamageTypes?));
+            RequirePatch("OnAttackTrigger", RollMethod, HarmonyPatchType.Prefix);
+            RequirePatch("FireProjectileBurst", PrepareMethod, HarmonyPatchType.Prefix);
+            RequirePatch("FireProjectileBurst", finalizer, HarmonyPatchType.Finalizer);
+            RequirePatch("UseAmmo", refund, HarmonyPatchType.Postfix, typeof(ItemDrop.ItemData).MakeByRefType());
         }
 
-        private static FieldInfo RequireField(Type type, string name, Type? fieldType, bool isPublic)
+        private static MethodInfo RequireMethod(Type type, string name, params Type[] parameters)
         {
-            FieldInfo? field = type.GetField(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            if (field == null || field.IsPublic != isPublic || field.IsInitOnly ||
+            MethodInfo? method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly,
+                null, parameters, null);
+            if (method == null || method.ContainsGenericParameters || method.ReturnType != typeof(void) ||
+                !method.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameters))
+                throw new MissingMethodException(type.FullName, name);
+            return method;
+        }
+
+        private static FieldInfo RequireField(Type type, string name, Type? fieldType)
+        {
+            FieldInfo? field = type.GetField(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            if (field == null || field.IsInitOnly || field.IsLiteral ||
                 (fieldType != null && field.FieldType != fieldType))
                 throw new MissingFieldException(type.FullName, name);
             return field;
+        }
+
+        private static void RequirePatch(string targetName, MethodInfo callback, HarmonyPatchType kind, params Type[] parameters)
+        {
+            MethodInfo? target = AccessTools.DeclaredMethod(typeof(Attack), targetName, parameters);
+            Patches? patches = target == null ? null : Harmony.GetPatchInfo(target);
+            bool registered = kind switch
+            {
+                HarmonyPatchType.Prefix => patches?.Prefixes.Any(p => p.PatchMethod == callback) == true,
+                HarmonyPatchType.Postfix => patches?.Postfixes.Any(p => p.PatchMethod == callback) == true,
+                HarmonyPatchType.Finalizer => patches?.Finalizers.Any(p => p.PatchMethod == callback) == true,
+                _ => false
+            };
+            if (!registered)
+                throw new NotSupportedException($"EpicLoot {callback.DeclaringType?.Name}.{callback.Name} is not registered as an Attack.{targetName} {kind}.");
         }
     }
 }
