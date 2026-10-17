@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.20
+
+- Added optional Path of Valheiman compatibility, reviewed against 5.0.4. The bridge checks required callbacks, writable state and installed Harmony registrations instead of gating on the reported version; no new config keys, YAML schema or required dependency is added.
+- Connected PoV additional arrows/bolts, ammo saving and paid-ammo recovery to actual ammo-using Burst shots. Crossbow extras extend the sequence within its existing 16-shot cap; other extras join the shot cluster. EpicLoot multishot/refunds are accounted for before recovery, preventing saved or refunded ammo from becoming recoverable drops. Empty native callbacks no longer charge or recoil, and PoV-only Burst defers reload consumption until completion.
+- Preserved PoV attack/weapon context for custom projectile damage, delayed projectile setup and Aftershock. Configured projectile Eitr uses PoV's cost multiplier consistently, including when its cost equals the primary attack, without an extra-projectile surcharge for unsupported formations.
+- Run custom melee after PoV area/charge preparation and retain Aftershock's prepared radius. Respect earlier hit rejections and keep Piercing/Scatter continuation under SA control while retaining PoV ignore/volley filters. Fixed formations retain their configured count and spread; extra-shot, ammo-saving and recovery extensions remain limited to ammo-using Burst.
+- Resolve marked Blood Magic summons and immediate children to their stored summoner for PoV bonuses, preserving explicit PoV ownership and avoiding a nearest-player fallback when the summoner is offline. Skill tooltip text now follows PoV's backstab and frozen-skill experience behavior.
+- Added isolated HarmonyX/payment/state-restoration regressions and original-DLL contract checks. Full magic extra-shot budgeting and combined pierce/chain mechanics remain outside this integration; live game and multiplayer testing is still required.
+
 ## 1.2.19
 
 - Removed the exact EpicLoot 0.14.13 version restriction. Burst compatibility now checks the required callback signatures, writable state fields and actual Harmony registrations; the detected version is included in diagnostics rather than used to enable or disable support.
