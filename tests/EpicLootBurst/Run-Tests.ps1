@@ -32,13 +32,17 @@ foreach ($name in @('TryFireBurstShot', 'FireBurstFire', 'ConsumeBurstFireReload
     $text += (Extract-Member $controllers $name) + "`n"
 }
 $text += "}}`n"
+$common = [IO.File]::ReadAllText((Join-Path $root 'SecondaryAttackManager.CommonRuntime.cs'))
+$text += "namespace SecondaryAttacks { internal static partial class SecondaryAttackManager {`n" + (Extract-Member $common 'TryRestorePersistedReloadedWeaponState') + "`n}}`n"
 $hooks = [IO.File]::ReadAllText((Join-Path $root 'SecondaryAttackHarmonyHooks.cs')).Replace('internal static class ', '    internal static class ')
 $text = "using HarmonyLib;`n" + $text + "namespace SecondaryAttacks {`n" + (Extract-Member $hooks 'AttackGetEitrConfiguredCostPatch') + "`n}`n"
 [void][IO.Directory]::CreateDirectory((Join-Path $PSScriptRoot 'obj'))
 [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'obj/ProductionSlices.cs'), $text)
-dotnet build (Join-Path $PSScriptRoot 'EpicLootBurst.csproj') -c Debug "-p:BepInExCore=$BepInExCore" --nologo
-if ($LASTEXITCODE -ne 0) { throw 'Harness build failed.' }
-foreach ($order in @('epic-first', 'sa-first')) {
-    & (Join-Path $PSScriptRoot 'bin/Debug/net48/EpicLootBurst.exe') $order
-    if ($LASTEXITCODE -ne 0) { throw "Burst regression failed: $order" }
+foreach ($magazine in @('false', 'true')) {
+    dotnet build (Join-Path $PSScriptRoot 'EpicLootBurst.csproj') -c Debug "-p:BepInExCore=$BepInExCore" "-p:PoVMagazine=$magazine" --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Harness build failed.' }
+    foreach ($order in @('epic-first', 'sa-first')) {
+        & (Join-Path $PSScriptRoot 'bin/Debug/net48/EpicLootBurst.exe') $order
+        if ($LASTEXITCODE -ne 0) { throw "Burst regression failed: $order, magazine=$magazine" }
+    }
 }

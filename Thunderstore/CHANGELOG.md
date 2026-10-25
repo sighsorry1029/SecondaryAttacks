@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.21
+
+- Updated optional Path of Valheiman compatibility for 5.3.2, where `ProjectileMods.burstFor` was removed and extra crossbow bolts became magazine capacity. The earlier extra-burst contract remains supported when present; new support checks the required methods, state and installed patches without a version or whole-DLL hash gate.
+- Connected PoV's original magazine processing to the first successful shot of a configured Burst, retaining trigger timing and first/last-loaded-shot effects for delayed shots. One Burst is one magazine trigger: its first shot determines magazine conservation, while each repeat still pays its configured inventory ammo. Physical unload waits for the Burst to finish, and PoV auto-chaining waits until the sequence ends.
+- Left partial-magazine restoration to PoV so weapon switching cannot refill it through SecondaryAttacks' saved loaded flag. Duplicate completion and cleanup of an old Burst do not consume a newly filled magazine.
+- Prevented custom projectile aim queries and fixed formations from charging PoV volley resources again. Ammo-saving rolls now use the actual attack weapon and restore the enclosing context; EpicLoot refunds and paid-only ammo recovery remain supported.
+- Added regressions for both PoV contracts, partial patch registration, magazine lifecycle, resource charges and exception cleanup, plus original-DLL/Mono binding and magazine checks. No settings, YAML schema or required dependencies changed. Live gameplay and multiplayer validation remain outstanding.
+
 ## 1.2.20
 
 - Added optional Path of Valheiman compatibility, reviewed against 5.0.4. The bridge checks required callbacks, writable state and installed Harmony registrations instead of gating on the reported version; no new config keys, YAML schema or required dependency is added.

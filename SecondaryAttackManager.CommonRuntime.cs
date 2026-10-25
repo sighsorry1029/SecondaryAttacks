@@ -13,7 +13,7 @@ internal static partial class SecondaryAttackManager
 
     internal static void TryRestorePersistedReloadedWeaponState(Player player, ItemDrop.ItemData weapon)
     {
-        if (player == null || weapon == null || !IsReloadableWeapon(weapon))
+        if (player == null || weapon == null || !IsReloadableWeapon(weapon) || PathOfValheimanCompat.OwnsMagazineReload(player, weapon))
         {
             return;
         }

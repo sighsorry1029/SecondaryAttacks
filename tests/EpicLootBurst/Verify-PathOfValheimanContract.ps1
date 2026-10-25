@@ -21,16 +21,17 @@ function Method($type, $name) { return $type.Methods | Where-Object Name -eq $na
 try {
     # Fixture identity only. Runtime acceptance checks signatures/registrations,
     # not this hash or version. No external assembly is loaded or publicized.
-    Check ((Get-FileHash -LiteralPath $PathOfValheimanDll).Hash -eq '36E45B65B44667AD596446CAC2AE989041669948C11710B05185E4FE16697DB4') 'Unexpected PoV review fixture.'
+    Check ((Get-FileHash -LiteralPath $PathOfValheimanDll).Hash -eq '83BD50F23D9C301FE469B5FBE2C430FD35C928D7A2CCFD99AF5A1040558C9D72') 'Unexpected PoV review fixture.'
     $identity = (FindType $pov 'PassiveTree.Plugin').CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'BepInEx.BepInPlugin' }
-    Check ($identity.ConstructorArguments[0].Value -eq 'treextr.pathofvalheiman' -and $identity.ConstructorArguments[2].Value -eq '5.0.4') 'Unexpected plugin identity.'
+    Check ($identity.ConstructorArguments[0].Value -eq 'treextr.pathofvalheiman' -and $identity.ConstructorArguments[2].Value -eq '5.3.2') 'Unexpected plugin identity.'
     $fields = @{
         'PassiveTree.SecondaryAttacks' = @{ producing = 'Attack' }
         'PassiveTree.ChargedAttacks' = @{ producing = 'Attack' }
         'PassiveTree.WeaponAffixes' = @{ Override = 'ItemDrop/ItemData' }
         'PassiveTree.Plugin' = @{ DisableVanillaSkills = 'BepInEx.Configuration.ConfigEntry`1<System.Boolean>' }
+        'PassiveTree.CrossbowMagazine' = @{ firing = 'Attack' }
         'PassiveTree.ProjectileMods' = @{
-            creatingProjectile = 'Attack'; lastAttack = 'Attack'; burstFor = 'Attack'
+            creatingProjectile = 'Attack'; lastAttack = 'Attack'; ammoWeapon = 'ItemDrop/ItemData'
             addedShots = 'System.Int32'; nativeShots = 'System.Int32'; recoverable = 'System.Int32'
             shotIndex = 'System.Int32'; volleyNow = 'System.Int32'; ownSpread = 'System.Single'
             usingAmmo = 'System.Boolean'; ammoSaved = 'System.Boolean'; inBurst = 'System.Boolean'; countingBurst = 'System.Boolean'
@@ -43,6 +44,18 @@ try {
         }
     }
     foreach ($contract in @(
+        @('PassiveTree.CrossbowMagazine', 'Is', 'System.Boolean', 'ItemDrop/ItemData', ''),
+        @('PassiveTree.CrossbowMagazine', 'Remaining', 'System.Int32', 'ItemDrop/ItemData', ''),
+        @('PassiveTree.CrossbowMagazine', 'ShotPosition', 'PassiveTree.HitTag', 'ItemDrop/ItemData', ''),
+        @('PassiveTree.HitContext', 'Push', 'PassiveTree.HitTag', 'PassiveTree.HitTag', ''),
+        @('PassiveTree.HitContext', 'Pop', 'System.Void', 'PassiveTree.HitTag', ''),
+        @('PassiveTree.ProjectileMods/VolleyResources', 'Postfix', 'System.Void', 'Attack', 'GetProjectileSpawnPoint'),
+        @('PassiveTree.CrossbowMagazine/Shot', 'Prefix', 'System.Boolean', 'Attack,Attack&', 'OnAttackTrigger'),
+        @('PassiveTree.CrossbowMagazine/Shot', 'Finalizer', 'System.Void', 'Attack', 'OnAttackTrigger'),
+        @('PassiveTree.CrossbowMagazine/KeepLoaded', 'Prefix', 'System.Boolean', 'Player', 'ResetLoadedWeapon'),
+        @('PassiveTree.CrossbowMagazine/Position', 'Prefix', 'System.Void', 'Attack,PassiveTree.HitTag&', 'FireProjectileBurst'),
+        @('PassiveTree.CrossbowMagazine/Position', 'Finalizer', 'System.Void', 'PassiveTree.HitTag', 'FireProjectileBurst'),
+        @('PassiveTree.CrossbowMagazine/NextShot', 'Postfix', 'System.Void', 'Player,System.Boolean&', 'HaveQueuedChain'),
         @('PassiveTree.TamingHunting', 'Keeper', 'Player', 'UnityEngine.Component', ''),
         @('PassiveTree.ProjectileMods', 'OpenBurst', 'System.Void', 'System.Int32,System.Single', ''),
         @('PassiveTree.SecondaryAttacks', 'Secondary', 'System.Boolean', 'Attack', ''),
@@ -60,6 +73,11 @@ try {
         }
     }
     foreach ($contract in @(
+        @('PassiveTree.CrossbowMagazine/Fill', 'Prefix', 'Player', 'SetWeaponLoaded'),
+        @('PassiveTree.CrossbowMagazine/Fill', 'Postfix', 'Player', 'SetWeaponLoaded'),
+        @('PassiveTree.CrossbowMagazine/Restore', 'Prefix', 'Player', 'UpdateWeaponLoading'),
+        @('PassiveTree.CrossbowMagazine/Gate', 'Prefix', 'Humanoid', 'StartAttack'),
+        @('PassiveTree.CrossbowMagazine/Gate', 'Postfix', 'Humanoid', 'StartAttack'),
         @('PassiveTree.ProjectileMods/ClassifyBeforeDamage', 'Prefix', 'SEMan', 'ModifyAttack'),
         @('PassiveTree.ProjectileMods/Attack_Start', 'Postfix', 'Attack', 'Start'),
         @('PassiveTree.ProjectileMods/Projectile_Setup', 'Prefix', 'Projectile', 'Setup'),
@@ -74,6 +92,7 @@ try {
         $patch = $type.CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'HarmonyLib.HarmonyPatch' }
         Check ($method.IsStatic -and $patch.ConstructorArguments[0].Value.FullName -eq $contract[2] -and $patch.ConstructorArguments[1].Value -eq $contract[3]) "Required callback contract changed: $($contract[0]).$($contract[1])"
     }
+    Check (-not ((FindType $pov 'PassiveTree.ProjectileMods').Fields | Where-Object Name -eq 'burstFor')) 'New PoV fixture must not contain the old burstFor field.'
     $attack = FindType $game 'Attack'
     foreach ($name in @('Pierce','Chain','Bounce')) {
         $field = (FindType $pov 'PassiveTree.ProjMods').Fields | Where-Object Name -eq $name

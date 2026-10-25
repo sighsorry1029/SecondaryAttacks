@@ -48,6 +48,9 @@ public class ItemDrop
         public SharedData m_shared = new SharedData();
         public UnityEngine.GameObject m_dropPrefab = new UnityEngine.GameObject("Bolt");
         public int m_stack;
+        public readonly Dictionary<string, string> m_customData = new Dictionary<string, string>();
+        public bool Crossbow;
+        public int Magazine, Used;
         public bool ValidPayload = true;
         public enum ItemType { Ammo, AmmoNonEquipable, Weapon }
         public class SharedData
@@ -87,12 +90,17 @@ public class Humanoid : Character
     public void TakeOff() { }
     public void ApplyPushback(UnityEngine.Vector3 v, float f) { SideEffects++; }
     public void Damage(HitData hit) { }
-    public void ResetLoadedWeapon() { Resets++; ((Player)this).m_weaponLoaded = null; }
+    public Attack? m_currentAttack;
+    public virtual void ResetLoadedWeapon() { Resets++; ((Player)this).m_weaponLoaded = null; }
 }
 public class Player : Humanoid
 {
     public static Player? m_localPlayer;
     public ItemDrop.ItemData? m_weaponLoaded;
+    [MethodImpl(MethodImplOptions.NoInlining)] public override void ResetLoadedWeapon() => base.ResetLoadedWeapon();
+    [MethodImpl(MethodImplOptions.NoInlining)] public void SetWeaponLoaded(ItemDrop.ItemData weapon) { m_weaponLoaded = weapon; }
+    [MethodImpl(MethodImplOptions.NoInlining)] public void UpdateWeaponLoading(ItemDrop.ItemData weapon) { }
+    [MethodImpl(MethodImplOptions.NoInlining)] public bool HaveQueuedChain() => false;
 }
 public class Attack
 {
@@ -113,7 +121,7 @@ public class Attack
     public ItemDrop.ItemData GetWeapon() => m_weapon;
     public void Stop() { Stops++; }
     public void ConsumeItem() { }
-    public void GetProjectileSpawnPoint(out UnityEngine.Vector3 p, out UnityEngine.Vector3 d) { p = d = default; }
+    [MethodImpl(MethodImplOptions.NoInlining)] public void GetProjectileSpawnPoint(out UnityEngine.Vector3 p, out UnityEngine.Vector3 d) { p = d = default; }
     public static ItemDrop.ItemData? FindAmmo(Humanoid c, ItemDrop.ItemData w) => c.Inventory.Items.FirstOrDefault();
     [MethodImpl(MethodImplOptions.NoInlining)] public float GetAttackEitr(Character character, ItemDrop.ItemData weapon) => 40;
     [MethodImpl(MethodImplOptions.NoInlining)] public float GetAttackEitr() => GetAttackEitr(m_character, m_weapon);
@@ -147,10 +155,12 @@ namespace SecondaryAttacks
         internal static readonly Dictionary<Attack, ActiveSecondaryAttack> Active = new Dictionary<Attack, ActiveSecondaryAttack>();
         internal static bool TryGetActiveAttack(Attack a, out ActiveSecondaryAttack? active) => Active.TryGetValue(a, out active);
     }
-    internal static class SecondaryAttackManager
+    internal static partial class SecondaryAttackManager
     {
         internal struct ReloadStateConsumptionScope { }
         internal static int PersistedConsumed;
+        private const string ReloadLoadedCustomDataKey = "SecondaryAttacks.ReloadLoaded";
+        private static bool IsReloadableWeapon(ItemDrop.ItemData w) => true;
         internal static ReloadStateConsumptionScope BeginReloadStateConsumption(Attack a) => default;
         internal static void EndReloadStateConsumption(ref ReloadStateConsumptionScope scope) { }
         internal static void ConsumePersistedReloadedWeaponState(Player p, ItemDrop.ItemData w) { PersistedConsumed++; }

@@ -1013,7 +1013,7 @@ internal static partial class ProjectileRuntimeSystem
             SpawnPrimaryProjectileCluster(attack, launchData, spawnPoint, aimDirection);
         if (managedShot)
         {
-            PathOfValheimanCompat.AfterBurstShot(attack);
+            PathOfValheimanCompat.AfterBurstShot(attack, paidAmmo);
             epicShot?.Dispose();
             SecondaryAttackRuntimeFacade.ApplyAttackTriggerSideEffects(attack, actualBurstShot: true);
         }
@@ -1023,10 +1023,14 @@ internal static partial class ProjectileRuntimeSystem
     private static void ConsumeBurstFireReload(Attack attack)
     {
         ClearDeferredBurstFireReloadReset(attack);
-        if (attack.m_character == null || !attack.m_requiresReload || EpicLootCompat.PreservesReload(attack))
+        if (attack.m_character == null || !attack.m_requiresReload)
         {
             return;
         }
+
+        using IDisposable? magazine = PathOfValheimanCompat.BeginReloadConsumption(attack,
+            EpicLootCompat.PreservesReload(attack), out bool preserve);
+        if (preserve) return;
 
         if (attack.m_character is Player player && player.m_weaponLoaded != attack.m_weapon)
         {

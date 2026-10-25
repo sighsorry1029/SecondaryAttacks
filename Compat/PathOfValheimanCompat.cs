@@ -19,6 +19,7 @@ internal static class PathOfValheimanCompat
     private static readonly AccessTools.FieldRef<Attack, int> BurstsFired = AccessTools.FieldRefAccess<Attack, int>("m_projectileBurstsFired");
     private static ConditionalWeakTable<Attack, BurstPlan> _bursts = new();
     private static ConditionalWeakTable<Attack, FixedVolley> _fixedVolleys = new();
+    private static ConditionalWeakTable<Attack, ReloadState> _reloads = new();
     [ThreadStatic] private static Attack? _manualCall;
     [ThreadStatic] private static Attack? _emitting;
     internal static bool Enabled => _api != null;
@@ -35,6 +36,10 @@ internal static class PathOfValheimanCompat
             new Harmony(HarmonyId).Patch(api.Keeper, prefix: new HarmonyMethod(typeof(PathOfValheimanCompat), nameof(ResolveKeeper)));
             foreach (MethodInfo callback in new[] { api.RecoilMethod, api.VarietyMethod })
                 new Harmony(HarmonyId).Patch(callback, prefix: new HarmonyMethod(typeof(PathOfValheimanCompat), nameof(AllowBurstCallback)));
+            if (api.VolleyResources != null)
+                new Harmony(HarmonyId).Patch(api.VolleyResources, prefix: new HarmonyMethod(typeof(PathOfValheimanCompat), nameof(AllowVolleyResources)));
+            if (api.NextShot != null)
+                new Harmony(HarmonyId).Patch(api.NextShot, prefix: new HarmonyMethod(typeof(PathOfValheimanCompat), nameof(AllowMagazineChain)));
             _api = api;
             SecondaryAttacksPlugin.ModLogger.LogInfo($"Path of Valheiman {plugin.Metadata.Version} compatibility enabled.");
         }
@@ -50,6 +55,7 @@ internal static class PathOfValheimanCompat
         _api = null;
         _bursts = new();
         _fixedVolleys = new();
+        _reloads = new();
         new Harmony(HarmonyId).UnpatchSelf();
     }
 
@@ -81,6 +87,19 @@ internal static class PathOfValheimanCompat
         active?.Definition.Behavior is ProjectileSecondaryBehavior { Preset: SecondaryAttackPreset.Burst } &&
         !string.IsNullOrEmpty(attack.GetWeapon()?.m_shared.m_ammoType);
 
+    // Spawn-point queries also run while aiming, before BeginEmission. SA owns
+    // configured costs/counts for these attacks, including fixed formations.
+    private static bool AllowVolleyResources(Attack __0) => _api == null || Character(__0) != Player.m_localPlayer ||
+        !SecondaryAttackRuntimeContext.TryGetActiveAttack(__0, out ActiveSecondaryAttack? active) ||
+        active?.Definition.Behavior is not ProjectileSecondaryBehavior;
+
+    internal static bool OwnsMagazineReload(Player player, ItemDrop.ItemData weapon) =>
+        player == Player.m_localPlayer && _api?.MagazineIs?.Invoke(weapon) == true;
+
+    private static readonly AccessTools.FieldRef<Humanoid, Attack> CurrentAttack = AccessTools.FieldRefAccess<Humanoid, Attack>("m_currentAttack");
+    private static bool AllowMagazineChain(Player __0) => _api == null ||
+        CurrentAttack(__0) is not Attack attack || !ProjectileRuntimeSystem.ShouldDeferBurstFireReloadReset(attack);
+
     // Start has already applied PoV's rolls and speed modifiers. Adopt only its
     // count reservation, so empty vanilla Fire callbacks cannot charge it again.
     internal static void RegisterAttack(Attack attack, SecondaryAttackDefinition definition)
@@ -90,12 +109,12 @@ internal static class PathOfValheimanCompat
         if (!ReferenceEquals(api.LastAttack.GetValue(null), attack)) return;
         int added = Math.Max(0, (int)api.AddedShots.GetValue(null)!);
         int native = Math.Max(1, (int)api.NativeShots.GetValue(null)!);
-        bool separateBursts = ReferenceEquals(api.BurstFor.GetValue(null), attack);
+        bool separateBursts = api.BurstFor != null && ReferenceEquals(api.BurstFor.GetValue(null), attack);
         api.LastAttack.SetValue(null, null);
         api.AddedShots.SetValue(null, 0);
         if (separateBursts)
         {
-            api.BurstFor.SetValue(null, null);
+            api.BurstFor!.SetValue(null, null);
             attack.m_projectileBursts = Math.Max(1, attack.m_projectileBursts - added);
         }
         if (HandlesBurst(attack))
@@ -119,9 +138,11 @@ internal static class PathOfValheimanCompat
         if (!HandlesBurst(attack)) return count;
         Api api = _api!;
         object? usingAmmo = api.UsingAmmo.GetValue(null), saved = api.AmmoSaved.GetValue(null);
+        object? weapon = api.AmmoWeapon?.GetValue(null);
         try
         {
             api.UsingAmmo.SetValue(null, true);
+            api.AmmoWeapon?.SetValue(null, attack.GetWeapon());
             int paid = 0;
             for (int i = 0; i < count; i++)
             {
@@ -131,14 +152,24 @@ internal static class PathOfValheimanCompat
             }
             return paid;
         }
-        finally { api.UsingAmmo.SetValue(null, usingAmmo); api.AmmoSaved.SetValue(null, saved); }
+        finally { api.UsingAmmo.SetValue(null, usingAmmo); api.AmmoSaved.SetValue(null, saved); api.AmmoWeapon?.SetValue(null, weapon); }
     }
 
     private static bool AllowBurstCallback(Attack __0) => _manualCall == __0 || !HandlesBurst(__0);
 
-    internal static void AfterBurstShot(Attack attack)
+    internal static void AfterBurstShot(Attack attack, int paidAmmo)
     {
         if (!HandlesBurst(attack)) return;
+        if (attack.m_requiresReload && _api!.MagazineIs?.Invoke(attack.GetWeapon()) == true && !_reloads.TryGetValue(attack, out _))
+        {
+            // PoV consumes one magazine position per trigger. Only the first
+            // successful shot represents that trigger; repeats still pay SA's
+            // configured ammo, but cannot consume/re-fill the magazine again.
+            SecondaryAttackRuntimeContext.TryGetActiveAttack(attack, out ActiveSecondaryAttack? active);
+            bool saved = paidAmmo == 0 && active?.Definition.Behavior is ProjectileSecondaryBehavior { AmmoConsumption: > 0 };
+            using ReloadScope scope = new(_api, attack, saved, out bool preserve);
+            _reloads.Add(attack, new ReloadState { Reset = !preserve });
+        }
         Attack? previous = _manualCall;
         int fired = BurstsFired(attack);
         try
@@ -150,6 +181,74 @@ internal static class PathOfValheimanCompat
             _api.Variety(attack);
         }
         finally { _manualCall = previous; BurstsFired(attack) = fired; }
+    }
+
+    private sealed class ReloadState { internal bool Reset, Completed; }
+
+    // The magazine was consumed at the trigger, where PoV records shot timing.
+    // Defer only the physical unload until SA's configured Burst finishes.
+    internal static IDisposable? BeginReloadConsumption(Attack attack, bool conserved, out bool preserve)
+    {
+        preserve = conserved;
+        Api? api = _api;
+        if (api?.MagazineShot == null || !_reloads.TryGetValue(attack, out ReloadState state)) return null;
+        preserve = state.Completed || !state.Reset || api.MagazineRemaining!(attack.GetWeapon()) > 0;
+        state.Completed = true;
+        return preserve ? null : new ReloadScope(api);
+    }
+
+    private sealed class ReloadScope : IDisposable
+    {
+        private readonly Api _api;
+        private readonly object? _saved, _firing;
+        private bool _disposed;
+        internal ReloadScope(Api api)
+        {
+            _api = api;
+            _saved = api.AmmoSaved.GetValue(null);
+            _firing = api.MagazineFiring!.GetValue(null);
+            // KeepLoaded already ran; the physical reset must not consume again.
+            api.MagazineFiring.SetValue(null, null);
+        }
+        internal ReloadScope(Api api, Attack attack, bool saved, out bool preserve) : this(api)
+        {
+            try
+            {
+                api.AmmoSaved.SetValue(null, saved);
+                preserve = !api.MagazineShot!(attack, out _) || !api.MagazineKeepLoaded!((Player)Character(attack));
+            }
+            catch { Dispose(); throw; }
+        }
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _api.MagazineFiring!.SetValue(null, _firing);
+            _api.AmmoSaved.SetValue(null, _saved);
+        }
+    }
+
+    private static Func<Attack, IDisposable> CreatePositionScope<T>(MethodInfo position, MethodInfo push, MethodInfo pop, Func<ItemDrop.ItemData, bool> isCrossbow)
+    {
+        var get = (Func<ItemDrop.ItemData, T>)Delegate.CreateDelegate(typeof(Func<ItemDrop.ItemData, T>), position);
+        var begin = (Func<T, T>)Delegate.CreateDelegate(typeof(Func<T, T>), push);
+        var end = (Action<T>)Delegate.CreateDelegate(typeof(Action<T>), pop);
+        var positions = new ConditionalWeakTable<Attack, PositionValue<T>>();
+        return attack =>
+        {
+            T tag = default!;
+            if (isCrossbow(attack.GetWeapon()))
+                tag = positions.GetValue(attack, a => new PositionValue<T> { Tag = get(a.GetWeapon()) }).Tag;
+            return new PositionScope<T>(begin(tag), end);
+        };
+    }
+    private sealed class PositionValue<T> { internal T Tag = default!; }
+    private sealed class PositionScope<T> : IDisposable
+    {
+        private readonly T _previous;
+        private Action<T>? _end;
+        internal PositionScope(T previous, Action<T> end) { _previous = previous; _end = end; }
+        public void Dispose() { Action<T>? end = _end; _end = null; end?.Invoke(_previous); }
     }
 
     internal static IDisposable? BeginEmission(Attack attack, int paidAmmo = 0)
@@ -177,6 +276,7 @@ internal static class PathOfValheimanCompat
         private readonly object?[] _values;
         private readonly IDisposable _origin;
         private readonly Attack? _previous;
+        private readonly IDisposable? _position;
         private bool _disposed;
         internal EmissionScope(Api api, Attack attack, int paidAmmo)
         {
@@ -187,6 +287,7 @@ internal static class PathOfValheimanCompat
             _emitting = attack;
             try
             {
+                _position = api.BeginPosition?.Invoke(attack);
                 bool extras = HandlesBurst(attack) && _bursts.TryGetValue(attack, out BurstPlan? plan) && plan.ExtraProjectiles > 0;
                 int native = Math.Max(1, attack.m_projectiles);
                 if (extras && _bursts.TryGetValue(attack, out BurstPlan extraPlan))
@@ -213,6 +314,7 @@ internal static class PathOfValheimanCompat
         {
             if (_disposed) return;
             _disposed = true;
+            _position?.Dispose();
             _emitting = _previous;
             for (int i = 0; i < _values.Length; i++) _api.EmissionFields[i].SetValue(null, _values[i]);
             _origin.Dispose();
@@ -259,11 +361,20 @@ internal static class PathOfValheimanCompat
     {
         internal delegate void EitrModifier(Character character, ItemDrop.ItemData weapon, ref float cost);
         internal delegate bool AmmoPayment(ref bool result);
+        internal delegate bool MagazineShotPrefix(Attack attack, out Attack previous);
         internal readonly MethodInfo Keeper;
         internal readonly EitrModifier Eitr;
         internal readonly Func<Attack, bool> Secondary;
         internal readonly FieldInfo SecondaryOrigin, ChargeOrigin, ProjectileOrigin, WeaponOverride;
-        internal readonly FieldInfo LastAttack, AddedShots, NativeShots, BurstFor, UsingAmmo, AmmoSaved, Recoverable;
+        internal readonly FieldInfo LastAttack, AddedShots, NativeShots, UsingAmmo, AmmoSaved, Recoverable;
+        internal readonly FieldInfo? BurstFor, AmmoWeapon, MagazineFiring;
+        internal readonly MethodInfo? VolleyResources;
+        internal readonly MethodInfo? NextShot;
+        internal readonly Func<ItemDrop.ItemData, int>? MagazineRemaining;
+        internal readonly MagazineShotPrefix? MagazineShot;
+        internal readonly Func<Player, bool>? MagazineKeepLoaded;
+        internal readonly Func<ItemDrop.ItemData, bool>? MagazineIs;
+        internal readonly Func<Attack, IDisposable>? BeginPosition;
         internal readonly FieldInfo[] EmissionFields;
         internal readonly AmmoPayment PayAmmo;
         internal readonly Action<int, float> OpenBurst;
@@ -296,7 +407,46 @@ internal static class PathOfValheimanCompat
             LastAttack = Field(assembly, projectiles, "lastAttack", typeof(Attack));
             AddedShots = Field(assembly, projectiles, "addedShots", typeof(int));
             NativeShots = Field(assembly, projectiles, "nativeShots", typeof(int));
-            BurstFor = Field(assembly, projectiles, "burstFor", typeof(Attack));
+            // Detect the complete new contract, not a version/hash allowlist.
+            if (assembly.GetType(projectiles + "+VolleyResources") == null)
+                BurstFor = Field(assembly, projectiles, "burstFor", typeof(Attack));
+            else
+            {
+                AmmoWeapon = Field(assembly, projectiles, "ammoWeapon", typeof(ItemDrop.ItemData));
+                VolleyResources = Method(assembly, projectiles + "+VolleyResources", "Postfix", typeof(void), typeof(Attack));
+                RequirePatch(AccessTools.DeclaredMethod(typeof(Attack), "GetProjectileSpawnPoint"), VolleyResources, HarmonyPatchType.Postfix);
+                const string magazine = "PassiveTree.CrossbowMagazine";
+                MagazineFiring = Field(assembly, magazine, "firing", typeof(Attack));
+                NextShot = Method(assembly, magazine + "+NextShot", "Postfix", typeof(void), typeof(Player), typeof(bool).MakeByRefType());
+                RequirePatch(AccessTools.DeclaredMethod(typeof(Player), "HaveQueuedChain"), NextShot, HarmonyPatchType.Postfix);
+                MagazineRemaining = (Func<ItemDrop.ItemData, int>)Delegate.CreateDelegate(typeof(Func<ItemDrop.ItemData, int>),
+                    Method(assembly, magazine, "Remaining", typeof(int), typeof(ItemDrop.ItemData)));
+                MagazineIs = (Func<ItemDrop.ItemData, bool>)Delegate.CreateDelegate(typeof(Func<ItemDrop.ItemData, bool>),
+                    Method(assembly, magazine, "Is", typeof(bool), typeof(ItemDrop.ItemData)));
+                MethodInfo shot = Method(assembly, magazine + "+Shot", "Prefix", typeof(bool), typeof(Attack), typeof(Attack).MakeByRefType());
+                MethodInfo keep = Method(assembly, magazine + "+KeepLoaded", "Prefix", typeof(bool), typeof(Player));
+                RequirePatch(AccessTools.DeclaredMethod(typeof(Attack), "OnAttackTrigger"), shot, HarmonyPatchType.Prefix);
+                RequirePatch(AccessTools.DeclaredMethod(typeof(Player), "ResetLoadedWeapon"), keep, HarmonyPatchType.Prefix);
+                RequireInstalled(assembly, "CrossbowMagazine+Shot", "Finalizer", typeof(Attack), "OnAttackTrigger");
+                RequireInstalled(assembly, "CrossbowMagazine+Fill", "Prefix", typeof(Player), "SetWeaponLoaded");
+                RequireInstalled(assembly, "CrossbowMagazine+Fill", "Postfix", typeof(Player), "SetWeaponLoaded");
+                RequireInstalled(assembly, "CrossbowMagazine+Restore", "Prefix", typeof(Player), "UpdateWeaponLoading");
+                RequireInstalled(assembly, "CrossbowMagazine+Gate", "Prefix", typeof(Humanoid), "StartAttack");
+                RequireInstalled(assembly, "CrossbowMagazine+Gate", "Postfix", typeof(Humanoid), "StartAttack");
+                MagazineShot = (MagazineShotPrefix)Delegate.CreateDelegate(typeof(MagazineShotPrefix), shot);
+                MagazineKeepLoaded = (Func<Player, bool>)Delegate.CreateDelegate(typeof(Func<Player, bool>), keep);
+                Type tag = assembly.GetType("PassiveTree.HitTag", true)!;
+                if (!tag.IsEnum) throw new TypeLoadException("PoV HitTag is not an enum.");
+                MethodInfo position = Method(assembly, magazine + "+Position", "Prefix", typeof(void), typeof(Attack), tag.MakeByRefType());
+                MethodInfo endPosition = Method(assembly, magazine + "+Position", "Finalizer", typeof(void), tag);
+                RequirePatch(AccessTools.DeclaredMethod(typeof(Attack), "FireProjectileBurst"), position, HarmonyPatchType.Prefix);
+                RequirePatch(AccessTools.DeclaredMethod(typeof(Attack), "FireProjectileBurst"), endPosition, HarmonyPatchType.Finalizer);
+                BeginPosition = (Func<Attack, IDisposable>)typeof(PathOfValheimanCompat).GetMethod(nameof(CreatePositionScope), BindingFlags.NonPublic | BindingFlags.Static)!
+                    .MakeGenericMethod(tag).Invoke(null, new object[] {
+                        Method(assembly, magazine, "ShotPosition", tag, typeof(ItemDrop.ItemData)),
+                        Method(assembly, "PassiveTree.HitContext", "Push", tag, tag),
+                        Method(assembly, "PassiveTree.HitContext", "Pop", typeof(void), tag), MagazineIs })!;
+            }
             UsingAmmo = Field(assembly, projectiles, "usingAmmo", typeof(bool));
             AmmoSaved = Field(assembly, projectiles, "ammoSaved", typeof(bool));
             Recoverable = Field(assembly, projectiles, "recoverable", typeof(int));
@@ -335,13 +485,15 @@ internal static class PathOfValheimanCompat
     {
         MethodInfo callback = assembly.GetType("PassiveTree." + type, true)!.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
             ?? throw new MissingMethodException(type, name);
-        RequirePatch(AccessTools.DeclaredMethod(targetType, targetName), callback, name == "Prefix" ? HarmonyPatchType.Prefix : HarmonyPatchType.Postfix);
+        RequirePatch(AccessTools.DeclaredMethod(targetType, targetName), callback,
+            name == "Prefix" ? HarmonyPatchType.Prefix : name == "Finalizer" ? HarmonyPatchType.Finalizer : HarmonyPatchType.Postfix);
     }
 
     private static void RequirePatch(MethodInfo target, MethodInfo callback, HarmonyPatchType kind)
     {
         Patches? patches = target == null ? null : Harmony.GetPatchInfo(target);
         bool present = kind == HarmonyPatchType.Prefix ? patches?.Prefixes.Any(p => p.PatchMethod == callback && p.owner == PluginGuid) == true
+            : kind == HarmonyPatchType.Finalizer ? patches?.Finalizers.Any(p => p.PatchMethod == callback && p.owner == PluginGuid) == true
             : patches?.Postfixes.Any(p => p.PatchMethod == callback && p.owner == PluginGuid) == true;
         if (!present) throw new NotSupportedException($"PoV callback is not registered: {callback.DeclaringType?.FullName}.{callback.Name}");
     }
